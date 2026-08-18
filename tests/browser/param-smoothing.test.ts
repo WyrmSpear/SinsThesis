@@ -5,6 +5,7 @@ import { registerModule, clearRegistry } from '../../src/engine/registry'
 import { vcoDescriptor } from '../../src/engine/modules/vco'
 import { vcaDescriptor } from '../../src/engine/modules/vca'
 import { vcfDescriptor } from '../../src/engine/modules/vcf'
+import { createLadderState, ladderSample } from '../../src/engine/dsp/ladder'
 
 /**
  * B3's own click test: spec acceptance criterion 3 ("turn knobs and hear
@@ -136,53 +137,65 @@ describe('param smoothing (B3)', () => {
 })
 
 /**
- * Final review Finding 2: B3's own click test above measures a `GainNode.gain`,
- * which is a-rate by construction -- it never exercised the actual defect,
- * which lives in worklet params. Every worklet param in this project declared
- * `automationRate: 'k-rate'` and was read once per 128-sample render quantum
- * as `params.foo![0]`, so even though `scheduleParam` (param-smoothing.ts)
- * was already handing the AudioParam a real, continuous `setTargetAtTime`
- * ramp, the worklet itself only ever saw that ramp's value at each block's
- * first sample -- a staircase of block-sized steps standing in for a glide.
- * With `PARAM_SMOOTH_TIME_CONSTANT = 0.008`, a k-rate param moves
- * `1 - e^(-128/48000/0.008)` = 28.4% of the jump in the first block alone --
- * about 11 dB better than snapping outright, not the 28.6 dB the GainNode
- * test demonstrates.
+ * Final review Finding 2 moved the VCF's cutoff, resonance and drive, and
+ * the VCO's tune and pulseWidth, from k-rate to a-rate: at k-rate a worklet
+ * reads `params.foo![0]` once per 128-sample render quantum, so even a real,
+ * continuous `setTargetAtTime`/ramp automation on the AudioParam only ever
+ * reached the DSP as a staircase of block-sized steps.
  *
- * The five params most exposed to this -- read continuously during a note
- * rather than at note-on -- are the VCF's cutoff, resonance and drive, and
- * the VCO's pulseWidth and tune; all five were moved to a-rate. This test
- * covers the VCF's cutoff, the param a player is most likely to sweep live.
+ * The click test written alongside that change (now `VCF cutoff a-rate: a
+ * case where it provably does not matter`, below) measured a worst
+ * single-sample delta of 0.0843 for a saw through the ladder, cutoff swept
+ * 1000 -> 2000 Hz over 0.4 s -- identical to four decimal places whether
+ * cutoff was read a-rate or k-rate -- and concluded from that one case that
+ * the ladder's IIR recursion generally absorbs block-quantized coefficient
+ * changes, so a-rate mattered only formally. **That conclusion does not
+ * generalize and was audited and reversed.** It is true only for that
+ * specific slow, narrow glide. A wide, fast sweep at high resonance, and
+ * continuous PWM, both show a-rate is measurably necessary -- exactly the
+ * LFO-to-cutoff and PWM patches a player builds, and exactly what a
+ * mouse-dragged knob produces once there is a UI. The two tests below
+ * replace the misleading generalization with cases that actually
+ * discriminate a-rate from k-rate, each verified by temporarily reverting
+ * the relevant `automationRate` back to `'k-rate'`, rebuilding the worklet
+ * bundle, and confirming the assertion below fails (numbers recorded in each
+ * test's own comment, and in
+ * `.superpowers/sdd/2026-08-18-phase1a-engine/a-rate-test-report.md`).
  *
- * Honest result, not the dramatic before/after B3's own test shows: for a
- * saw (220 Hz) through the ladder, cutoff swept 1000 Hz -> 2000 Hz (a
- * realistic knob turn) with no atTime, the worst single-sample delta around
- * the mid-render switch measures 0.0843 -- identical to four decimal places
- * whether cutoff is read a-rate (shipped) or k-rate (reproduced by
- * temporarily reverting ladder.worklet.ts's cutoff to k-rate for this
- * measurement). Confirmed not a measurement bug: instrumenting the worklet
- * directly shows `params.cutoff!.length` genuinely alternating between 1
- * (steady) and 128 (mid-ramp) as a-rate should, and reverting to k-rate
- * genuinely changes the worklet's compiled bundle (verified with a
- * deliberately wrong multiplier, which does move this test's numbers).
- * The reason a-rate vs k-rate doesn't show up here: unlike a `GainNode`,
- * where output[n] = input[n] * gain[n] so a stale gain read directly steps
- * the output, the ladder is a stateful IIR recursion -- its output at any
- * sample already depends on its own previous output, so a block-quantized
- * coefficient change doesn't inject a discontinuity, only a (harmless)
- * change in the filter's forward trajectory; the filter's own transient
- * response to *any* cutoff change dominates the worst-sample-delta metric
- * regardless of how finely the coefficient itself is read. (`drive`, which
- * scales the input before the recursion and so looked like the multiply
- * case, shows the same non-result for the same reason: the multiplied
- * value still only reaches the output through the stateful recursion.)
- * a-rate is still the correct fix -- it matches how every other a-rate
- * param in Web Audio is meant to be read, removes a real block-quantization
- * error confirmed present on the AudioParam's own values, and this test
- * still stands as the regression guard Finding 2 asks for: it fails loudly
- * if a future change reintroduces an actual output-level discontinuity.
+ * Why the two tests below use different metrics: a plain "worst
+ * consecutive-sample delta of the rendered output" -- the metric the
+ * original (misleading) test used -- turns out not to discriminate for the
+ * VCF at all, in any configuration measured (fast/slow sweeps, resonance
+ * 0 to 1, single ramps and repeating LFO modulation): the filter's own
+ * transient response to *any* cutoff change dominates that metric
+ * regardless of how finely the coefficient is read, exactly as the original
+ * test found, just true far more broadly than it claimed. What *does*
+ * discriminate is comparing the worklet's actual output against an
+ * independently computed reference that uses the exact, continuous,
+ * per-sample cutoff curve (see the VCF test below) -- i.e. does the filter
+ * track the automation curve it was actually given, not just "is there an
+ * audible click". For the VCO's pulseWidth, by contrast, the plain
+ * consecutive-sample-delta metric discriminates directly and dramatically
+ * (0.65 a-rate vs 1.97 k-rate, see the PWM test below) because `pulseWidth`
+ * sets the read *position* in the pulse waveform's table
+ * (`pulseSample`'s `wrap01(t - w)` in dsp/wavetable.ts), and a stale,
+ * block-held `w` can put that read on the wrong side of the underlying
+ * saw table's own sharp discontinuity for up to 127 samples -- a real,
+ * audible glitch, not just a differently-shaped transient.
+ *
+ * `tune` also moved to a-rate but is not covered by a dedicated
+ * discriminating test here: unlike `cutoff`/`pulseWidth`, `tune` only sets
+ * the oscillator's phase *increment* (`dt` in vco.worklet.ts's `process`) --
+ * an integrator input, not a value read directly into the output sample --
+ * so a block-quantized `tune` only staircases the *rate* of phase advance, a
+ * smooth (if very slightly wrong) FM rather than a value-domain
+ * discontinuity. Measured separately (6 Hz vibrato, +-2 semitones): worst
+ * delta 0.0029, essentially noise. `tune` stays a-rate anyway because it is
+ * nearly free once the same worklet's `pulseWidth` already forces a
+ * per-sample param read loop -- not because it fixes an audible problem of
+ * its own.
  */
-describe('VCF cutoff a-rate click test (Finding 2)', () => {
+describe('VCF cutoff a-rate: a case where it provably does not matter (slow glide)', () => {
   async function renderWithMidRenderCutoffChange(): Promise<{ out: Float32Array; switchSample: number }> {
     const seconds = 0.4
     const suspendAt = 0.2
@@ -209,11 +222,130 @@ describe('VCF cutoff a-rate click test (Finding 2)', () => {
     return { out: buffer.getChannelData(0), switchSample: Math.round(suspendAt * SR) }
   }
 
-  it('a live cutoff sweep produces no discontinuity above the stated threshold', async () => {
+  it('a slow (1000->2000 Hz over 0.4s) cutoff glide produces no discontinuity above the stated threshold, and this is true regardless of a-rate/k-rate -- see the module doc comment above; this is a documented boundary, not evidence the fix is unnecessary', async () => {
     const { out, switchSample } = await renderWithMidRenderCutoffChange()
-    // Measured worst single-sample delta: 0.0843 (see the doc comment above
-    // for why this doesn't move between a-rate and k-rate for this DSP).
-    // 0.15 leaves real margin above the measured figure.
+    // Measured worst single-sample delta: 0.0843, identical whether cutoff
+    // is read a-rate (shipped) or k-rate (temporarily reverted and
+    // rebuilt to check). 0.15 leaves real margin above the measured figure.
     expect(worstDelta(windowAroundSwitch(out, switchSample))).toBeLessThan(0.15)
+  })
+})
+
+describe('VCF cutoff a-rate: fast sweep at high resonance discriminates a-rate from k-rate', () => {
+  /** Value of a linear ramp from (t0, v0) to (t1, v1) at time t, held flat
+   *  outside [t0, t1] -- matches how `setValueAtTime` +
+   *  `linearRampToValueAtTime` actually behaves on the real AudioParam. */
+  function rampValueAt(t: number, t0: number, v0: number, t1: number, v1: number): number {
+    if (t <= t0) return v0
+    if (t >= t1) return v1
+    return v0 + (v1 - v0) * ((t - t0) / (t1 - t0))
+  }
+
+  function worstAbsDiff(a: Float32Array, b: Float32Array): number {
+    let worst = 0
+    for (let i = 0; i < a.length; i++) worst = Math.max(worst, Math.abs(a[i]! - b[i]!))
+    return worst
+  }
+
+  it('tracks an independently-computed continuous-coefficient reference through a 200->8000 Hz sweep in 5ms at resonance 0.99', async () => {
+    // A plain "worst consecutive-sample delta of the output" does not
+    // discriminate a-rate from k-rate for this filter (see the module doc
+    // comment above) -- measured identical (0.431) under both. What does
+    // discriminate: whether the worklet's actual output tracks the exact,
+    // continuous cutoff curve it was scheduled with, computed independently
+    // here via the same pure `ladderSample` the worklet calls internally,
+    // driven by a known sine (not the VCO, to keep the reference exact and
+    // simple) and the identical cutoff/resonance schedule applied directly
+    // to the real AudioParams (bypassing scheduleParam's resonance ramp, so
+    // the reference's constant resonance matches exactly).
+    const seconds = 0.15
+    const t0 = 0.05
+    const t1 = t0 + 0.005
+    const cutoffLo = 200
+    const cutoffHi = 8000
+    const resonance = 0.99
+    const freq = 220 // 48000/220 is not near-integer -- safe per project convention
+
+    const N = Math.ceil(seconds * SR)
+    const sine = new Float32Array(N)
+    for (let i = 0; i < N; i++) sine[i] = Math.sin((2 * Math.PI * freq * i) / SR) * 0.8
+
+    const refState = createLadderState()
+    const reference = new Float32Array(N)
+    for (let i = 0; i < N; i++) {
+      const cutoff = rampValueAt(i / SR, t0, cutoffLo, t1, cutoffHi)
+      reference[i] = ladderSample(refState, sine[i]!, cutoff, resonance, SR)
+    }
+
+    const ctx = new OfflineAudioContext(1, N, SR)
+    await ensureWorklets(ctx)
+    const graph = new PatchGraph(ctx)
+    const vcf = graph.addModule('vcf', 'vcf')
+    const vcfNode = graph.getInstance(vcf)!.outputs.get('out') as AudioWorkletNode
+
+    const srcBuffer = ctx.createBuffer(1, N, SR)
+    srcBuffer.copyToChannel(sine, 0)
+    const src = ctx.createBufferSource()
+    src.buffer = srcBuffer
+    const audioIn = graph.getInstance(vcf)!.inputs.get('in') as AudioNode
+    src.connect(audioIn)
+    src.start(0)
+
+    vcfNode.parameters.get('resonance')!.setValueAtTime(resonance, 0)
+    vcfNode.parameters.get('cutoff')!.setValueAtTime(cutoffLo, 0)
+    vcfNode.parameters.get('cutoff')!.setValueAtTime(cutoffLo, t0)
+    vcfNode.parameters.get('cutoff')!.linearRampToValueAtTime(cutoffHi, t1)
+
+    const out = graph.getInstance(vcf)!.outputs.get('out')!
+    out.connect(ctx.destination)
+
+    const buffer = await ctx.startRendering()
+    const actual = buffer.getChannelData(0)
+
+    // Measured worst deviation from the reference: 0.0000658 (float32
+    // rounding noise) with cutoff a-rate as shipped, 0.6506 -- about 9900x
+    // larger -- with cutoff temporarily reverted to k-rate and the worklet
+    // bundle rebuilt. 0.05 sits comfortably above the a-rate noise floor and
+    // more than 10x below the k-rate failure.
+    expect(worstAbsDiff(actual, reference)).toBeLessThan(0.05)
+  })
+})
+
+describe('VCO pulseWidth a-rate: continuous PWM discriminates a-rate from k-rate', () => {
+  it('an 8 Hz PWM sweep (pulseWidth 0.2-0.8) produces no discontinuity above the stated threshold', async () => {
+    const seconds = 0.3
+    const ctx = new OfflineAudioContext(1, Math.ceil(seconds * SR), SR)
+    await ensureWorklets(ctx)
+
+    const graph = new PatchGraph(ctx)
+    const osc = graph.addModule('vco', 'osc')
+    graph.setParam(osc, 'tune', -12) // 220 Hz: 48000/220 is not near-integer
+    graph.setParam(osc, 'shape', 1) // pulse
+    const out = graph.getInstance(osc)!.outputs.get('out')!
+    out.connect(ctx.destination)
+
+    // Continuous PWM the way a patch actually produces it: an LFO connected
+    // straight to the AudioParam, not a scripted step -- pulseWidth's
+    // default (0.5) is the param's own intrinsic value, so the connected
+    // signal simply adds to it, giving 0.5 +- 0.3 = 0.2..0.8.
+    const vcoNode = out as AudioWorkletNode
+    const pwParam = vcoNode.parameters.get('pulseWidth')!
+    const lfo = ctx.createOscillator()
+    lfo.frequency.value = 8
+    lfo.type = 'sine'
+    const lfoGain = ctx.createGain()
+    lfoGain.gain.value = 0.3
+    lfo.connect(lfoGain)
+    lfoGain.connect(pwParam)
+    lfo.start(0)
+
+    const buffer = await ctx.startRendering()
+    const data = buffer.getChannelData(0)
+
+    // Measured worst single-sample delta: 0.649 with pulseWidth a-rate as
+    // shipped, 1.975 -- essentially full scale, out of a max possible 2.0 --
+    // with pulseWidth temporarily reverted to k-rate and the worklet bundle
+    // rebuilt. 1.0 sits with real margin on both sides.
+    expect(worstDelta(data.subarray(10))).toBeLessThan(1.0)
   })
 })
