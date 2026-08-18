@@ -44,12 +44,14 @@
  *    fold) at the oversampled rate, interpolated up and decimated back down
  *    through a 127-tap Blackman-windowed-sinc FIR (`FIR`, `INTERP_BRANCHES`
  *    below), reused for both stages via textbook polyphase decomposition --
- *    this is what actually band-limits the kinks. Measured with this
- *    config: drive 1.5 -> -97.4 dB, drive 3 -> -87.9 dB, drive 8 -> -63.8 dB,
- *    drive 20 -> -45.6 dB. Only oversampling *of the ADAA-corrected signal*
- *    reaches these numbers -- oversampling without ADAA, or ADAA without
- *    oversampling, both leave real energy on the table (see the spec for
- *    the tap-count and window-vs-ratio experiments that pinned this down).
+ *    this is what actually band-limits the kinks. Measured at a 1109 Hz
+ *    fundamental with this config: drive 1.5 -> -97.4 dB, drive 3 -> -87.9 dB,
+ *    drive 8 -> -63.8 dB, drive 20 -> -45.6 dB. Only oversampling *of the
+ *    ADAA-corrected signal* reaches these numbers -- oversampling without
+ *    ADAA, or ADAA without oversampling, both leave real energy on the table
+ *    (see the spec for the tap-count and window-vs-ratio experiments that
+ *    pinned this down). These are single-fundamental numbers, not the worst
+ *    case across the musical range -- see the honest caveat below.
  * 3. **A one-pole DC blocker** after decimation, at the module's native
  *    rate. Folding an asymmetric waveform (`symmetry != 0`) is not an
  *    aliasing problem -- ADAA does not touch it (measured DC unchanged) --
@@ -71,13 +73,54 @@
  *    -163 dBFS, comfortably inside the -100 dBFS bar and identical in
  *    spirit to `ladder.ts`'s output DC blocker.
  *
- * Honest caveat, not silently hidden: **drive above ~10 is ACCEPTABLE-grade
- * by measurement (-56 to -46 dB), not RELEASE (<=-60 dB).** At that many
- * folds per cycle the *true*, unaliased signal genuinely contains energy
- * approaching and past Nyquist -- there is no free lunch, and 8x
- * oversampling only buys a further ~2 dB at double the cost. The 0.1-20
- * drive range ships as-is rather than being narrowed to hide this; drive
- * <=8, the range a player actually reaches for, is fully RELEASE-grade.
+ * Honest caveat, not silently hidden: **every figure above is a single
+ * fundamental (1109 Hz), and that is the best case, not the worst.** A
+ * closing audit swept the alias floor across four fundamentals spanning the
+ * musical range -- 131, 441, 1109, 2637 Hz, each picked so `sampleRate / f0`
+ * is nowhere near an integer (docs/CONTINUATION.md trap 1) -- at drive 1.5,
+ * 3, 8, 16 and 20, 48 kHz, Blackman-Harris window, N=65536. Full methodology
+ * and the raw run: `.superpowers/sdd/2026-08-18-phase1a-engine/wavefolder-honesty-report.md`.
+ *
+ * | f0 (Hz) | drive 1.5 | drive 3 | drive 8 | drive 16 | drive 20 |
+ * |---|---|---|---|---|---|
+ * | 131  | -101.4 dB | -91.7 dB | -75.3 dB | -70.9 dB | -66.5 dB |
+ * | 441  |  -94.8 dB | -94.3 dB | -63.1 dB | -48.4 dB | -63.8 dB |
+ * | 1109 |  -97.4 dB | -87.9 dB | -63.8 dB | -56.2 dB | -45.6 dB |
+ * | 2637 |  -84.1 dB | -73.6 dB | -55.7 dB | -38.3 dB | -39.5 dB |
+ *
+ * The bright end of the range folds measurably worse than the 1109 Hz
+ * numbers above suggest -- at 2637 Hz the same drive reads 7-15 dB worse
+ * (drive 8: -55.7 vs -63.8, drive 16: -38.3 vs -56.2, drive 20: -39.5 vs
+ * -45.6). This is structural, not a tap-count shortfall: the oversampling
+ * FIR's cutoff sits at a fixed *fraction* of the sample rate (0.45x, see the
+ * FIR design comment below), not a fixed distance above the fundamental, so
+ * a higher fundamental leaves less headroom before the fold's kink harmonics
+ * land back in-band as alias. 8x oversampling only recovers ~2 dB at the
+ * 1109 Hz reference point (see the spec) and does not change this shape.
+ *
+ * Grading against this project's own bars (RELEASE <=-60 dB / ACCEPTABLE
+ * <=-45 dB in the 1-5 kHz band the two brighter fundamentals sit in;
+ * RELEASE <=-80 dB / ACCEPTABLE <=-60 dB below 1 kHz):
+ *
+ * - **Drive up to 3 is RELEASE-grade everywhere measured.** Worst case
+ *   -73.6 dB (2637 Hz).
+ * - **Drive 8 is ACCEPTABLE-grade everywhere measured**, RELEASE at the low
+ *   end. Worst case -55.7 dB (2637 Hz).
+ * - **Drive above ~12 is a deliberate harsh-texture zone, not a clean
+ *   fold, and on bright material it is AMATEUR-grade by measurement, not
+ *   ACCEPTABLE.** 2637 Hz reads -38.3 dB at drive 16 and -39.5 dB at
+ *   drive 20 -- audible unmasked alias, not "aggressive by design." A
+ *   player who dials in drive 16-20 on a bright patch will hear digital
+ *   grit mixed into the fold's harmonic brightness, and should expect that,
+ *   not a clean aggressive fold. (441 Hz also dips to AMATEUR at drive 16,
+ *   -48.4 dB, before recovering to -63.8 dB at drive 20 -- the floor is not
+ *   even monotonic in drive once folding is this dense, another reason not
+ *   to trust a single spot-check.)
+ *
+ * The 0.1-20 drive range ships as-is, unnarrowed: a musician may want the
+ * harsh zone on purpose, and clamping the knob to hide a measured number
+ * would be worse than documenting it plainly. Treat drive above ~12 as a
+ * texture control, not a transparency guarantee.
  */
 
 /** Proper modulo: result always in `[0, m)`, unlike `%` for negative `v`. */

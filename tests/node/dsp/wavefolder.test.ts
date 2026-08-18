@@ -114,6 +114,50 @@ describe('wavefolderSample: alias floor', () => {
   })
 })
 
+// B1 follow-up (closing honesty audit): the tests above all measure a single
+// fundamental (1109 Hz), which turns out to be a best case, not a worst
+// case -- a bright fundamental folds measurably worse at the same drive,
+// because the oversampling FIR's cutoff sits at a fixed fraction of the
+// sample rate (0.45x), not a fixed distance above the fundamental, so a
+// higher fundamental leaves less headroom before the fold's kink harmonics
+// land back in-band. See the module doc comment's "Honest caveat" section
+// for the full four-fundamental x five-drive sweep and
+// .superpowers/sdd/2026-08-18-phase1a-engine/wavefolder-honesty-report.md
+// for the raw measurement run. Bars below are this project's own
+// measurements at 2637 Hz plus a small margin (never loosened to fit a
+// worse number -- these are consistent with the closing audit's figures at
+// this fundamental: -55.7 dB at drive 8, -38.3 dB at drive 16, -39.5 dB at
+// drive 20).
+const BRIGHT_F0 = 2637
+
+function antialiasedFoldedSineAt(f0: number, drive: number, symmetry = 0): Float32Array {
+  const state = createWavefolderState()
+  const total = WARMUP + ALIAS_N
+  const out = new Float32Array(total)
+  for (let i = 0; i < total; i++) {
+    const x = Math.sin((2 * Math.PI * f0 * i) / SR)
+    out[i] = wavefolderSample(state, x, drive, symmetry, SR)
+  }
+  return out.subarray(WARMUP)
+}
+
+describe('wavefolderSample: alias floor at a bright fundamental (2637 Hz)', () => {
+  it('drive 3 reaches RELEASE grade even at the bright end', () => {
+    const floor = aliasFloorDb(antialiasedFoldedSineAt(BRIGHT_F0, 3.0), SR, BRIGHT_F0)
+    expect(floor).toBeLessThanOrEqual(-70)
+  })
+
+  it('drive 8 is only ACCEPTABLE grade at the bright end, not RELEASE', () => {
+    const floor = aliasFloorDb(antialiasedFoldedSineAt(BRIGHT_F0, 8.0), SR, BRIGHT_F0)
+    expect(floor).toBeLessThanOrEqual(-53)
+  })
+
+  it('drive 20 is AMATEUR grade at the bright end -- the harsh-texture zone is genuinely harsh, not just aggressive', () => {
+    const floor = aliasFloorDb(antialiasedFoldedSineAt(BRIGHT_F0, 20.0), SR, BRIGHT_F0)
+    expect(floor).toBeLessThanOrEqual(-36)
+  })
+})
+
 describe('wavefolderSample: DC blocker', () => {
   it('keeps steady-state DC below -100 dBFS at nonzero symmetry', () => {
     // A naive time-domain mean over a window holding a non-integer number
