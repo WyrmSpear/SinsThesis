@@ -2,7 +2,12 @@ import {
   createEnvState, envSample, createSampleHoldState, sampleHold,
   createSequencerState, sequencerStep,
 } from '../dsp/segment'
-import { createOscState, oscSample, hardSync, type OscShape } from '../dsp/wavetable'
+import { createOscState, getWavetableSet, oscSample, hardSync, type OscShape } from '../dsp/wavetable'
+
+// Built once, at module top level -- see the identical comment in
+// vco.worklet.ts (A1). The LFO processor below is the other consumer of
+// dsp/wavetable's per-sample generation, so it needs the same hoist.
+const wavetableSet = getWavetableSet(sampleRate)
 
 /** Thin shell. All the math lives in dsp/segment and dsp/wavetable, which
  *  Node tests directly. One bundle registers all four processors because
@@ -70,7 +75,7 @@ class LfoProcessor extends AudioWorkletProcessor {
       const s = sync?.[i] ?? 0
       if (s >= 0.5 && this.lastSync < 0.5) hardSync(this.state)
       this.lastSync = s
-      out[i] = oscSample(this.state, shape, rate, sampleRate) * depth
+      out[i] = oscSample(this.state, shape, rate, sampleRate, wavetableSet) * depth
     }
     return true
   }

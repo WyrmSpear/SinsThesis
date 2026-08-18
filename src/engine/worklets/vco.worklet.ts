@@ -1,6 +1,15 @@
-import { createOscState, hardSync, oscSample, pitchToFreq, type OscShape } from '../dsp/wavetable'
+import { createOscState, getWavetableSet, hardSync, oscSample, pitchToFreq, type OscShape } from '../dsp/wavetable'
 
 const SHAPES: OscShape[] = ['saw', 'pulse', 'tri', 'sine']
+
+// Built once, here, at module top level -- this code runs during
+// `audioWorklet.addModule()`, before any node exists, which is what makes
+// this safe to do at all. `sampleRate` is the AudioWorkletGlobalScope
+// global. Building the 24 band-limited tables (millions of trig calls) on
+// the audio thread's first non-sine sample was A1: a live AudioContext
+// dropped out on the first note. Every VcoProcessor instance in this
+// bundle shares this one read-only set.
+const wavetableSet = getWavetableSet(sampleRate)
 
 /** Thin shell. All the math lives in dsp/wavetable, which Node tests directly. */
 class VcoProcessor extends AudioWorkletProcessor {
@@ -45,7 +54,7 @@ class VcoProcessor extends AudioWorkletProcessor {
 
       const cv = (pitchCv?.[i] ?? 0) + (fmCv?.[i] ?? 0) * fmAmount
       const freq = pitchToFreq(base, cv, sampleRate)
-      out[i] = oscSample(this.state, shape, freq, sampleRate, pw)
+      out[i] = oscSample(this.state, shape, freq, sampleRate, wavetableSet, pw)
     }
     return true
   }

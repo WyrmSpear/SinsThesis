@@ -8,10 +8,12 @@ import { peakHz, aliasFloorDb, rms } from '../../../src/engine/analysis/features
 const SR = 48000
 const N = 8192
 
+const set = getWavetableSet(SR)
+
 function render(shape: OscShape, freq: number, pw = 0.5, n = N): Float32Array {
   const state = createOscState()
   const out = new Float32Array(n)
-  for (let i = 0; i < n; i++) out[i] = oscSample(state, shape, freq, SR, pw)
+  for (let i = 0; i < n; i++) out[i] = oscSample(state, shape, freq, SR, set, pw)
   return out
 }
 
@@ -158,7 +160,7 @@ describe('mip transition', () => {
     for (let i = 0; i < durationSamples; i++) {
       const freq = startFreq + ((endFreq - startFreq) * i) / durationSamples
       const level = mipLevelForFreq(freq, set)
-      const sample = oscSample(state, 'tri', freq, SR)
+      const sample = oscSample(state, 'tri', freq, SR, set)
       if (level !== prevLevel && prevSample !== null) {
         transitionDeltas.push(Math.abs(sample - prevSample))
       }
@@ -179,7 +181,7 @@ describe('mip transition', () => {
 describe('hardSync', () => {
   it('resets phase so the cycle restarts at the bottom of the ramp', () => {
     const state = createOscState()
-    for (let i = 0; i < 100; i++) oscSample(state, 'saw', 440, SR)
+    for (let i = 0; i < 100; i++) oscSample(state, 'saw', 440, SR, set)
     hardSync(state)
     expect(state.phase).toBe(0)
 
@@ -192,7 +194,7 @@ describe('hardSync', () => {
     // is that the ramp reaches near its floor shortly after the reset, not
     // that it teleports there on the very next sample.
     let min = Infinity
-    for (let i = 0; i < 5; i++) min = Math.min(min, oscSample(state, 'saw', 440, SR))
+    for (let i = 0; i < 5; i++) min = Math.min(min, oscSample(state, 'saw', 440, SR, set))
     expect(min).toBeLessThan(-0.9)
   })
 })

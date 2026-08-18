@@ -137,7 +137,18 @@ function buildTriTable(topFreqHz: number, sampleRate: number, size: number): Flo
  *  time -- but expensive enough (millions of sin/cos evaluations across all
  *  12 levels) that callers should go through `getWavetableSet` rather than
  *  calling this directly per voice. */
+let buildCallCount = 0
+
+/** Test-only hook: how many times `buildWavetableSet` has actually run (not
+ *  cache hits through `getWavetableSet`). Exists so a test can prove the
+ *  expensive generation happens once, at worklet module load, and never
+ *  during sample generation -- see tests/node/worklets/wavetable-build-timing.test.ts. */
+export function debugWavetableBuildCount(): number {
+  return buildCallCount
+}
+
 export function buildWavetableSet(sampleRate: number): WavetableSet {
+  buildCallCount++
   const saw: Float32Array[] = []
   const tri: Float32Array[] = []
   for (let level = 0; level < OCTAVE_COUNT; level++) {
@@ -233,12 +244,24 @@ const TWO_PI = Math.PI * 2
 const MIN_PW = 0.01
 const MAX_PW = 0.99
 
-/** Advance one sample and return the oscillator's output in [-1, 1]. */
+/**
+ * Advance one sample and return the oscillator's output in [-1, 1].
+ *
+ * `set` must be the caller's own already-built `WavetableSet` (from
+ * `getWavetableSet`, called once up front -- at worklet module load, not
+ * per sample). This function never calls `getWavetableSet` itself: doing so
+ * from inside a per-sample loop is exactly the bug that put table
+ * generation -- millions of trig calls -- on the audio thread's first
+ * non-sine sample. `sine` doesn't read tables at all, but still takes `set`
+ * so callers can hold one reference regardless of which shape is selected
+ * at runtime.
+ */
 export function oscSample(
   state: OscState,
   shape: OscShape,
   freq: number,
   sampleRate: number,
+  set: WavetableSet,
   pulseWidth = 0.5,
 ): number {
   const dt = Math.abs(freq) / sampleRate
@@ -247,7 +270,6 @@ export function oscSample(
 
   if (shape === 'sine') return Math.sin(TWO_PI * t)
 
-  const set = getWavetableSet(sampleRate)
   const level = mipLevelForFreq(freq, set)
 
   switch (shape) {
