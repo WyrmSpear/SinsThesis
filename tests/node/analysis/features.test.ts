@@ -75,13 +75,19 @@ describe('slopeDbPerOctave', () => {
 })
 
 describe('aliasFloorDb', () => {
+  // 2 kHz was dropped as the test frequency: 48000 / 2000 = 24 exactly, so
+  // every alias product lands on a harmonic and is excluded along with it --
+  // that is how this metric used to read a fictitious -71 dB here. 1109 Hz
+  // is not a small-integer divisor of 48000, so aliases actually show up.
   it('reports a very low floor for a band-limited saw', () => {
-    expect(aliasFloorDb(bandlimitedSaw(2000), SR, 2000)).toBeLessThan(-60)
+    // Measured: -96.7 dB. Margin to -85 leaves ~11 dB of headroom.
+    expect(aliasFloorDb(bandlimitedSaw(1109), SR, 1109)).toBeLessThan(-85)
   })
 
   it('reports a high floor for a naive saw', () => {
-    // A naive saw at 2 kHz folds partials back below the fundamental.
-    const naive = gen(N, (i) => 2 * (((i * 2000) / SR) % 1) - 1)
-    expect(aliasFloorDb(naive, SR, 2000)).toBeGreaterThan(-40)
+    // A naive saw at 1109 Hz folds partials back below the fundamental.
+    // Measured: -26.6 dB.
+    const naive = gen(N, (i) => 2 * (((i * 1109) / SR) % 1) - 1)
+    expect(aliasFloorDb(naive, SR, 1109)).toBeGreaterThan(-32)
   })
 })

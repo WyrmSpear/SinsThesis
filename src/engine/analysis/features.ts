@@ -1,4 +1,4 @@
-import { fftMagnitude } from './fft'
+import { fftMagnitude, type FftWindow } from './fft'
 
 /** Largest power of two that fits in `n`. */
 function fitPow2(n: number): number {
@@ -8,9 +8,11 @@ function fitPow2(n: number): number {
 }
 
 /** Magnitude spectrum of the largest power-of-two prefix, with the size used. */
-function spectrumOf(samples: Float32Array): { mags: Float32Array; size: number } {
+function spectrumOf(
+  samples: Float32Array, window: FftWindow = 'hann',
+): { mags: Float32Array; size: number } {
   const size = fitPow2(samples.length)
-  return { mags: fftMagnitude(samples.subarray(0, size)), size }
+  return { mags: fftMagnitude(samples.subarray(0, size), window), size }
 }
 
 export function binToHz(bin: number, sampleRate: number, fftSize: number): number {
@@ -91,33 +93,63 @@ export function slopeDbPerOctave(
 }
 
 /**
- * Loudest non-harmonic content, in dB relative to the fundamental.
+ * Loudest non-harmonic content, in dB relative to the fundamental -- the
+ * closest thing this codebase has to a trustworthy alias-floor measurement.
  *
- * Bins within a quarter-tone of any integer multiple of `fundamentalHz` count
- * as harmonic and are excluded; everything else is alias or noise. An
- * antialiased oscillator should stay below -60.
+ * Uses the Blackman-Harris window (see fft.ts) rather than Hann, because
+ * Hann's -31.5 dB first sidelobe puts a floor under any measurement built on
+ * it: readings near -31 dB are the window, not the signal. Blackman-Harris's
+ * -92 dB sidelobes let a genuinely clean oscillator read that low.
+ *
+ * DC (h=0) is excluded from the alias search on the same basis as every
+ * other harmonic: a window spreads energy from 0 Hz into its neighboring
+ * bins, and without this exclusion that leakage gets counted as "alias" even
+ * when the oscillator has none. (A synthetically band-limited pulse with
+ * pw=0.3 and no real aliasing used to report a *positive* floor for exactly
+ * this reason; with DC excluded it reads about -144.7 dB.)
+ *
+ * The exclusion band around each harmonic -- including DC -- is
+ * `max(binHz * 8, fundamentalHz * 0.03)` wide, and the fundamental's own
+ * magnitude is the maximum over every bin within that same tolerance of
+ * `fundamentalHz`, not a single rounded bin, so a test tone that isn't
+ * exactly bin-aligned is still located correctly.
+ *
+ * IMPORTANT: do not call this with a `fundamentalHz` where
+ * `sampleRate / fundamentalHz` is at or near an integer. When it is, every
+ * alias product also lands on an exact harmonic multiple of the fundamental
+ * and gets excluded along with the real harmonics -- the metric then reports
+ * however quiet the *window floor* is, not how much the oscillator aliases.
+ * That is exactly how this project previously measured a fictitious -71 dB
+ * "alias floor" at 2 kHz into a 48 kHz sample rate (48000 / 2000 = 24):
+ * every alias folded onto a harmonic and vanished from the count along with
+ * it. Prefer a fundamental that is not a small-integer divisor of the sample
+ * rate.
  */
 export function aliasFloorDb(
   samples: Float32Array, sampleRate: number, fundamentalHz: number,
 ): number {
-  const { mags, size } = spectrumOf(samples)
+  const { mags, size } = spectrumOf(samples, 'blackman-harris')
   const binHz = sampleRate / size
-  const tolerance = Math.max(binHz * 2, fundamentalHz * 0.03)
+  const tolerance = Math.max(binHz * 8, fundamentalHz * 0.03)
 
   let fundamental = 0
-  let worstAlias = 0
   for (let i = 1; i < mags.length; i++) {
     const hz = binToHz(i, sampleRate, size)
-    const nearestHarmonic = Math.round(hz / fundamentalHz) * fundamentalHz
-    const isHarmonic = nearestHarmonic > 0 && Math.abs(hz - nearestHarmonic) <= tolerance
-    if (isHarmonic) {
-      if (Math.abs(nearestHarmonic - fundamentalHz) <= tolerance) {
-        fundamental = Math.max(fundamental, mags[i]!)
-      }
-    } else if (mags[i]! > worstAlias) {
-      worstAlias = mags[i]!
+    if (Math.abs(hz - fundamentalHz) <= tolerance) {
+      fundamental = Math.max(fundamental, mags[i]!)
     }
   }
   if (fundamental === 0) throw new Error('aliasFloorDb: no energy at the fundamental')
+
+  let worstAlias = 0
+  for (let i = 1; i < mags.length; i++) {
+    const hz = binToHz(i, sampleRate, size)
+    const harmonicIndex = Math.round(hz / fundamentalHz)
+    const nearestHarmonic = harmonicIndex * fundamentalHz
+    const isHarmonicOrDc = Math.abs(hz - nearestHarmonic) <= tolerance
+    if (!isHarmonicOrDc && mags[i]! > worstAlias) {
+      worstAlias = mags[i]!
+    }
+  }
   return db(worstAlias) - db(fundamental)
 }
