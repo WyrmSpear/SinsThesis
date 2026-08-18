@@ -54,8 +54,21 @@
  *    rate. Folding an asymmetric waveform (`symmetry != 0`) is not an
  *    aliasing problem -- ADAA does not touch it (measured DC unchanged) --
  *    it's a genuine property of a fold law that is no longer odd-symmetric
- *    once `symmetry != 0`. `R = 0.995` (~38 Hz corner at 48 kHz) settles to
- *    -148.7 dBFS, comfortably inside the -100 dBFS bar and identical in
+ *    once `symmetry != 0`. Originally set to `R = 0.995` (~38 Hz corner at
+ *    48 kHz); a final review (Finding 1) caught that this sits inside the
+ *    audible band and costs real low end on every signal through this
+ *    module, folding or not -- measured at drive 1.0, symmetry 0 (no
+ *    folding, nothing to block): -6.63 dB at 20 Hz, -2.78 dB at 40 Hz,
+ *    -1.45 dB at 60 Hz, -0.57 dB at 100 Hz. Moved to 4 Hz to match
+ *    `ladder.ts`'s output DC blocker exactly (same pole formula, same
+ *    corner). At 4 Hz the same drive-1/symmetry-0 sweep reads -0.167 dB at
+ *    20 Hz, -0.074 dB at 30 Hz, -0.028 dB at 50 Hz -- comfortably under the
+ *    ladder's own 1 dB bar (see `tests/node/dsp/wavefolder.test.ts`'s
+ *    "low-frequency guard" describe block, the mirror of the ladder's own
+ *    guard test). Settling is correspondingly slower (~40 ms time
+ *    constant), but on the symmetry-induced DC this fix exists to remove
+ *    (drive 3, symmetry +-0.3, ~0.34 s settle) it still reaches -148 to
+ *    -163 dBFS, comfortably inside the -100 dBFS bar and identical in
  *    spirit to `ladder.ts`'s output DC blocker.
  *
  * Honest caveat, not silently hidden: **drive above ~10 is ACCEPTABLE-grade
@@ -202,16 +215,19 @@ const INTERP_HISTORY_LEN = Math.max(...INTERP_BRANCHES.map((b) => b.length))
 // Folding an asymmetric waveform (symmetry != 0) is not an aliasing
 // artifact -- ADAA does not touch it, see the module doc comment -- so it
 // needs its own one-pole blocker after decimation, at the module's native
-// rate. Same shape as ladder.ts's output DC blocker.
+// rate. Same shape and same 4 Hz corner as ladder.ts's output DC blocker
+// (Finding 1, final review moved this from an original 38 Hz, which sat
+// inside the audible band -- see the module doc comment for the numbers).
 
 /** Pole for the one-pole DC blocker, solved so its corner sits at `hz`
- *  regardless of sample rate. At 48 kHz and 38 Hz this is ~0.995, the
- *  figure the spec measured settling to -148.7 dBFS. */
+ *  regardless of sample rate. At 48 kHz and 4 Hz this is ~0.9995, matching
+ *  ladder.ts's own blocker; the module doc comment has the full
+ *  low-frequency and DC-rejection measurements at this corner. */
 function dcBlockerPole(hz: number, sampleRate: number): number {
   return 1 - (2 * Math.PI * hz) / sampleRate
 }
 
-const DC_BLOCKER_HZ = 38
+const DC_BLOCKER_HZ = 4
 
 export interface WavefolderState {
   /** Ring buffer of raw input samples at the original rate, for the

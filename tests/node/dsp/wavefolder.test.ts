@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { foldSample, createWavefolderState, wavefolderSample } from '../../../src/engine/dsp/wavefolder'
-import { spectralCentroid, aliasFloorDb } from '../../../src/engine/analysis/features'
+import { spectralCentroid, aliasFloorDb, rms } from '../../../src/engine/analysis/features'
 import { fftMagnitude } from '../../../src/engine/analysis/fft'
 
 const SR = 48000
@@ -27,7 +27,16 @@ const ALIAS_N = 65536
 // swamp the measurement. Same convention as this codebase's ladder
 // self-oscillation tests (docs/CONTINUATION.md trap 6): render past the
 // transient and only measure the settled tail.
-const WARMUP = 4096
+//
+// 16384 samples (~0.34 s), not 4096: the DC blocker's corner moved from
+// 38 Hz to 4 Hz (Finding 1, final review), and its ~40 ms time constant
+// needs several multiples to settle. At 4096 samples the DC test below
+// still read a real but only partially settled -107.5 dBFS; at 16384 it
+// reads -148 to -163 dBFS, matching the figure the fix was measured
+// against. The alias-floor tests below don't care about the extra length
+// beyond a small compute cost -- they were never warmup-sensitive at this
+// level of settling either way.
+const WARMUP = 16384
 
 function antialiasedFoldedSine(drive: number, symmetry = 0): Float32Array {
   const state = createWavefolderState()
@@ -120,6 +129,33 @@ describe('wavefolderSample: DC blocker', () => {
       const mags = fftMagnitude(out, 'blackman-harris')
       const dcDb = 20 * Math.log10(Math.max(mags[0]!, 1e-12))
       expect(dcDb).toBeLessThanOrEqual(-100)
+    }
+  })
+})
+
+// Finding 1 (final review): the blocker's corner sat at 38 Hz, inside the
+// audible band -- measured through wavefolderSample at drive 1.0, symmetry 0
+// (no folding, nothing to block), it cost -6.63 dB at 20 Hz, -2.78 dB at
+// 40 Hz, -1.45 dB at 60 Hz and -0.57 dB at 100 Hz. Every signal routed
+// through a wavefolder lost real low end whether or not it ever folded.
+// Moved to 4 Hz to match ladder.ts's own output blocker, mirroring that
+// module's guard test (tests/node/dsp/ladder.test.ts) exactly, including its
+// bar: attenuation better than -1 dB at 20/30/50 Hz.
+describe('wavefolderSample: low-frequency guard', () => {
+  it('leaves 20/30/50 Hz effectively untouched', () => {
+    const DC_N = 65536
+    for (const freq of [20, 30, 50]) {
+      const state = createWavefolderState()
+      const input = new Float32Array(DC_N)
+      const out = new Float32Array(DC_N)
+      for (let i = 0; i < DC_N; i++) {
+        input[i] = Math.sin((2 * Math.PI * freq * i) / SR) * 0.5
+        out[i] = wavefolderSample(state, input[i]!, 1.0, 0, SR)
+      }
+      const inRms = rms(input.subarray(DC_N / 2))
+      const outRms = rms(out.subarray(DC_N / 2))
+      const attenDb = 20 * Math.log10(outRms / inRms)
+      expect(attenDb).toBeGreaterThan(-1)
     }
   })
 })
