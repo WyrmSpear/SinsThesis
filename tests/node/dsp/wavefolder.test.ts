@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { foldSample } from '../../../src/engine/dsp/wavefolder'
-import { spectralCentroid } from '../../../src/engine/analysis/features'
+import { foldSample, createWavefolderState, wavefolderSample } from '../../../src/engine/dsp/wavefolder'
+import { spectralCentroid, aliasFloorDb } from '../../../src/engine/analysis/features'
+import { fftMagnitude } from '../../../src/engine/analysis/fft'
 
 const SR = 48000
 const N = 8192
@@ -11,6 +12,32 @@ function foldedSine(drive: number): Float32Array {
     out[i] = foldSample(Math.sin((2 * Math.PI * 200 * i) / SR), drive)
   }
   return out
+}
+
+// B1: non-commensurate fundamental (48000/1109 = 43.28..., no small-integer
+// ratio -- see docs/CONTINUATION.md trap 1) and a large N for FFT resolution,
+// matching the wavefolder spec's own measurement methodology exactly.
+const ALIAS_F0 = 1109
+const ALIAS_N = 65536
+
+// The oversampling FIR's ring buffers start at zero, so the very first
+// samples see a cold-start edge (silence snapping to a full-scale sine) the
+// steady state never produces -- a one-time startup transient, not a
+// periodic aliasing artifact, but its broadband energy would otherwise
+// swamp the measurement. Same convention as this codebase's ladder
+// self-oscillation tests (docs/CONTINUATION.md trap 6): render past the
+// transient and only measure the settled tail.
+const WARMUP = 4096
+
+function antialiasedFoldedSine(drive: number, symmetry = 0): Float32Array {
+  const state = createWavefolderState()
+  const total = WARMUP + ALIAS_N
+  const out = new Float32Array(total)
+  for (let i = 0; i < total; i++) {
+    const x = Math.sin((2 * Math.PI * ALIAS_F0 * i) / SR)
+    out[i] = wavefolderSample(state, x, drive, symmetry, SR)
+  }
+  return out.subarray(WARMUP)
 }
 
 describe('foldSample', () => {
@@ -39,5 +66,60 @@ describe('foldSample', () => {
   it('adds harmonics as drive rises', () => {
     expect(spectralCentroid(foldedSine(6), SR))
       .toBeGreaterThan(spectralCentroid(foldedSine(1), SR) * 2)
+  })
+})
+
+// B1: the naive fold (above) has no band-limiting -- measured alias floor
+// -45.7 dB at drive 1.5, -31.9 dB at drive 3 (well inside the range a
+// player uses), and +6.4 to +6.8 dB at drive 16-20 (alias energy LOUDER
+// than the fundamental). wavefolderSample is the antialiased replacement:
+// ADAA-1 folding at 4x oversampling, decimated through a 127-tap
+// Blackman-windowed-sinc FIR, plus a DC blocker. Bars below are from
+// .superpowers/sdd/2026-08-18-phase1a-engine/wavefolder-spec.md section 3,
+// measured against the same 1109 Hz / 48 kHz / Blackman-Harris methodology
+// the naive-fold numbers above were reproduced with.
+describe('wavefolderSample: alias floor', () => {
+  it('drive 1.0 stays clean -- regression check, no folding engaged', () => {
+    const floor = aliasFloorDb(antialiasedFoldedSine(1.0), SR, ALIAS_F0)
+    expect(floor).toBeLessThanOrEqual(-100)
+  })
+
+  it('drive 1.5 reaches RELEASE grade', () => {
+    const floor = aliasFloorDb(antialiasedFoldedSine(1.5), SR, ALIAS_F0)
+    expect(floor).toBeLessThanOrEqual(-90)
+  })
+
+  it('drive 3 reaches RELEASE grade', () => {
+    const floor = aliasFloorDb(antialiasedFoldedSine(3.0), SR, ALIAS_F0)
+    expect(floor).toBeLessThanOrEqual(-80)
+  })
+
+  it('drive 8 reaches RELEASE grade', () => {
+    const floor = aliasFloorDb(antialiasedFoldedSine(8.0), SR, ALIAS_F0)
+    expect(floor).toBeLessThanOrEqual(-60)
+  })
+
+  it('drive 20 reaches at least ACCEPTABLE grade, the honest top of the range', () => {
+    const floor = aliasFloorDb(antialiasedFoldedSine(20.0), SR, ALIAS_F0)
+    expect(floor).toBeLessThanOrEqual(-42)
+  })
+})
+
+describe('wavefolderSample: DC blocker', () => {
+  it('keeps steady-state DC below -100 dBFS at nonzero symmetry', () => {
+    // A naive time-domain mean over a window holding a non-integer number
+    // of cycles of a ~1109 Hz tone (any window will, since 48000/1109 is
+    // irrational-looking to samples) leaks AC energy into the estimate at a
+    // level that swamps a genuinely well-blocked DC component -- this
+    // measured a fictitious -74 dBFS "DC" against a window of pure AC
+    // leakage before this test used the DC (bin 0) magnitude from a
+    // Blackman-Harris-windowed FFT instead, whose ~-92 dB sidelobes keep
+    // that leakage far out of the way of a real measurement.
+    for (const symmetry of [0.3, -0.3]) {
+      const out = antialiasedFoldedSine(3.0, symmetry)
+      const mags = fftMagnitude(out, 'blackman-harris')
+      const dcDb = 20 * Math.log10(Math.max(mags[0]!, 1e-12))
+      expect(dcDb).toBeLessThanOrEqual(-100)
+    }
   })
 })
