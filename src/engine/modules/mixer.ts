@@ -1,4 +1,5 @@
 import type { ModuleDescriptor, ModuleInstance } from '../types'
+import { scheduleParam } from '../param-smoothing'
 
 const CHANNELS = [1, 2, 3, 4] as const
 
@@ -51,11 +52,12 @@ export const mixerDescriptor: ModuleDescriptor = {
         inputs.map(({ id, gain }) => [id, gain]),
       ),
       outputs: new Map([['out', sum as AudioNode]]),
-      setParam(id, value) {
+      // All four channel levels are continuous attenuverters. B3.
+      setParam(id, value, atTime) {
         const match = /^level([1-4])$/.exec(id)
         if (!match) return
         const channel = inputs[Number(match[1]) - 1]
-        if (channel) channel.gain.gain.value = value
+        if (channel) scheduleParam(channel.gain.gain, value, ctx, atTime)
       },
       dispose() {
         sum.disconnect()

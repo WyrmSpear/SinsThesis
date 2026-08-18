@@ -1,4 +1,5 @@
 import type { ModuleDescriptor, ModuleInstance } from '../types'
+import { scheduleParam } from '../param-smoothing'
 
 export const noiseDescriptor: ModuleDescriptor = {
   type: 'noise',
@@ -30,8 +31,16 @@ export const noiseDescriptor: ModuleDescriptor = {
     return {
       inputs: new Map(),
       outputs: new Map([['out', tilt as AudioNode]]),
-      setParam(id, value) {
-        if (id === 'color') tilt.frequency.value = value > 0.5 ? 1200 : 20000
+      // `color`'s knob is continuous-looking but the mapping underneath is
+      // a hard 0.5 threshold onto one of two frequencies (a known,
+      // separately tracked issue -- see docs/CONTINUATION.md -- not this
+      // module's B3 fix). What B3 does fix: the AudioParam write at that
+      // threshold used to be a bare `.value =` snap, audible as a click
+      // exactly at the midpoint; scheduleParam smooths the jump between
+      // the two frequencies instead, without changing which two values
+      // color ever resolves to.
+      setParam(id, value, atTime) {
+        if (id === 'color') scheduleParam(tilt.frequency, value > 0.5 ? 1200 : 20000, ctx, atTime)
       },
       dispose() {
         source.stop()

@@ -1,4 +1,5 @@
 import type { ModuleDescriptor, ModuleInstance } from '../types'
+import { scheduleParam } from '../param-smoothing'
 
 /**
  * Every input port is fronted by its own GainNode, so the graph connects with
@@ -53,11 +54,17 @@ export const vcoDescriptor: ModuleDescriptor = {
         ['sync', fronts[2]!],
       ]),
       outputs: new Map([['out', node as AudioNode]]),
+      // tune, octave, pulseWidth and fmAmount all feed continuous math in
+      // the worklet (octave in particular is never rounded -- see
+      // vco.worklet.ts -- so fractional values already glide the pitch
+      // correctly), and all smooth. shape indexes a fixed waveform table
+      // (SHAPES[Math.round(shape)]) -- a value between two shapes is
+      // meaningless -- so it stays instant. B3.
       setParam(id, value, atTime) {
         const param = node.parameters.get(id)
         if (!param) return
-        if (atTime === undefined) param.value = value
-        else param.setValueAtTime(value, atTime)
+        if (id === 'shape') param.value = value
+        else scheduleParam(param, value, ctx, atTime)
       },
       dispose() {
         node.disconnect()

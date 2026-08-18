@@ -1,4 +1,5 @@
 import type { ModuleDescriptor, ModuleInstance } from '../types'
+import { scheduleParam } from '../param-smoothing'
 
 export const vcfDescriptor: ModuleDescriptor = {
   type: 'vcf',
@@ -38,11 +39,12 @@ export const vcfDescriptor: ModuleDescriptor = {
     return {
       inputs: new Map<string, AudioNode | AudioParam>([['in', audioIn], ['cutoffCv', cvIn]]),
       outputs: new Map([['out', node as AudioNode]]),
+      // cutoff, resonance, cutoffCvAmount and drive are all continuous --
+      // no discrete/switch param on this module -- so every one smooths. B3.
       setParam(id, value, atTime) {
         const param = node.parameters.get(id)
         if (!param) return
-        if (atTime === undefined) param.value = value
-        else param.setValueAtTime(value, atTime)
+        scheduleParam(param, value, ctx, atTime)
       },
       dispose() {
         node.disconnect()

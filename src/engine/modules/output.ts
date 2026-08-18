@@ -1,4 +1,5 @@
 import type { ModuleDescriptor, ModuleInstance } from '../types'
+import { scheduleParam } from '../param-smoothing'
 
 export const outputDescriptor: ModuleDescriptor = {
   type: 'output',
@@ -28,8 +29,9 @@ export const outputDescriptor: ModuleDescriptor = {
     return {
       inputs: new Map<string, AudioNode | AudioParam>([['in', level]]),
       outputs: new Map([['out', level as AudioNode]]),
-      setParam(id, value) {
-        if (id === 'level') level.gain.value = value
+      // The only param, level, is a continuous master fader. B3.
+      setParam(id, value, atTime) {
+        if (id === 'level') scheduleParam(level.gain, value, ctx, atTime)
       },
       dispose() {
         level.disconnect()

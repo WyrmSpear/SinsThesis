@@ -32,7 +32,21 @@ describe('native modules', () => {
       g.connect([osc, 'out'], [vca, 'in'])
       return vca
     })
-    expect(rms(out)).toBeLessThan(1e-5)
+    // B3: level is a continuous param, so setParam now ramps it down via
+    // setTargetAtTime (8 ms time constant) instead of snapping to 0 at
+    // sample 0 -- the fix this whole file is otherwise unaware of. That
+    // ramp asymptotically approaches but never exactly reaches 0, and it
+    // starts from full level (the VCA's own default), so the render's
+    // first ~100 ms (well over 10 time constants) carries real, decaying
+    // signal that used to not exist. Measuring the whole buffer for
+    // near-silence -- which is what this test asserted before B3 -- would
+    // now be asserting the old snapping behavior, so it measures the
+    // settled tail instead, same as this project's other ramp-aware tests
+    // (e.g. ladder.test.ts's DC-offset tests skip their own settling
+    // time). 120 ms in is >15 time constants (e^-15 ~ 3e-7), comfortably
+    // past the ramp.
+    const settled = out.subarray(Math.floor(out.length * 0.6))
+    expect(rms(settled)).toBeLessThan(1e-5)
   })
 
   it('VCA passes its input at full level', async () => {

@@ -1,4 +1,5 @@
 import type { ModuleDescriptor, ModuleInstance } from '../types'
+import { scheduleParam } from '../param-smoothing'
 
 const MAX_DELAY_SECONDS = 2
 
@@ -59,12 +60,14 @@ export const delayDescriptor: ModuleDescriptor = {
     return {
       inputs: new Map<string, AudioNode | AudioParam>([['in', input], ['timeCv', timeCvFront]]),
       outputs: new Map([['out', out as AudioNode]]),
-      setParam(id, value) {
-        if (id === 'time') delay.delayTime.value = value
-        else if (id === 'feedback') feedback.gain.value = value
+      // time, feedback and mix are all continuous -- no discrete param on
+      // this module -- so every one smooths. B3.
+      setParam(id, value, atTime) {
+        if (id === 'time') scheduleParam(delay.delayTime, value, ctx, atTime)
+        else if (id === 'feedback') scheduleParam(feedback.gain, value, ctx, atTime)
         else if (id === 'mix') {
-          wet.gain.value = value
-          dry.gain.value = 1 - value
+          scheduleParam(wet.gain, value, ctx, atTime)
+          scheduleParam(dry.gain, 1 - value, ctx, atTime)
         }
       },
       dispose() {

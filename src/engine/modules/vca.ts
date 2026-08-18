@@ -1,4 +1,5 @@
 import type { ModuleDescriptor, ModuleInstance } from '../types'
+import { scheduleParam } from '../param-smoothing'
 
 export const vcaDescriptor: ModuleDescriptor = {
   type: 'vca',
@@ -32,9 +33,10 @@ export const vcaDescriptor: ModuleDescriptor = {
     return {
       inputs: new Map<string, AudioNode | AudioParam>([['in', vca], ['cv', cvDepth]]),
       outputs: new Map([['out', vca as AudioNode]]),
-      setParam(id, value) {
-        if (id === 'level') vca.gain.value = value
-        else if (id === 'cvAmount') cvDepth.gain.value = value
+      // Both level and cvAmount are continuous. B3.
+      setParam(id, value, atTime) {
+        if (id === 'level') scheduleParam(vca.gain, value, ctx, atTime)
+        else if (id === 'cvAmount') scheduleParam(cvDepth.gain, value, ctx, atTime)
       },
       dispose() {
         vca.disconnect()

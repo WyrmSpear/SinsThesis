@@ -1,4 +1,5 @@
 import type { ModuleDescriptor, ModuleInstance } from '../types'
+import { scheduleParam } from '../param-smoothing'
 
 export const lfoDescriptor: ModuleDescriptor = {
   type: 'lfo',
@@ -32,11 +33,14 @@ export const lfoDescriptor: ModuleDescriptor = {
     return {
       inputs: new Map<string, AudioNode | AudioParam>([['sync', syncIn]]),
       outputs: new Map([['out', node as AudioNode]]),
+      // rate and depth are continuous and smooth. shape indexes a fixed
+      // waveform table in the worklet (SHAPES[Math.round(shape)]) -- a
+      // value between two shapes is meaningless, so it stays instant. B3.
       setParam(id, value, atTime) {
         const param = node.parameters.get(id)
         if (!param) return
-        if (atTime === undefined) param.value = value
-        else param.setValueAtTime(value, atTime)
+        if (id === 'shape') param.value = value
+        else scheduleParam(param, value, ctx, atTime)
       },
       dispose() {
         node.disconnect()

@@ -94,11 +94,18 @@ export class PatchGraph {
     return { ...node.params }
   }
 
-  setParam(moduleId: string, paramId: string, value: number): void {
+  /**
+   * @param atTime When given, schedules an exact change at that audio-clock
+   *   time. When omitted -- the ordinary live-knob-turn case -- the module
+   *   smoothly ramps to `value` instead of snapping to it (B3; see
+   *   param-smoothing.ts). Either way `getParams` reflects the new target
+   *   value immediately, not the value mid-ramp.
+   */
+  setParam(moduleId: string, paramId: string, value: number, atTime?: number): void {
     const node = this.nodes.get(moduleId)
     if (!node) throw new Error(`setParam: no module "${moduleId}"`)
     node.params[paramId] = value
-    node.instance?.setParam(paramId, value)
+    node.instance?.setParam(paramId, value, atTime)
   }
 
   getSlot(id: string): [number, number] {

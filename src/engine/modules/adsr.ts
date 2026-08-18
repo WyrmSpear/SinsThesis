@@ -1,4 +1,5 @@
 import type { ModuleDescriptor, ModuleInstance } from '../types'
+import { scheduleParam } from '../param-smoothing'
 
 export const adsrDescriptor: ModuleDescriptor = {
   type: 'adsr',
@@ -34,11 +35,13 @@ export const adsrDescriptor: ModuleDescriptor = {
     return {
       inputs: new Map<string, AudioNode | AudioParam>([['gate', gateIn]]),
       outputs: new Map([['out', node as AudioNode]]),
+      // All four params (attack/decay/sustain/release) are continuous --
+      // times and a level, none of them a discrete switch -- so every one
+      // of them smooths through scheduleParam. B3.
       setParam(id, value, atTime) {
         const param = node.parameters.get(id)
         if (!param) return
-        if (atTime === undefined) param.value = value
-        else param.setValueAtTime(value, atTime)
+        scheduleParam(param, value, ctx, atTime)
       },
       dispose() {
         node.disconnect()

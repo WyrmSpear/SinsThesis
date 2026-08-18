@@ -1,4 +1,5 @@
 import type { ModuleDescriptor, ModuleInstance } from '../types'
+import { scheduleParam } from '../param-smoothing'
 
 const STEP_PARAMS = Array.from({ length: 16 }, (_, i) => ({
   id: `step${i + 1}`,
@@ -69,11 +70,18 @@ export const sequencerDescriptor: ModuleDescriptor = {
         ['cv', cvOut],
         ['gate', gateOut],
       ]),
+      // Each step's CV is continuous (the same character as a VCO tune
+      // knob) and smooths. `steps` is a step count -- the task's own
+      // example of a param that must stay instant, since a fractional
+      // step count mid-ramp is meaningless to the loop-around logic in
+      // dsp/segment.ts. `glide` isn't a real AudioParam on this worklet
+      // (see the module doc comment above), so it already no-ops here
+      // regardless. B3.
       setParam(id, value, atTime) {
         const param = node.parameters.get(id)
         if (!param) return
-        if (atTime === undefined) param.value = value
-        else param.setValueAtTime(value, atTime)
+        if (id === 'steps') param.value = value
+        else scheduleParam(param, value, ctx, atTime)
       },
       dispose() {
         node.disconnect()

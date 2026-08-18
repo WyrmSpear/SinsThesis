@@ -142,6 +142,14 @@ export const clockDescriptor: ModuleDescriptor = {
         ['gate', gateSource],
         ['reset', resetSource],
       ]),
+      // B3 (param smoothing) does not apply here: none of these three ever
+      // write an AudioParam's `.value` directly. They feed
+      // `rescheduleGate`, which re-derives a set of exact gate edges via
+      // `setValueAtTime` -- the output is a 0/1 gate square wave, not a
+      // continuously varying level, so there is no zipper step to smooth
+      // in the first place. A tempo or division change retiming the
+      // transport from now, immediately, is the correct hardware-clock
+      // behavior this module documents above, not a defect.
       setParam(id, value) {
         if (id === 'bpm') settings.bpm = value
         else if (id === 'division') settings.division = value
