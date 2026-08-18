@@ -48,4 +48,18 @@ describe('render harness', () => {
     })
     expect(Math.max(...samples)).toBeGreaterThan(0.9)
   })
+
+  it('shares one in-flight load between concurrent callers', async () => {
+    const ctx = new OfflineAudioContext(1, 128, 48000)
+    // Against a completion-flag guard, both calls would pass the check before
+    // either recorded itself, and the second addModule would register the same
+    // processor name twice and throw.
+    await expect(Promise.all([ensureWorklets(ctx), ensureWorklets(ctx)])).resolves.toHaveLength(2)
+  })
+
+  it('is a no-op when called again after loading', async () => {
+    const ctx = new OfflineAudioContext(1, 128, 48000)
+    await ensureWorklets(ctx)
+    await expect(ensureWorklets(ctx)).resolves.toBeUndefined()
+  })
 })
