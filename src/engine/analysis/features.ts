@@ -58,6 +58,12 @@ const db = (x: number) => 20 * Math.log10(Math.max(x, EPS))
 /**
  * Least-squares slope of the spectrum in dB against log2(Hz), measured between
  * `fromHz` and `toHz`. A one-pole filter reads about -6, a four-pole about -24.
+ *
+ * Fits every bin in the band. On dense spectra -- noise, filtered noise -- that
+ * is unbiased and is the intended use. On sparse harmonic spectra the
+ * inter-harmonic leakage floor dominates the fit and biases the result steeper
+ * than the harmonic envelope, so compare like with like rather than reading an
+ * absolute figure off a harmonic-rich signal.
  */
 export function slopeDbPerOctave(
   samples: Float32Array, sampleRate: number, fromHz: number, toHz: number,
