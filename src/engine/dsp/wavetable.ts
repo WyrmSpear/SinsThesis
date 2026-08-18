@@ -275,10 +275,14 @@ function pulseSample(sawTable: Float32Array, t: number, w: number): number {
  *  the upper one it sits. `read(table, t)` is whichever per-shape reader
  *  (plain table lookup, or pulse's saw-difference) is being crossfaded --
  *  both levels must produce output in the same convention for the blend to
- *  be meaningful. At an exact octave boundary the weight is 0 (or 1 at the
- *  far end of the range), so this reduces to a single table read there and
- *  at every frequency that isn't near a boundary at all -- the extra table
- *  read only costs something during the transition band. */
+ *  be meaningful. `frac === 0` only exactly on an octave boundary (an
+ *  integer `levelFrac`, e.g. a bin-aligned test tone) -- corrected final
+ *  review comment, this file previously and wrongly claimed that also
+ *  covers "every frequency that isn't near a boundary"; in practice almost
+ *  every sample's frequency lands off-boundary (`frac` some fraction other
+ *  than exactly 0), so almost every call does the full two-table blend
+ *  below, not just ones near a transition. That cost is fine -- two table
+ *  reads and a lerp -- it was only the comment that was wrong. */
 function readBlended(
   tables: Float32Array[], freqHz: number, set: WavetableSet, read: (table: Float32Array) => number,
 ): number {

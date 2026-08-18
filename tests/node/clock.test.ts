@@ -136,3 +136,67 @@ describe('surviving Chrome intensive throttling (once-a-minute timer ticks)', ()
     expect(LOOKAHEAD_SECONDS).toBeGreaterThanOrEqual(THROTTLED_TICK_SECONDS * 1.5)
   })
 })
+
+// Finding 3 (final review): topUp never clamped the start of scheduling to
+// "now". The 90 s horizon and the throttling suite above cover the steady
+// state -- a tick arriving late, but not absurdly late -- correctly. But if
+// a tick ever arrives much later than that (machine sleep/resume, or a long
+// main-thread stall), scheduledUntil sits far behind ctx.currentTime by the
+// time the next tick fires, and without a clamp, rollingHorizonEdges would
+// treat every edge between that stale point and the new target as still
+// owed -- all of them already in the past -- and emit them in one
+// synchronous burst. At 300 BPM, division 8 (a 25 ms step, this module's
+// fastest setting), a ten-minute gap is roughly 24,000 edges -- 48,000
+// setValueAtTime calls -- in one call. The fix clamps the start of
+// scheduling to `ctx.currentTime` (`const from = Math.max(scheduledUntil,
+// ctx.currentTime)` in clock-module.ts's topUp) before calling
+// rollingHorizonEdges, so a late tick only ever schedules LOOKAHEAD_SECONDS
+// worth of edges, however far scheduledUntil had fallen behind.
+describe('surviving a large time jump (machine sleep/resume, a long stall)', () => {
+  const bpm = 300
+  const division = 8 // the module's fastest setting -- see FINDING 3's own math
+  const pulseWidth = 0.5
+  const GAP_SECONDS = 600 // ten minutes: far past both LOOKAHEAD_SECONDS and the throttle
+
+  it('demonstrates the bug this fixes: unclamped, a large gap emits tens of thousands of edges in one call', () => {
+    let epoch = 0
+    let scheduledUntil = epoch
+    let now = epoch
+    ;({ scheduledUntil } = rollingHorizonEdges(
+      epoch, scheduledUntil, now + LOOKAHEAD_SECONDS, bpm, division, pulseWidth,
+    ))
+
+    now += GAP_SECONDS
+    // Unclamped: the pre-fix call, passing the stale scheduledUntil
+    // straight through, exactly as topUp used to.
+    const { edges } = rollingHorizonEdges(
+      epoch, scheduledUntil, now + LOOKAHEAD_SECONDS, bpm, division, pulseWidth,
+    )
+    expect(edges.length).toBeGreaterThan(20000)
+  })
+
+  it('stays bounded to about LOOKAHEAD_SECONDS worth of edges after the same gap, clamped', () => {
+    let epoch = 0
+    let scheduledUntil = epoch
+    let now = epoch
+    ;({ scheduledUntil } = rollingHorizonEdges(
+      epoch, scheduledUntil, now + LOOKAHEAD_SECONDS, bpm, division, pulseWidth,
+    ))
+
+    now += GAP_SECONDS
+    // The fix: clamp the start of scheduling to "now" before asking for
+    // more edges, the same way clock-module.ts's topUp does.
+    const from = Math.max(scheduledUntil, now)
+    const target = now + LOOKAHEAD_SECONDS
+    const { edges, scheduledUntil: newScheduledUntil } = rollingHorizonEdges(
+      epoch, from, target, bpm, division, pulseWidth,
+    )
+
+    const stepsInHorizon = LOOKAHEAD_SECONDS / stepDuration(bpm, division)
+    // A little slack (+2) for the half-open step-count arithmetic in
+    // rollingHorizonEdges, not for the gap itself -- the whole point is
+    // that GAP_SECONDS (600) contributes nothing here.
+    expect(edges.length).toBeLessThan(stepsInHorizon + 2)
+    expect(newScheduledUntil).toBe(target)
+  })
+})

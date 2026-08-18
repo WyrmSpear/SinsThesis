@@ -135,8 +135,25 @@ export const clockDescriptor: ModuleDescriptor = {
       const target = offlineDuration !== undefined
         ? epoch + offlineDuration
         : ctx.currentTime + LOOKAHEAD_SECONDS
+      // Final review Finding 3: clamp the start of scheduling to "now".
+      // scheduledUntil is only ever stale in the direction of the past --
+      // the 90 s horizon is sized for the documented once-a-minute
+      // throttle, so in steady state it's always comfortably ahead of
+      // ctx.currentTime. But if a tick ever arrives much later than that
+      // (machine sleep/resume, a long main-thread stall), scheduledUntil
+      // can sit far behind ctx.currentTime, and without this clamp
+      // rollingHorizonEdges would treat every edge between that stale
+      // point and target as still owed -- all of them already in the past
+      // -- and emit them in one synchronous burst (at 300 BPM, division 8,
+      // a ten-minute gap is roughly 48,000 setValueAtTime calls). Clamping
+      // to `ctx.currentTime` means a late tick only ever schedules
+      // LOOKAHEAD_SECONDS worth of edges, exactly as if the schedule had
+      // never fallen behind at all -- gate edges strictly in the past are
+      // silently dropped rather than played back-to-back, which is the
+      // only sane behavior for time that has already gone by unheard.
+      const from = Math.max(scheduledUntil, ctx.currentTime)
       const result = rollingHorizonEdges(
-        epoch, scheduledUntil, target, settings.bpm, settings.division, settings.pulseWidth,
+        epoch, from, target, settings.bpm, settings.division, settings.pulseWidth,
       )
       for (const edge of result.edges) {
         gateSource.offset.setValueAtTime(1, edge.on)

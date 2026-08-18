@@ -214,6 +214,24 @@ export class PatchGraph {
     this.nodes.delete(id)
   }
 
+  /**
+   * Tear down every module in this graph. **Callers that construct a
+   * `PatchGraph` must call this when they're done with it -- most of all
+   * when a live session swaps in a new patch and discards the old graph.**
+   * At least one module (the clock, `clock-module.ts`) owns a JS
+   * `setInterval` timer that keeps its closure (and the `AudioContext`,
+   * `ConstantSourceNode`s and settings it captures) alive independent of
+   * whether anything still references the `PatchGraph` object itself --
+   * dropping the reference alone does not stop the timer. Only this method
+   * reaches every module's own `dispose()`, and the clock's `dispose()` is
+   * where that timer actually gets `clearInterval`'d (final review, minor
+   * finding alongside Finding 3). Nothing in `src/` calls this today
+   * because there is no live UI yet to swap patches (Phase 1B); an offline
+   * render never creates a clock timer in the first place (see
+   * `clock-module.ts`'s doc comment), so the gap is silent until that UI
+   * exists. Whoever builds it: call this on every patch swap, not only on
+   * final teardown.
+   */
   dispose(): void {
     for (const id of [...this.nodes.keys()]) this.removeModule(id)
   }
