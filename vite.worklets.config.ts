@@ -17,7 +17,10 @@ export default defineConfig({
     outDir: 'public/worklets',
     emptyOutDir: true,
     lib: {
-      entry: { passthrough: entry('./src/engine/worklets/passthrough.worklet.ts') },
+      entry: {
+        passthrough: entry('./src/engine/worklets/passthrough.worklet.ts'),
+        vco: entry('./src/engine/worklets/vco.worklet.ts'),
+      },
       formats: ['es'],
     },
     rollupOptions: { output: { entryFileNames: '[name].js' } },
