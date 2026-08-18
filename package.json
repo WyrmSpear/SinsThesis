@@ -6,7 +6,7 @@
   "scripts": {
     "test": "vitest run --project node",
     "test:watch": "vitest --project node",
-    "build:worklets": "vite build --config vite.worklets.config.ts",
+    "build:worklets": "node scripts/build-worklets.mjs",
     "test:browser": "npm run build:worklets && vitest run --project browser",
     "typecheck": "tsc --noEmit"
   },
