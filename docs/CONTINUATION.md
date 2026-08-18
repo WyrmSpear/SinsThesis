@@ -1,9 +1,10 @@
 # SinsThesis — continuation
 
-**Paused:** 2026-08-18, for a machine restart.
-**Branch:** `feat/phase1a-engine` — 33 commits, HEAD `682fbda`.
-**State:** 213 tests pass (182 node + 31 browser), `typecheck` clean, working tree clean.
-**Not merged.** Two fix waves stand between this and a presentable instrument.
+**Updated:** 2026-08-18, after both fix waves closed.
+**Branch:** `feat/phase1a-engine` — 47 commits, HEAD `30d466b`.
+**State:** 247 tests pass (209 node + 38 browser), `typecheck` clean, working tree clean.
+**Not merged.** Both fix waves are done and the audio critic's blockers are cleared.
+Next real work is Phase 1B, the UI.
 
 Read this file first. Then `docs/audio/PHASE1A-LEDGER.md` for every decision made
 and why.
@@ -18,12 +19,12 @@ git checkout feat/phase1a-engine
 npm install                 # if node_modules is gone
 npx playwright install chromium
 npm run build:worklets      # MUST run before browser tests
-npm test                    # 182 node tests
-npm run test:browser        # 31 browser tests
+npm test                    # 209 node tests
+npm run test:browser        # 38 browser tests
 npm run typecheck
 ```
 
-`npm test` runs the node project only. No single command runs all 213 — worth
+`npm test` runs the node project only. No single command runs all 247 — worth
 adding.
 
 ---
@@ -49,6 +50,9 @@ docs/audio/oscillator-architecture-study.md  four oscillator architectures, meas
 
 ### Measured audio quality, as shipped
 
+All figures reproduced independently by the audio critic, not accepted from the
+implementers.
+
 | | Measured | Grade |
 |---|---|---|
 | Saw alias floor, 441 Hz | −143.7 dB | RELEASE |
@@ -58,10 +62,22 @@ docs/audio/oscillator-architecture-study.md  four oscillator architectures, meas
 | Self-oscillation THD | −63.7 to −75.9 dB | RELEASE |
 | Envelope click at stage transitions | −65 to −83 dBFS | RELEASE |
 | LFO amplitude, 0.01–200 Hz | <0.3 dB spread | RELEASE |
-| **Wavefolder alias floor, drive 3** | **−31 dB** | **AMATEUR** |
-| **Wavefolder alias floor, drive 16–20** | **+7 dB** | **AMATEUR** |
-| **Ladder DC, saw in, resonance ≥0.3** | **−29 to −23 dBFS** | **AMATEUR** |
-| Triangle mip-boundary tick, 5120/10240 Hz | 0.42–0.74 sample delta | ACCEPTABLE |
+| Wavefolder alias floor, drive 3 | −87.8 dB | RELEASE |
+| Wavefolder alias floor, drive 8 | −63.8 dB (−55.7 at 2637 Hz) | RELEASE / ACCEPTABLE |
+| Wavefolder alias floor, drive 16–20 | −45.6 dB (−38.3 at 2637 Hz) | ACCEPTABLE / AMATEUR |
+| Ladder DC, saw in, full resonance | −188.5 dBFS | RELEASE |
+| Knob-turn discontinuity | 0.029 sample delta | RELEASE |
+| Triangle mip-boundary, 5120/10240 Hz | 0.407 / 0.599 | ACCEPTABLE — inherent, see below |
+
+The wavefolder above drive ~12 on bright material is the one area still graded
+AMATEUR. It is documented in the module's own doc comment with a four-frequency
+table, and the drive range was deliberately left at 0.1–20 rather than narrowed:
+a player may want that texture, and now they know what it is.
+
+The mip-boundary residual was verified inherent rather than a switching
+artifact — the unswitched steady-playback delta at the same mip level measures
+0.44–0.68, the same order. The crossfade removes all of the switching
+contribution.
 
 The oscillator started at −43 dB and is now −143. That rebuild is the single
 biggest thing that happened here, and it happened because the critic prototyped
@@ -69,82 +85,56 @@ instead of reasoning.
 
 ---
 
+## What was fixed, and what it cost
+
+Two fix waves closed after the first full audit. Every figure below is
+before → after, reproduced independently.
+
+**Wave A — correctness. The engine worked offline but was not a live instrument.**
+
+| | Before | After |
+|---|---|---|
+| Wavetable build | inside `process()`, per sample | once at module load: 49 ms once, 0.29 µs/sample steady |
+| Clock lifetime | stopped at 60 s | drift-free to 600 s, verified |
+| Backgrounded tab | gate stalled 91.7% of the time under Chrome's default throttling | survives one tick per minute (90 s lookahead) |
+| Clock after machine sleep | ~48,000 scheduled events in one synchronous burst | bounded ~3,600 regardless of gap |
+| `disconnect` | severed every cable sharing an endpoint pair | per-cable; stress-tested to 30 cables and 1000 cycles |
+| Sequencer test | passed even if the sequencer was frozen | fails when step advance is stubbed |
+
+**Wave B — sound.**
+
+| | Before | After |
+|---|---|---|
+| Wavefolder, drive 3 | −31.9 dB | −87.8 dB |
+| Wavefolder, drive 20 | +6.8 dB (alias louder than signal) | −45.6 dB |
+| Wavefolder bass loss at 20 Hz | −6.63 dB (its own DC blocker) | −0.167 dB |
+| Ladder DC, full resonance | −15.8 dBFS | −188.5 dBFS |
+| Knob-turn discontinuity | 0.775 | 0.029 |
+| PWM under modulation (k-rate vs a-rate) | 1.975 | 0.649 |
+| Fast filter sweep vs continuous reference | 0.6506 | 0.0000658 |
+
+The wavefolder fix is first-order antiderivative antialiasing plus 4×
+oversampling scoped to the fold. Plain ADAA alone was prototyped and rejected on
+measurement — it bought 4–8 dB, because its local-linearity assumption fails
+once the kink rate approaches the sample rate.
+
 ## What to do next
 
-Two fix waves, in this order. Wave A is correctness; wave B is sound. Neither
-has been started.
+1. **`superpowers:finishing-a-development-branch`** — the branch is clean, both
+   audits are satisfied, and the only outstanding audio finding is documented
+   rather than hidden.
+2. **Phase 1B, the UI**: rack, panels, eight themes, the power switch. Its plan
+   is not written. Write it against this working engine, not speculatively —
+   that was the point of splitting Phase 1 in two.
 
-### Fix wave A — the engine is offline-only until these land
+Two things Phase 1B will immediately need, both known:
 
-**A1. The oscillator builds its wavetables on the audio thread.** *(most serious)*
-`src/engine/dsp/wavetable.ts:243` calls `getWavetableSet(sampleRate)` inside
-`oscSample` — once per sample. The first non-sine sample builds 24 band-limited
-tables, millions of trig calls, inside `process()`. Offline rendering hides this
-because it runs faster than real time; **a live `AudioContext` will drop out on
-the first note.**
-*Fix:* call `getWavetableSet(sampleRate)` at module top level in
-`vco.worklet.ts` and `segment.worklet.ts` — top-level worklet code runs during
-`audioWorklet.addModule()`, before any node exists — and hoist the lookup out of
-the per-sample loop. Prove it with a test that fails against current code.
-
-**A2. The clock stops after 60 seconds.** `clock-module.ts` schedules to
-`HORIZON_SECONDS = 60` and only reschedules at create and on param change. Spec
-acceptance criterion 5 ("patches evolve unattended") is false past a minute.
-*Fix:* rolling horizon. Scheduling must stay on the audio clock —
-`setValueAtTime`, never a JS timer generating audio. A timer may only *schedule*
-future audio-clock events.
-
-**A3. `disconnect` severs more cables than asked.** `graph.ts:169` calls
-`outNode.disconnect(inNode)`, which removes *every* connection between that node
-pair. Reachable today: all four `multiple` outputs are the same `GainNode`, so
-two cables from one mult into one mixer share an endpoint pair — disconnect
-either and both die while `cableList` still lists the survivor.
-*Fix:* give each cable its own pass-through `GainNode`. Also covers the
-delay-node cleanup gap flagged back in Task 9.
-
-**A4. The sequencer test cannot fail.** `sequencer.test.ts:150` renders 0.4 s at
-60 BPM (1 s per step) and asserts only that step 1 reads 440 Hz. It passes
-identically if the sequencer is frozen. *Fix:* render across two step
-boundaries, assert the second step's pitch, and verify it fails when step
-advance is stubbed.
-
-### Fix wave B — audio quality
-
-**B1. The wavefolder. Worst thing in the instrument.** No oversampling anywhere.
-Alias floor: drive 1.5 → −45 dB, drive 3 → −31 dB (inside normal creative
-range), drive 16–20 → **+7 dB, alias energy louder than the fundamental**. The
-one module built to sound aggressive turns into digital noise at exactly the
-settings a player reaches for. No test measures any of it.
-*Fix:* 4–8× oversampling around the fold with a decimation filter, or a proper
-band-limited folder. Ask the critic which — it has the harness.
-
-**B2. The default patch bleeds DC.** Saw into the VCF at resonance 0.3–1.0
-injects −29 to −23 dBFS DC (resonance 0 gives −208 dBFS; a sine gives −240
-regardless). Cause: `tanh` in the feedback loop acting on a waveform without
-half-wave symmetry. Nothing downstream blocks it.
-*Fix:* a one-pole DC blocker at the ladder output is cheap and sufficient.
-
-**B3. No parameter smoothing anywhere.** Spec acceptance criterion 3 ("turn
-knobs without clicks or zipper noise") is **unimplemented, not merely unproven**.
-Every native module ignores the `atTime` argument and assigns `.value` directly;
-`PatchGraph.setParam` never passes a time; worklet params are k-rate steps.
-*Fix:* thread `atTime` through `setParam`, use `setTargetAtTime` with a short
-time constant for continuous params. Then write the click test that criterion
-demands.
-
-**B4. Triangle ticks at high mip boundaries.** Worst single-sample delta
-0.42–0.74 at the 5120/10240 Hz boundaries, past the codebase's own 0.35
-threshold. The shipped test only covers the lower three of seven boundaries.
-Portamento across them will tick. *Fix:* crossfade at the upper boundaries, or
-denser mips up top. Extend the test to all seven.
-
-### Then
-
-- Re-run the critic's full audit (prompt shape in the ledger).
-- Re-run the whole-branch review.
-- `superpowers:finishing-a-development-branch`.
-- Phase 1B is the UI: rack, panels, eight themes, the power switch. Its plan is
-  not written. Write it against the working engine, not speculatively.
+- **`PatchGraph.dispose()` is the only thing that clears the clock's interval,
+  and nothing in `src/` calls it.** Harmless while everything is offline. The
+  moment the UI swaps patches live, every abandoned clock keeps a timer
+  scheduling onto a discarded node forever.
+- **No default patch exists**, so spec acceptance criterion 1 ("open the site,
+  press power, hear something") has nothing to test against yet.
 
 ---
 
