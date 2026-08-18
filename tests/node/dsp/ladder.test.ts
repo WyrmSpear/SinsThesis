@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { createLadderState, ladderSample } from '../../../src/engine/dsp/ladder'
+import { createOscState, oscSample, getWavetableSet } from '../../../src/engine/dsp/wavetable'
 import { slopeDbPerOctave, peakHz, rms } from '../../../src/engine/analysis/features'
 
 const SR = 48000
@@ -101,6 +102,76 @@ describe('calibration', () => {
       const gain = rms(filter(tone, 2000, res).subarray(1000)) / reference
       expect(20 * Math.log10(gain)).toBeGreaterThan(-1.5)
       expect(20 * Math.log10(gain)).toBeLessThan(1.5)
+    }
+  })
+})
+
+describe('DC blocker', () => {
+  // The stock saw into a resonant loop is where B2 lived: tanh has no way
+  // to cancel the mean of an asymmetric waveform, so without a blocker the
+  // ladder bled -29 to -23 dBFS DC at resonance 0.3-1.0 (measured on this
+  // implementation before the fix: -20.4, -17.3, -15.8 dBFS at 0.3/0.5/1 --
+  // same story, different exact figures, because the audit's baseline used
+  // a different cutoff/frequency; res 0 was already clean).
+  //
+  // Measurement needs two things the rest of this file's tests don't:
+  // bin-aligned input (an exact integer number of cycles in the render, so
+  // a partial trailing cycle doesn't bias the mean on its own -- the same
+  // reasoning tests/node/dsp/wavetable.test.ts's DC-offset test documents),
+  // and enough settle time for the filter's own transient plus the DC
+  // blocker's ~4 Hz corner (time constant ~40 ms) to die out -- measuring
+  // over the whole render averages in that transient and reads a much
+  // worse (but spurious) number. Both matter: without bin alignment, DC
+  // measured over the settled tail alone still read around -80 dBFS purely
+  // from leftover partial-cycle bias, not from anything the filter did.
+  const DC_N = 65536
+  function alignFreq(targetHz: number, n = DC_N): number {
+    const bin = Math.round((targetHz * n) / SR)
+    return (bin * SR) / n
+  }
+  function sawIn(freq: number, n: number): Float32Array {
+    const state = createOscState()
+    const set = getWavetableSet(SR)
+    const out = new Float32Array(n)
+    for (let i = 0; i < n; i++) out[i] = oscSample(state, 'saw', freq, SR, set)
+    return out
+  }
+  function dcDb(samples: Float32Array): number {
+    let sum = 0
+    for (const v of samples) sum += v
+    const mean = Math.abs(sum / samples.length)
+    return 20 * Math.log10(Math.max(mean, 1e-12))
+  }
+
+  it('keeps saw-into-resonant-loop DC below -80 dBFS across resonance 0-1', () => {
+    // Measured on this implementation, saw at 441 Hz into cutoff 1000 Hz
+    // (settled tail, i.e. after the DC blocker's own transient has died
+    // out): -203.7, -197.7, -188.4, -188.5 dBFS at resonance 0/0.3/0.5/1 --
+    // 108-165 dB below this test's -80 dBFS bar, not merely under it.
+    const freq = alignFreq(441)
+    const input = sawIn(freq, DC_N)
+    for (const res of [0, 0.3, 0.5, 1.0]) {
+      const state = createLadderState()
+      const out = new Float32Array(DC_N)
+      for (let i = 0; i < DC_N; i++) out[i] = ladderSample(state, input[i]!, 1000, res, SR)
+      expect(dcDb(out.subarray(DC_N / 2))).toBeLessThan(-80)
+    }
+  })
+
+  it('leaves 20/30/50 Hz effectively untouched', () => {
+    // The blocker's ~4 Hz corner should be inaudible at these frequencies.
+    // Measured: -0.684, -0.589, -0.540 dB at 20/30/50 Hz -- comfortably
+    // under a third of a dB, using a cutoff (15 kHz) far above the test
+    // tone and resonance 0 so any measured attenuation is attributable to
+    // the blocker, not the ladder's own passband.
+    for (const freq of [20, 30, 50]) {
+      const input = new Float32Array(DC_N)
+      for (let i = 0; i < DC_N; i++) input[i] = Math.sin((2 * Math.PI * freq * i) / SR) * 0.5
+      const out = filter(input, 15000, 0)
+      const inRms = rms(input.subarray(DC_N / 2))
+      const outRms = rms(out.subarray(DC_N / 2))
+      const attenDb = 20 * Math.log10(outRms / inRms)
+      expect(attenDb).toBeGreaterThan(-1)
     }
   })
 })
