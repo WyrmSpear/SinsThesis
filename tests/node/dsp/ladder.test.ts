@@ -26,10 +26,15 @@ function filter(input: Float32Array, cutoff: number, res: number): Float32Array 
 }
 
 describe('ladder response', () => {
-  it('rolls off about -24 dB per octave above cutoff', () => {
-    const slope = slopeDbPerOctave(filter(noise(N), 1000, 0), SR, 2000, 12000)
-    expect(slope).toBeLessThan(-18)
-    expect(slope).toBeGreaterThan(-30)
+  it('reaches a four-pole asymptotic slope well above cutoff', () => {
+    // Measured in a band far enough above the knee to be asymptotic but below
+    // the region where bilinear prewarp steepens the response near Nyquist.
+    // The local slope is not uniform: it ramps from about -8 dB/oct just above
+    // the knee to about -38 dB/oct approaching Nyquist. Four poles is the
+    // figure in between, and this band is where it actually holds.
+    const slope = slopeDbPerOctave(filter(noise(N), 1000, 0), SR, 4000, 8000)
+    expect(slope).toBeLessThan(-22)
+    expect(slope).toBeGreaterThan(-28)
   })
 
   it('passes low frequencies close to unity', () => {
@@ -70,5 +75,32 @@ describe('resonance', () => {
   it('stays bounded when driven hard at full resonance', () => {
     const out = filter(noise(N, 4), 2000, 1)
     for (const v of out) expect(Number.isFinite(v) && Math.abs(v) < 4).toBe(true)
+  })
+})
+
+describe('calibration', () => {
+  it('self-oscillates at the dialled cutoff across the range', () => {
+    // The knob's contract: this is the frequency it rings at, so a resonant
+    // ladder tracks 1V/oct and plays in tune.
+    for (const cutoff of [200, 1000, 5000]) {
+      const input = new Float32Array(N)
+      input.set(noise(256, 0.5))
+      const out = filter(input, cutoff, 1)
+      const measured = peakHz(out.subarray(N / 2), SR)
+      expect(Math.abs(measured - cutoff) / cutoff).toBeLessThan(0.02)
+    }
+  })
+
+  it('holds unity passband as resonance opens', () => {
+    // Without makeup gain the closed loop's 1/(1+k) DC gain costs nearly 10 dB
+    // at full resonance, and the patch thins out as the player opens it up.
+    const tone = new Float32Array(N)
+    for (let i = 0; i < N; i++) tone[i] = Math.sin((2 * Math.PI * 100 * i) / SR) * 0.5
+    const reference = rms(tone.subarray(1000))
+    for (const res of [0, 0.5, 1]) {
+      const gain = rms(filter(tone, 2000, res).subarray(1000)) / reference
+      expect(20 * Math.log10(gain)).toBeGreaterThan(-1.5)
+      expect(20 * Math.log10(gain)).toBeLessThan(1.5)
+    }
   })
 })

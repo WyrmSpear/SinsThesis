@@ -25,6 +25,11 @@ export function createLadderState(): LadderState {
  * Process one sample.
  *
  * @param resonance 0 to 1. 1 places the loop gain at self-oscillation.
+ * @param cutoffHz Sets the per-stage pole frequency. This is the calibration
+ *   landmark: the filter self-oscillates here and tracks it at 1 V/octave, so a
+ *   resonant ladder plays in tune. At resonance 0 the passive four-pole corner
+ *   sits about 0.435x lower -- the cascade factor sqrt(2^(1/4) - 1) -- which is
+ *   analog ladder behavior, not a calibration error.
  */
 export function ladderSample(
   state: LadderState,
@@ -57,7 +62,11 @@ export function ladderSample(
 
   // Zero-delay solve for the ladder input.
   const G4 = G * G * G * G
-  const u = Math.tanh((input - k * S) / (1 + k * G4))
+  // The closed loop has a DC gain of 1/(1 + k), so without compensation the
+  // passband collapses by nearly 10 dB as resonance opens and the patch goes
+  // thin exactly when it should get more aggressive. Scaling the input by
+  // (1 + k) restores unity passband across the whole resonance range.
+  const u = Math.tanh((input * (1 + k) - k * S) / (1 + k * G4))
 
   // Four TPT one-poles in series.
   let x = u
