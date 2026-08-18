@@ -20,6 +20,8 @@ export default defineConfig({
       entry: {
         passthrough: entry('./src/engine/worklets/passthrough.worklet.ts'),
         vco: entry('./src/engine/worklets/vco.worklet.ts'),
+        ladder: entry('./src/engine/worklets/ladder.worklet.ts'),
+        wavefolder: entry('./src/engine/worklets/wavefolder.worklet.ts'),
       },
       formats: ['es'],
     },
