@@ -108,3 +108,53 @@ export function sampleHold(
   state.lastTrigger = trigger
   return state.held
 }
+
+export interface SequencerState {
+  /** -1 means "no clock pulse seen yet". Reading clamps that to step 0, so a
+   *  sequencer that has never been clocked still shows its first step. */
+  index: number
+  lastClock: number
+  lastReset: number
+}
+
+export function createSequencerState(): SequencerState {
+  return { index: -1, lastClock: 0, lastReset: 0 }
+}
+
+export interface SequencerOutput {
+  cv: number
+  gate: number
+}
+
+/**
+ * Advance the step index on each clock rising edge, wrapping at `steps`, and
+ * read the corresponding entry of `values` as `cv`. `gate` simply follows the
+ * clock's high period. A rising edge on `reset` returns to step 0.
+ *
+ * The first-ever clock edge selects step 0 rather than advancing past it --
+ * pulse 1 plays step 1, pulse 2 plays step 2, and so on -- which is why the
+ * index starts at the sentinel -1 instead of 0: `(-1 + 1) % steps` is 0.
+ */
+export function sequencerStep(
+  state: SequencerState,
+  clock: number,
+  reset: number,
+  steps: number,
+  values: readonly number[],
+): SequencerOutput {
+  const count = Math.max(1, Math.min(16, Math.round(steps)))
+
+  if (reset >= 0.5 && state.lastReset < 0.5) state.index = 0
+  state.lastReset = reset
+
+  if (clock >= 0.5 && state.lastClock < 0.5) {
+    state.index = state.index < 0 ? 0 : (state.index + 1) % count
+  }
+  state.lastClock = clock
+
+  const activeIndex = state.index < 0 ? 0 : state.index
+  const idx = Math.min(activeIndex, count - 1, Math.max(values.length - 1, 0))
+  const cv = values[idx] ?? 0
+  const gate = clock >= 0.5 ? 1 : 0
+  return { cv, gate }
+}

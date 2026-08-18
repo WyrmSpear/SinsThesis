@@ -1,8 +1,11 @@
-import { createEnvState, envSample, createSampleHoldState, sampleHold } from '../dsp/segment'
+import {
+  createEnvState, envSample, createSampleHoldState, sampleHold,
+  createSequencerState, sequencerStep,
+} from '../dsp/segment'
 import { createOscState, oscSample, hardSync, type OscShape } from '../dsp/polyblep'
 
 /** Thin shell. All the math lives in dsp/segment and dsp/polyblep, which Node
- *  tests directly. One bundle registers all three processors because they
+ *  tests directly. One bundle registers all four processors because they
  *  share the segment core and change together. */
 class AdsrProcessor extends AudioWorkletProcessor {
   private readonly state = createEnvState()
@@ -88,6 +91,46 @@ class SampleHoldProcessor extends AudioWorkletProcessor {
   }
 }
 
+const STEP_PARAM_NAMES = Array.from({ length: 16 }, (_, i) => `step${i + 1}`)
+
+class SequencerProcessor extends AudioWorkletProcessor {
+  private readonly state = createSequencerState()
+
+  static get parameterDescriptors(): AudioParamDescriptor[] {
+    return [
+      { name: 'steps', defaultValue: 8, minValue: 1, maxValue: 16, automationRate: 'k-rate' },
+      ...STEP_PARAM_NAMES.map((name) => ({
+        name, defaultValue: 0, minValue: -2, maxValue: 2, automationRate: 'k-rate' as const,
+      })),
+    ]
+  }
+
+  process(
+    inputs: Float32Array[][],
+    outputs: Float32Array[][],
+    params: Record<string, Float32Array>,
+  ): boolean {
+    const cvOut = outputs[0]?.[0]
+    const gateOut = outputs[1]?.[0]
+    if (!cvOut || !gateOut) return true
+
+    const clock = inputs[0]?.[0]
+    const reset = inputs[1]?.[0]
+    const steps = params.steps![0]!
+    const values = STEP_PARAM_NAMES.map((name) => params[name]![0]!)
+
+    for (let i = 0; i < cvOut.length; i++) {
+      const { cv, gate } = sequencerStep(
+        this.state, clock?.[i] ?? 0, reset?.[i] ?? 0, steps, values,
+      )
+      cvOut[i] = cv
+      gateOut[i] = gate
+    }
+    return true
+  }
+}
+
 registerProcessor('adsr', AdsrProcessor)
 registerProcessor('lfo', LfoProcessor)
 registerProcessor('sample-hold', SampleHoldProcessor)
+registerProcessor('sequencer', SequencerProcessor)

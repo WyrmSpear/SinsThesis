@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
-  createEnvState, envSample, createSampleHoldState, sampleHold, type AdsrParams,
+  createEnvState, envSample, createSampleHoldState, sampleHold,
+  createSequencerState, sequencerStep, type AdsrParams,
 } from '../../../src/engine/dsp/segment'
 
 const SR = 48000
@@ -93,5 +94,57 @@ describe('sampleHold', () => {
 
   it('starts at zero', () => {
     expect(sampleHold(createSampleHoldState(), 0.9, 0)).toBe(0)
+  })
+})
+
+describe('sequencerStep', () => {
+  const values = [0, 1, 2] // three programmed octaves
+
+  it('shows step 0 before any clock pulse arrives', () => {
+    const state = createSequencerState()
+    expect(sequencerStep(state, 0, 0, 3, values).cv).toBe(0)
+  })
+
+  it('the first rising edge selects step 0, not step 1', () => {
+    const state = createSequencerState()
+    expect(sequencerStep(state, 1, 0, 3, values).cv).toBe(0)
+  })
+
+  it('advances one step per rising edge and wraps at `steps`', () => {
+    const state = createSequencerState()
+    const cvs: number[] = []
+    // Three low/high pairs so each pulse produces exactly one rising edge.
+    for (const clock of [1, 0, 1, 0, 1, 0, 1, 0]) {
+      cvs.push(sequencerStep(state, clock, 0, 3, values).cv)
+    }
+    expect(cvs).toEqual([0, 0, 1, 1, 2, 2, 0, 0]) // wraps back to step 0
+  })
+
+  it('does not advance again while the clock stays high', () => {
+    const state = createSequencerState()
+    sequencerStep(state, 1, 0, 3, values)
+    sequencerStep(state, 1, 0, 3, values)
+    expect(sequencerStep(state, 1, 0, 3, values).cv).toBe(0)
+  })
+
+  it('a reset rising edge returns to step 0', () => {
+    const state = createSequencerState()
+    sequencerStep(state, 1, 0, 3, values) // step 0
+    sequencerStep(state, 0, 0, 3, values)
+    sequencerStep(state, 1, 0, 3, values) // step 1
+    expect(sequencerStep(state, 0, 0, 3, values).cv).toBe(1)
+    expect(sequencerStep(state, 0, 1, 3, values).cv).toBe(0) // reset edge
+  })
+
+  it('the gate follows the clock high period', () => {
+    const state = createSequencerState()
+    expect(sequencerStep(state, 1, 0, 3, values).gate).toBe(1)
+    expect(sequencerStep(state, 0, 0, 3, values).gate).toBe(0)
+  })
+
+  it('clamps a fractional or out-of-range steps param', () => {
+    const state = createSequencerState()
+    expect(() => sequencerStep(state, 0, 0, 30, values)).not.toThrow()
+    expect(() => sequencerStep(state, 0, 0, 0.4, values)).not.toThrow()
   })
 })
