@@ -7,9 +7,10 @@ function fitPow2(n: number): number {
   return p
 }
 
-function spectrumOf(samples: Float32Array): Float32Array {
+/** Magnitude spectrum of the largest power-of-two prefix, with the size used. */
+function spectrumOf(samples: Float32Array): { mags: Float32Array; size: number } {
   const size = fitPow2(samples.length)
-  return fftMagnitude(samples.subarray(0, size))
+  return { mags: fftMagnitude(samples.subarray(0, size)), size }
 }
 
 export function binToHz(bin: number, sampleRate: number, fftSize: number): number {
@@ -17,8 +18,7 @@ export function binToHz(bin: number, sampleRate: number, fftSize: number): numbe
 }
 
 export function peakHz(samples: Float32Array, sampleRate: number): number {
-  const size = fitPow2(samples.length)
-  const mags = fftMagnitude(samples.subarray(0, size))
+  const { mags, size } = spectrumOf(samples)
   let peak = 1
   for (let i = 1; i < mags.length; i++) if (mags[i]! > mags[peak]!) peak = i
   return binToHz(peak, sampleRate, size)
@@ -41,8 +41,7 @@ export function rmsEnvelope(samples: Float32Array, windowSize: number): Float32A
 }
 
 export function spectralCentroid(samples: Float32Array, sampleRate: number): number {
-  const size = fitPow2(samples.length)
-  const mags = fftMagnitude(samples.subarray(0, size))
+  const { mags, size } = spectrumOf(samples)
   let weighted = 0
   let total = 0
   for (let i = 1; i < mags.length; i++) {
@@ -68,8 +67,7 @@ const db = (x: number) => 20 * Math.log10(Math.max(x, EPS))
 export function slopeDbPerOctave(
   samples: Float32Array, sampleRate: number, fromHz: number, toHz: number,
 ): number {
-  const size = fitPow2(samples.length)
-  const mags = fftMagnitude(samples.subarray(0, size))
+  const { mags, size } = spectrumOf(samples)
   const xs: number[] = []
   const ys: number[] = []
   for (let i = 1; i < mags.length; i++) {
@@ -102,8 +100,7 @@ export function slopeDbPerOctave(
 export function aliasFloorDb(
   samples: Float32Array, sampleRate: number, fundamentalHz: number,
 ): number {
-  const size = fitPow2(samples.length)
-  const mags = fftMagnitude(samples.subarray(0, size))
+  const { mags, size } = spectrumOf(samples)
   const binHz = sampleRate / size
   const tolerance = Math.max(binHz * 2, fundamentalHz * 0.03)
 
