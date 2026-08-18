@@ -22,6 +22,7 @@ export default defineConfig({
         vco: entry('./src/engine/worklets/vco.worklet.ts'),
         ladder: entry('./src/engine/worklets/ladder.worklet.ts'),
         wavefolder: entry('./src/engine/worklets/wavefolder.worklet.ts'),
+        segment: entry('./src/engine/worklets/segment.worklet.ts'),
       },
       formats: ['es'],
     },
