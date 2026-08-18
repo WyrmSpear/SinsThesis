@@ -3,14 +3,14 @@ import { createsCycle } from './cycle'
 import type { ModuleInstance } from './types'
 
 export interface Cable {
-  id: string
+  readonly id: string
   /** [moduleId, portId] */
-  from: [string, string]
-  to: [string, string]
+  readonly from: readonly [string, string]
+  readonly to: readonly [string, string]
   /** True when this cable closes a loop and carries the 128-sample delay. */
-  delayed: boolean
+  readonly delayed: boolean
   /** False when either end is a ghost, so no audio flows. */
-  active: boolean
+  readonly active: boolean
 }
 
 interface GraphNode {
@@ -36,7 +36,7 @@ export class PatchGraph {
   }
 
   get cables(): readonly Cable[] {
-    return this.cableList
+    return [...this.cableList]
   }
 
   addModule(type: string, id?: string): string {
@@ -81,7 +81,7 @@ export class PatchGraph {
   getParams(id: string): Readonly<Record<string, number>> {
     const node = this.nodes.get(id)
     if (!node) throw new Error(`getParams: no module "${id}"`)
-    return node.params
+    return { ...node.params }
   }
 
   setParam(moduleId: string, paramId: string, value: number): void {

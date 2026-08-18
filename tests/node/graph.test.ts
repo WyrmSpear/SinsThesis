@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { PatchGraph } from '../../src/engine/graph'
+import { PatchGraph, type Cable } from '../../src/engine/graph'
 import { registerModule, clearRegistry } from '../../src/engine/registry'
 import { stubDescriptor, stubContext, type StubNode } from '../helpers/stub-instance'
 
@@ -97,5 +97,38 @@ describe('PatchGraph', () => {
     expect(cable.active).toBe(false)
     expect(graph.getType('mystery')).toBe('quantum-vco')
     expect(nodeOf(graph, 'a', 'out').connections).toHaveLength(0)
+  })
+
+  it('removes a module that sits at both ends of different cables', () => {
+    graph.addModule('vco', 'a')
+    graph.addModule('vcf', 'b')
+    graph.addModule('vco', 'c')
+    graph.connect(['a', 'out'], ['b', 'in'])
+    graph.connect(['b', 'out'], ['c', 'in'])
+    graph.removeModule('b')
+    expect(graph.cables).toHaveLength(0)
+    expect([...graph.moduleIds].sort()).toEqual(['a', 'c'])
+  })
+
+  it('drops the delay node when a feedback cable is removed', () => {
+    graph.addModule('vco', 'a')
+    graph.addModule('vcf', 'b')
+    graph.connect(['a', 'out'], ['b', 'in'])
+    const feedback = graph.connect(['b', 'out'], ['a', 'in'])
+    expect(feedback.delayed).toBe(true)
+    graph.removeModule('b')
+    expect(graph.cables).toHaveLength(0)
+    // A second feedback cable must get a fresh delay, not a stale one.
+    graph.addModule('vcf', 'b2')
+    graph.connect(['a', 'out'], ['b2', 'in'])
+    expect(graph.connect(['b2', 'out'], ['a', 'in']).delayed).toBe(true)
+  })
+
+  it('does not expose its internal cable array', () => {
+    graph.addModule('vco', 'a')
+    graph.addModule('vcf', 'b')
+    graph.connect(['a', 'out'], ['b', 'in'])
+    ;(graph.cables as Cable[]).length = 0
+    expect(graph.cables).toHaveLength(1)
   })
 })
