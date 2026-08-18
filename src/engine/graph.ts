@@ -28,6 +28,15 @@ export class PatchGraph {
   private readonly nodes = new Map<string, GraphNode>()
   private readonly cableList: Cable[] = []
   private readonly delays = new Map<string, DelayNode>()
+  // A3: every non-delayed cable gets its own pass-through GainNode between
+  // source and destination, so `disconnect` can sever exactly the one
+  // cable being removed. Without this, `outNode.disconnect(inNode)` (the
+  // WebAudio API only offers node-pair granularity, not per-connection)
+  // would tear out *every* cable between that pair -- reachable today
+  // because all four `multiple` outputs are the same GainNode, so two
+  // cables from one mult landing on the same input share an
+  // (outNode, inNode) pair.
+  private readonly passthroughs = new Map<string, GainNode>()
   private counter = 0
 
   constructor(private readonly ctx: BaseAudioContext) {}
@@ -142,7 +151,14 @@ export class PatchGraph {
         outNode!.connect(delay)
         delay.connect(inNode as AudioNode)
       } else {
-        outNode!.connect(inNode as AudioNode)
+        // A dedicated unity-gain passthrough per cable -- see the field
+        // comment on `passthroughs` -- so this cable's connection can be
+        // told apart from any sibling cable sharing the same node pair.
+        const pass = this.ctx.createGain()
+        pass.gain.value = 1
+        this.passthroughs.set(cable.id, pass)
+        outNode!.connect(pass)
+        pass.connect(inNode as AudioNode)
       }
     }
 
@@ -157,16 +173,23 @@ export class PatchGraph {
 
     if (cable.active) {
       const source = this.nodes.get(cable.from[0])
-      const target = this.nodes.get(cable.to[0])
       const outNode = source?.instance?.outputs.get(cable.from[1])
-      const inNode = target?.instance?.inputs.get(cable.to[1])
       const delay = this.delays.get(cableId)
+      const pass = this.passthroughs.get(cableId)
+      // The delay/passthrough node is exclusive to this one cable, so a
+      // bare `.disconnect()` (no argument -- disconnect all of its
+      // outputs) is safe and removes the whole path in one step. Only the
+      // link from `outNode` needs to name its target explicitly, since
+      // `outNode` may be shared with other cables' own delay/passthrough
+      // nodes (the `multiple` module's fan-out).
       if (delay) {
         outNode?.disconnect(delay)
-        if (inNode) delay.disconnect(inNode as AudioNode)
+        delay.disconnect()
         this.delays.delete(cableId)
-      } else if (outNode && inNode) {
-        outNode.disconnect(inNode as AudioNode)
+      } else if (pass) {
+        outNode?.disconnect(pass)
+        pass.disconnect()
+        this.passthroughs.delete(cableId)
       }
     }
 

@@ -30,6 +30,10 @@ export function stubContext(): BaseAudioContext {
     // The graph sets delayTime.value on the node it inserts for feedback
     // cables, so the stub has to carry one.
     createDelay: () => Object.assign(stubNode(), { delayTime: { value: 0 } }) as unknown as DelayNode,
+    // A3: every non-delayed cable gets its own pass-through gain node, so
+    // it can be disconnected without severing a sibling cable that happens
+    // to share the same (outNode, inNode) endpoint pair.
+    createGain: () => Object.assign(stubNode(), { gain: { value: 0 } }) as unknown as GainNode,
   } as unknown as BaseAudioContext
 }
 
