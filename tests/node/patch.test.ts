@@ -10,6 +10,7 @@ function buildPatch(): PatchGraph {
   graph.addModule('vcf', 'filter')
   graph.setParam('osc', 'level', 0.8)
   graph.connect(['osc', 'out'], ['filter', 'in'])
+  graph.setSlot('filter', [1, 4])
   return graph
 }
 
@@ -69,6 +70,22 @@ describe('patch format', () => {
     expect(out.modules[0]).toEqual({
       id: 'x', type: 'quantum-vco', slot: [2, 3], params: { drift: 0.7 },
     })
+  })
+
+  it('preserves a cable between two ghost modules', () => {
+    const file: PatchFile = {
+      version: 1,
+      meta: { name: 'Two ghosts', created: '2026-08-18T00:00:00.000Z', author: '' },
+      modules: [
+        { id: 'g1', type: 'quantum-vco', slot: [0, 0], params: { drift: 0.7 } },
+        { id: 'g2', type: 'quantum-vcf', slot: [0, 1], params: { warp: 0.2 } },
+      ],
+      cables: [{ from: ['g1', 'out'], to: ['g2', 'in'] }],
+    }
+    const { graph, ghosts } = loadPatch(stubContext(), file)
+    expect(ghosts.sort()).toEqual(['quantum-vcf', 'quantum-vco'])
+    expect(graph.cables[0]!.active).toBe(false)
+    expect(serializePatch(graph, file.meta)).toEqual(file)
   })
 
   it('rejects a file from a newer format version', () => {

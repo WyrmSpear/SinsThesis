@@ -128,8 +128,8 @@ export class PatchGraph {
 
     const cable: Cable = {
       id: `cable-${++this.counter}`,
-      from,
-      to,
+      from: [from[0], from[1]],
+      to: [to[0], to[1]],
       delayed,
       active,
     }
