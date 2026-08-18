@@ -55,6 +55,31 @@ describe('envSample', () => {
     const retriggered = run(1, 0.001, releasing.state)
     expect(retriggered.values[0]!).toBeGreaterThanOrEqual(levelAtRetrigger * 0.9)
   })
+
+  it('releases from wherever attack got to when the gate falls early', () => {
+    // 5 ms into a 10 ms attack, so the envelope is partway up and nowhere near
+    // a stage boundary. Release must continue from that level, not restart.
+    const rising = run(1, 0.005)
+    const level = rising.last
+    expect(level).toBeGreaterThan(0.05)
+    expect(level).toBeLessThan(1)
+
+    const released = run(0, 0.0005, rising.state)
+    expect(released.values[0]!).toBeLessThanOrEqual(level)
+    expect(released.values[0]!).toBeGreaterThan(level * 0.9)
+  })
+
+  it('releases from the decay stage without jumping', () => {
+    // 35 ms in: past the 1.0 peak, partway down toward sustain.
+    const decaying = run(1, 0.035)
+    const level = decaying.last
+    expect(level).toBeGreaterThan(0.5)
+    expect(level).toBeLessThan(1)
+
+    const released = run(0, 0.0005, decaying.state)
+    expect(released.values[0]!).toBeLessThanOrEqual(level)
+    expect(released.values[0]!).toBeGreaterThan(level * 0.9)
+  })
 })
 
 describe('sampleHold', () => {
