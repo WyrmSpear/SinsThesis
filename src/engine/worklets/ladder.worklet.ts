@@ -19,10 +19,17 @@ class LadderProcessor extends AudioWorkletProcessor {
 
   static get parameterDescriptors(): AudioParamDescriptor[] {
     return [
-      { name: 'cutoff', defaultValue: 1000, minValue: 20, maxValue: 20000, automationRate: 'k-rate' },
-      { name: 'resonance', defaultValue: 0, minValue: 0, maxValue: 1, automationRate: 'k-rate' },
+      // cutoff, resonance and drive are a-rate (final review Finding 2):
+      // at k-rate a worklet reads params.foo![0] once per 128-sample
+      // render quantum, so a scheduleParam ramp -- a real, continuous
+      // AudioParam automation -- still reached the DSP as a staircase of
+      // block-sized steps, not the smooth glide the automation curve
+      // actually describes. a-rate delivers the browser's own per-sample
+      // ramp as a Float32Array; see process() below for how it's read.
+      { name: 'cutoff', defaultValue: 1000, minValue: 20, maxValue: 20000, automationRate: 'a-rate' },
+      { name: 'resonance', defaultValue: 0, minValue: 0, maxValue: 1, automationRate: 'a-rate' },
       { name: 'cutoffCvAmount', defaultValue: 0, minValue: -8, maxValue: 8, automationRate: 'k-rate' },
-      { name: 'drive', defaultValue: 1, minValue: 0.1, maxValue: 8, automationRate: 'k-rate' },
+      { name: 'drive', defaultValue: 1, minValue: 0.1, maxValue: 8, automationRate: 'a-rate' },
     ]
   }
 
@@ -37,12 +44,18 @@ class LadderProcessor extends AudioWorkletProcessor {
     const audio = inputs[0]?.[0]
     const cv = inputs[1]?.[0]
 
-    const cutoff = params.cutoff![0]!
-    const resonance = params.resonance![0]!
+    const cutoffArr = params.cutoff!
+    const resonanceArr = params.resonance!
     const cvAmount = params.cutoffCvAmount![0]!
-    const drive = params.drive![0]!
+    const driveArr = params.drive!
 
     for (let i = 0; i < out.length; i++) {
+      // a-rate params arrive as length 1 (constant this block) or length
+      // `out.length` (one value per sample); this is the standard way to
+      // handle both without branching per-param on the caller's behalf.
+      const cutoff = cutoffArr.length > 1 ? cutoffArr[i]! : cutoffArr[0]!
+      const resonance = resonanceArr.length > 1 ? resonanceArr[i]! : resonanceArr[0]!
+      const drive = driveArr.length > 1 ? driveArr[i]! : driveArr[0]!
       // CV is 1.0 per octave, matching the pitch convention everywhere else.
       const fc = cutoff * Math.pow(2, (cv?.[i] ?? 0) * cvAmount)
       // Zero is an exact fixed point of ladderSample's recursion (see the

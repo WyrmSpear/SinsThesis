@@ -18,10 +18,20 @@ class VcoProcessor extends AudioWorkletProcessor {
 
   static get parameterDescriptors(): AudioParamDescriptor[] {
     return [
-      { name: 'tune', defaultValue: 0, minValue: -24, maxValue: 24, automationRate: 'k-rate' },
+      // tune and pulseWidth are a-rate (final review Finding 2): at k-rate
+      // a worklet reads params.foo![0] once per 128-sample render quantum,
+      // so a scheduleParam ramp -- a real, continuous AudioParam automation
+      // -- still reached the DSP as a staircase of block-sized steps, not
+      // the smooth glide the automation curve actually describes. a-rate
+      // delivers the browser's own per-sample ramp as a Float32Array; see
+      // process() below for how it's read. octave, shape and fmAmount stay
+      // k-rate: octave is nearly always used in whole steps and fmAmount
+      // scales an already-continuous CV input rather than being twiddled
+      // on its own, and shape is a discrete table index.
+      { name: 'tune', defaultValue: 0, minValue: -24, maxValue: 24, automationRate: 'a-rate' },
       { name: 'octave', defaultValue: 0, minValue: -4, maxValue: 4, automationRate: 'k-rate' },
       { name: 'shape', defaultValue: 0, minValue: 0, maxValue: 3, automationRate: 'k-rate' },
-      { name: 'pulseWidth', defaultValue: 0.5, minValue: 0.01, maxValue: 0.99, automationRate: 'k-rate' },
+      { name: 'pulseWidth', defaultValue: 0.5, minValue: 0.01, maxValue: 0.99, automationRate: 'a-rate' },
       { name: 'fmAmount', defaultValue: 0, minValue: 0, maxValue: 4, automationRate: 'k-rate' },
     ]
   }
@@ -38,20 +48,23 @@ class VcoProcessor extends AudioWorkletProcessor {
     const fmCv = inputs[1]?.[0]
     const syncGate = inputs[2]?.[0]
 
-    const tune = params.tune![0]!
+    const tuneArr = params.tune!
     const octave = params.octave![0]!
     const shape = SHAPES[Math.round(params.shape![0]!)] ?? 'saw'
-    const pw = params.pulseWidth![0]!
+    const pwArr = params.pulseWidth!
     const fmAmount = params.fmAmount![0]!
-
-    // A4 = 440 Hz; pitch CV is 1.0 per octave, tune is in semitones.
-    const base = 440 * Math.pow(2, octave + tune / 12)
 
     for (let i = 0; i < out.length; i++) {
       const sync = syncGate?.[i] ?? 0
       if (sync >= 0.5 && this.lastSync < 0.5) hardSync(this.state)
       this.lastSync = sync
 
+      // a-rate params arrive as length 1 (constant this block) or length
+      // `out.length` (one value per sample).
+      const tune = tuneArr.length > 1 ? tuneArr[i]! : tuneArr[0]!
+      const pw = pwArr.length > 1 ? pwArr[i]! : pwArr[0]!
+      // A4 = 440 Hz; pitch CV is 1.0 per octave, tune is in semitones.
+      const base = 440 * Math.pow(2, octave + tune / 12)
       const cv = (pitchCv?.[i] ?? 0) + (fmCv?.[i] ?? 0) * fmAmount
       const freq = pitchToFreq(base, cv, sampleRate)
       out[i] = oscSample(this.state, shape, freq, sampleRate, wavetableSet, pw)
