@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { renderGraph, ensureWorklets } from '../../src/engine/render'
+import { WORKLET_MODULES } from '../../src/engine/worklets/registry'
 import { registerModule, clearRegistry } from '../../src/engine/registry'
 import type { ModuleDescriptor, ModuleInstance } from '../../src/engine/types'
 
@@ -49,17 +50,35 @@ describe('render harness', () => {
     expect(Math.max(...samples)).toBeGreaterThan(0.9)
   })
 
-  it('shares one in-flight load between concurrent callers', async () => {
+  it('issues one addModule per worklet even when called concurrently', async () => {
     const ctx = new OfflineAudioContext(1, 128, 48000)
-    // Against a completion-flag guard, both calls would pass the check before
-    // either recorded itself, and the second addModule would register the same
-    // processor name twice and throw.
-    await expect(Promise.all([ensureWorklets(ctx), ensureWorklets(ctx)])).resolves.toHaveLength(2)
+    const real = ctx.audioWorklet.addModule.bind(ctx.audioWorklet)
+    let calls = 0
+    ctx.audioWorklet.addModule = (url: string) => {
+      calls++
+      return real(url)
+    }
+    await Promise.all([ensureWorklets(ctx), ensureWorklets(ctx), ensureWorklets(ctx)])
+    // A completion-flag guard would let all three callers through, giving
+    // 3 x WORKLET_MODULES.length calls.
+    expect(calls).toBe(WORKLET_MODULES.length)
   })
 
   it('is a no-op when called again after loading', async () => {
     const ctx = new OfflineAudioContext(1, 128, 48000)
     await ensureWorklets(ctx)
+    await expect(ensureWorklets(ctx)).resolves.toBeUndefined()
+  })
+
+  it('allows a retry after a failed load', async () => {
+    const ctx = new OfflineAudioContext(1, 128, 48000)
+    const real = ctx.audioWorklet.addModule.bind(ctx.audioWorklet)
+    let failing = true
+    ctx.audioWorklet.addModule = (url: string) =>
+      failing ? Promise.reject(new Error('boom')) : real(url)
+
+    await expect(ensureWorklets(ctx)).rejects.toThrow('boom')
+    failing = false
     await expect(ensureWorklets(ctx)).resolves.toBeUndefined()
   })
 })

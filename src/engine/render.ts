@@ -11,7 +11,14 @@ export function ensureWorklets(ctx: BaseAudioContext): Promise<void> {
   if (!inFlight) {
     inFlight = Promise.all(
       WORKLET_MODULES.map((name) => ctx.audioWorklet.addModule(workletUrl(name))),
-    ).then(() => undefined)
+    )
+      .then(() => undefined)
+      .catch((err: unknown) => {
+        // A failed load must not poison the context for good: drop the cached
+        // rejection so the next caller gets a fresh attempt.
+        loading.delete(ctx)
+        throw err
+      })
     loading.set(ctx, inFlight)
   }
   return inFlight
