@@ -1,13 +1,20 @@
 import { PatchGraph } from './graph'
 import { WORKLET_MODULES, workletUrl } from './worklets/registry'
 
-const loaded = new WeakSet<BaseAudioContext>()
+const loading = new WeakMap<BaseAudioContext, Promise<void>>()
 
-/** Load every worklet into a context. Safe to call repeatedly. */
-export async function ensureWorklets(ctx: BaseAudioContext): Promise<void> {
-  if (loaded.has(ctx)) return
-  await Promise.all(WORKLET_MODULES.map((name) => ctx.audioWorklet.addModule(workletUrl(name))))
-  loaded.add(ctx)
+/** Load every worklet into a context. Safe to call repeatedly and concurrently:
+ *  overlapping callers share one in-flight load rather than racing to register
+ *  the same processor twice. */
+export function ensureWorklets(ctx: BaseAudioContext): Promise<void> {
+  let inFlight = loading.get(ctx)
+  if (!inFlight) {
+    inFlight = Promise.all(
+      WORKLET_MODULES.map((name) => ctx.audioWorklet.addModule(workletUrl(name))),
+    ).then(() => undefined)
+    loading.set(ctx, inFlight)
+  }
+  return inFlight
 }
 
 /**

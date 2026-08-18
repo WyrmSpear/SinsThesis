@@ -1,16 +1,16 @@
 /**
- * TypeScript's built-in libs do not declare AudioWorkletGlobalScope: the DOM
- * lib mentions `AudioWorkletProcessor` only in passing doc comments, and the
- * "webworker" lib actually conflicts with "DOM" in the same tsc program (this
- * project's tsconfig loads DOM for the app code, and a worklet file living
- * under the same `src` include cannot get its own program). So every worklet
- * shell needs these declared by hand, once, here.
+ * Ambient declarations for AudioWorkletGlobalScope.
  *
- * These names are only ever valid inside AudioWorkletGlobalScope, but
- * TypeScript has no mechanism to scope ambient globals to one directory —
- * they leak into the whole program's global namespace. That is an accepted,
- * deliberate trade-off: nothing outside `worklets/*.worklet.ts` references
- * `AudioWorkletProcessor` or `registerProcessor`, so the leak is inert.
+ * TypeScript's built-in libs declare neither `AudioWorkletProcessor` nor
+ * `registerProcessor`, and pulling in the `webworker` lib alongside this
+ * project's `DOM` lib collides on about thirty global-scope names. So we
+ * declare the handful of things worklets actually need.
+ *
+ * The cost: `declare global` reaches the whole program, so `sampleRate` and
+ * `currentTime` typecheck in ordinary engine files that have no such global at
+ * runtime. Scoping this properly would need a separate tsconfig and project
+ * references. Instead, tests/node/boundaries.test.ts asserts these names appear
+ * only in *.worklet.ts files.
  */
 declare global {
   interface AudioWorkletProcessor {
