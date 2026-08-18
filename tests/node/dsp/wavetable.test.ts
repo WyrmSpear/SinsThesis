@@ -39,10 +39,15 @@ describe.each(['saw', 'pulse', 'tri', 'sine'] as OscShape[])('%s oscillator', (s
     expect(peakHz(render(shape, 440), SR)).toBeCloseTo(440, -1)
   })
 
-  it('stays inside +/-1.05', () => {
-    for (const freq of [110, 441, 1109, 1760, 5000]) {
+  it('stays inside +/-1.06', () => {
+    // Individual tables hold ±1.05, but readBlended's crossfade of two
+    // tables (see wavetable.ts) can add slightly past that where their
+    // Gibbs ripples land out of phase -- measured worst case ±1.053, pulse
+    // near a boundary. 5120 is included here (it wasn't before) because
+    // that's exactly where it shows up.
+    for (const freq of [110, 441, 1109, 1760, 5000, 5120]) {
       const out = render(shape, freq)
-      for (const v of out) expect(Math.abs(v)).toBeLessThan(1.05)
+      for (const v of out) expect(Math.abs(v)).toBeLessThan(1.06)
     }
   })
 
@@ -140,41 +145,77 @@ describe('pulse width', () => {
 })
 
 describe('mip transition', () => {
-  // Sweep 100 -> 900 Hz, crossing the 160/320/640 Hz mip boundaries -- the
-  // same three-boundary sweep minblep-spec.md section 7d measures. Triangle
-  // is continuous everywhere in its ideal form (no inherent per-cycle jump
-  // the way saw/pulse have at wrap), so a first-difference spike at a
-  // mip-level transition is unambiguously the transition itself, not a
-  // wrap this test would otherwise have to filter out.
-  it('produces no discontinuity larger than the stated threshold at a mip boundary', () => {
+  // Sweep 100 -> 11000 Hz, crossing all seven audible mip boundaries (160,
+  // 320, 640, 1280, 2560, 5120, 10240 Hz -- LOWEST_HZ * 2^k). The original
+  // version of this test swept only to 900 Hz, covering the lowest three;
+  // an audit that swept the full seven found triangle's worst single-sample
+  // delta reaching 0.42-0.74 at the top two, well past this file's 0.35
+  // threshold, and reproducibly phase-dependent -- the exact sample that
+  // lands on the boundary shifts with sweep rate, so this test tries a
+  // handful of different rates and takes the worst per boundary rather than
+  // trusting one sweep to find it.
+  //
+  // Triangle is continuous everywhere in its ideal form (no inherent
+  // per-cycle jump the way saw/pulse have at wrap), so a first-difference
+  // spike at a mip-level transition is unambiguously the transition itself,
+  // not a wrap this test would otherwise have to filter out.
+  function worstDeltaPerBoundary(startFreq: number, endFreq: number, durationSamples: number): Map<number, number> {
     const state = createOscState()
     const set = getWavetableSet(SR)
-    const durationSamples = SR // 1 second sweep
-    const startFreq = 100
-    const endFreq = 900
-
     let prevSample: number | null = null
     let prevLevel = mipLevelForFreq(startFreq, set)
-    const transitionDeltas: number[] = []
+    const worst = new Map<number, number>()
 
     for (let i = 0; i < durationSamples; i++) {
       const freq = startFreq + ((endFreq - startFreq) * i) / durationSamples
       const level = mipLevelForFreq(freq, set)
       const sample = oscSample(state, 'tri', freq, SR, set)
       if (level !== prevLevel && prevSample !== null) {
-        transitionDeltas.push(Math.abs(sample - prevSample))
+        const boundaryHz = set.lowestHz * 2 ** Math.max(level, prevLevel)
+        const delta = Math.abs(sample - prevSample)
+        worst.set(boundaryHz, Math.max(worst.get(boundaryHz) ?? 0, delta))
       }
       prevLevel = level
       prevSample = sample
     }
+    return worst
+  }
 
-    // At least the 160/320/640 Hz boundaries must actually have been
-    // crossed by this sweep, or the test isn't exercising what it claims to.
-    expect(transitionDeltas.length).toBeGreaterThanOrEqual(3)
-    for (const delta of transitionDeltas) {
-      // Measured worst case at these three boundaries; see task-M2-report.md.
-      expect(delta).toBeLessThan(0.35)
+  it('produces no discontinuity larger than the stated threshold at any of the seven boundaries', () => {
+    const worst = new Map<number, number>()
+    // A few different sweep rates so a boundary isn't accidentally measured
+    // at a lucky (low-delta) phase -- see comment above.
+    for (const durationSamples of [SR, Math.floor(SR * 1.37), Math.floor(SR * 0.73)]) {
+      const perBoundary = worstDeltaPerBoundary(100, 11000, durationSamples)
+      for (const [hz, delta] of perBoundary) worst.set(hz, Math.max(worst.get(hz) ?? 0, delta))
     }
+
+    // All seven boundaries must actually have been crossed, or the test
+    // isn't exercising what it claims to.
+    expect(worst.size).toBe(7)
+
+    // The five lower boundaries clear the codebase's standing 0.35 tick
+    // threshold after crossfading (readBlended in wavetable.ts).
+    for (const hz of [160, 320, 640, 1280, 2560]) {
+      expect(worst.get(hz)!).toBeLessThan(0.35)
+    }
+
+    // 5120 and 10240 Hz do not clear 0.35, even after crossfading, and
+    // cannot: a control measurement of *steady, unswitched* playback of a
+    // single top-level table (no mip transition anywhere in sight) already
+    // shows a sample-to-sample delta of 0.43-0.44 at 5120 Hz and 0.64-0.83
+    // at 10240 Hz. At those frequencies a 48 kHz sample rate gives under
+    // five samples per cycle, and the top two mip levels carry only one or
+    // two harmonics (see maxHarmonicFor), so the waveform's own slope
+    // between consecutive samples is already this large -- crossfading
+    // removes the *extra* jump switching used to add on top of that (was
+    // 0.41/0.73, now within measurement noise of the unswitched floor), but
+    // it cannot remove the floor itself without changing the top tables'
+    // amplitude, which would change the sound. See
+    // .superpowers/sdd/2026-08-18-phase1a-engine/fix-wave-B-report.md for
+    // the full measurement.
+    expect(worst.get(5120)!).toBeLessThan(0.45)
+    expect(worst.get(10240)!).toBeLessThan(0.65)
   })
 })
 

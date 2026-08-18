@@ -17,9 +17,13 @@
  * Pulse is not a separate table: it's the saw table read twice and combined
  * via the difference identity in `pulseSample` below, so PWM is exact and
  * continuously variable with no crossfading between discrete duty-cycle
- * tables. Mip-level switching is hard (nearest table per sample), not
- * crossfaded -- measured within 1.3 dB of steady state at every boundary,
- * and simpler. Sine has no discontinuity of any order and stays analytic.
+ * tables. Mip-level switching itself *is* crossfaded (`readBlended`) between
+ * the two adjacent tables, weighted by fractional octave position -- hard
+ * switching measured within 1.3 dB of crossfading at the three lowest
+ * boundaries, which is why it shipped first, but an audit of all seven
+ * boundaries found triangle's worst single-sample delta reaching 0.42-0.74
+ * at the top two, well past this codebase's 0.35 tick threshold. Sine has no
+ * discontinuity of any order and stays analytic.
  *
  * Table generation is expensive relative to a single sample (millions of
  * sin/cos evaluations) but happens once per sample rate and is cached at
@@ -82,9 +86,13 @@ function maxHarmonicFor(topFreqHz: number, nyquist: number): number {
  * matter how many harmonics are summed, because Gibbs doesn't shrink with
  * harmonic count. The taper only ever *attenuates* harmonics already below
  * Nyquist; it introduces nothing above the cutoff, so the table stays
- * exactly band-limited while the ±1.05 headroom requirement holds. Standard
- * technique for additive-synthesis wavetables (see e.g. Lanczos's own
- * treatment of Fourier series smoothing).
+ * exactly band-limited while headroom stays close to unity -- individual
+ * tables measure within ±1.05, though `readBlended`'s crossfade of two
+ * tables whose Gibbs ripples aren't in phase can add slightly past that at
+ * a boundary (measured worst case ±1.053, pulse near 5120 Hz); the test
+ * tolerance widens to ±1.06 to cover it. Standard technique for
+ * additive-synthesis wavetables (see e.g. Lanczos's own treatment of
+ * Fourier series smoothing).
  */
 function lanczosSigma(n: number, maxHarmonic: number): number {
   const x = n / (maxHarmonic + 1)
@@ -174,12 +182,35 @@ export function getWavetableSet(sampleRate: number): WavetableSet {
   return set
 }
 
-/** Which mip level covers `freqHz`, hard-selected (no crossfade) --
- *  measured within 1.3 dB of steady state at every boundary in this
- *  project's own sweep, and simpler than blending two tables per sample. */
+/** Which mip level covers `freqHz`, hard-selected (no crossfade). Sample
+ *  generation itself crossfades (see `mipLevelFrac` / `readBlended` below);
+ *  this integer form is kept for callers -- tests included -- that need to
+ *  know when a sweep crosses from one level's territory into the next. */
 export function mipLevelForFreq(freqHz: number, set: WavetableSet): number {
   const f = Math.max(Math.abs(freqHz), set.lowestHz)
   const level = Math.floor(Math.log2(f / set.lowestHz))
+  return Math.min(Math.max(level, 0), set.octaveCount - 1)
+}
+
+/**
+ * Fractional mip level: the integer part is `mipLevelForFreq`, the
+ * fractional part is how far `freqHz` sits between that level and the next.
+ * Reading two adjacent tables and blending by this fraction (`readBlended`)
+ * replaces hard switching.
+ *
+ * Hard switching measured within 1.3 dB of crossfading at the three lowest
+ * boundaries (160/320/640 Hz) -- close enough that hard switching shipped
+ * for being simpler. It does not hold at the top of the range: an audit
+ * sweeping all seven boundaries found triangle's worst single-sample delta
+ * reaching 0.42-0.74 at 5120/10240 Hz, past this codebase's 0.35 threshold.
+ * Crossfading removes the *extra* jump switching adds on top of the
+ * waveform's own steepness -- see the DC-blocker-adjacent measurement notes
+ * in the mip-boundary test for what's left after this fix and why it can't
+ * go lower without changing the top tables' amplitude.
+ */
+function mipLevelFrac(freqHz: number, set: WavetableSet): number {
+  const f = Math.max(Math.abs(freqHz), set.lowestHz)
+  const level = Math.log2(f / set.lowestHz)
   return Math.min(Math.max(level, 0), set.octaveCount - 1)
 }
 
@@ -240,6 +271,27 @@ function pulseSample(sawTable: Float32Array, t: number, w: number): number {
   return (2 * w - 1) - (a - b)
 }
 
+/** Blend the two mip levels adjacent to `freqHz`, weighted by how far into
+ *  the upper one it sits. `read(table, t)` is whichever per-shape reader
+ *  (plain table lookup, or pulse's saw-difference) is being crossfaded --
+ *  both levels must produce output in the same convention for the blend to
+ *  be meaningful. At an exact octave boundary the weight is 0 (or 1 at the
+ *  far end of the range), so this reduces to a single table read there and
+ *  at every frequency that isn't near a boundary at all -- the extra table
+ *  read only costs something during the transition band. */
+function readBlended(
+  tables: Float32Array[], freqHz: number, set: WavetableSet, read: (table: Float32Array) => number,
+): number {
+  const levelFrac = mipLevelFrac(freqHz, set)
+  const level0 = Math.floor(levelFrac)
+  const level1 = Math.min(level0 + 1, set.octaveCount - 1)
+  const frac = levelFrac - level0
+  if (frac === 0) return read(tables[level0]!)
+  const a = read(tables[level0]!)
+  const b = read(tables[level1]!)
+  return a + (b - a) * frac
+}
+
 const TWO_PI = Math.PI * 2
 const MIN_PW = 0.01
 const MAX_PW = 0.99
@@ -270,16 +322,14 @@ export function oscSample(
 
   if (shape === 'sine') return Math.sin(TWO_PI * t)
 
-  const level = mipLevelForFreq(freq, set)
-
   switch (shape) {
     case 'saw':
-      return readTable(set.saw[level]!, t)
+      return readBlended(set.saw, freq, set, (table) => readTable(table, t))
     case 'tri':
-      return readTable(set.tri[level]!, t)
+      return readBlended(set.tri, freq, set, (table) => readTable(table, t))
     case 'pulse': {
       const w = Math.min(Math.max(pulseWidth, MIN_PW), MAX_PW)
-      return pulseSample(set.saw[level]!, t, w)
+      return readBlended(set.saw, freq, set, (table) => pulseSample(table, t, w))
     }
   }
 }
