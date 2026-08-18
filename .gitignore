@@ -1,3 +1,6 @@
 .superpowers/
 node_modules/
 dist/
+coverage/
+public/worklets/
+tests/browser/__screenshots__/
