@@ -49,6 +49,39 @@ describe('VCF module', () => {
     expect(rms(tail)).toBeGreaterThan(0.005)
     expect(peakHz(tail, SR)).toBeCloseTo(800, -2)
   })
+
+  it('self-oscillates when resonance is raised after the node has been running', async () => {
+    // The failure this guards: an earlier version seeded self-oscillation
+    // with a one-shot kick on the processor's very first process() call.
+    // That already fires (and, at resonance 0, decays back toward silence)
+    // long before a player leaves 'in' unpatched and cranks resonance up
+    // mid-session -- a real, ordinary sequence the original test never
+    // exercised because it set resonance to 1 before the first tick.
+    //
+    // A literal `setTimeout` inside the graph-builder callback (as sketched
+    // in review) can't express "partway through the render": OfflineAudioContext
+    // doesn't run on wall-clock time, and the timeout's callback fires while
+    // the synchronous build() call is still unwinding -- before
+    // ctx.startRendering() has produced a single sample -- so it lands at
+    // t=0 in the render regardless of the requested delay, collapsing to the
+    // same case the original self-oscillation test already covers.
+    //
+    // graph.setParam has no time argument either. What genuinely schedules a
+    // change partway through an offline render is the AudioParam itself, so
+    // this reaches the instance directly and calls its setParam with an
+    // atTime in the render's own timeline -- 0.5s into the 1.5s render.
+    const out = await renderGraph(1.5, (_ctx, g) => {
+      const vcf = g.addModule('vcf', 'vcf')
+      g.setParam(vcf, 'cutoff', 800)
+      g.setParam(vcf, 'resonance', 0)
+      g.getInstance(vcf)!.setParam('resonance', 1, 0.5)
+      return vcf
+    })
+    // Measure well after resonance opens, so a continuous (rather than
+    // one-shot) noise floor has had time to ring the loop up.
+    const tail = out.subarray(out.length >> 1)
+    expect(rms(tail)).toBeGreaterThan(0.01)
+  })
 })
 
 describe('Wavefolder module', () => {

@@ -17,6 +17,12 @@ export interface LadderState {
   s: [number, number, number, number]
 }
 
+/**
+ * Zero is an exact fixed point of this recursion: fed pure silence, the loop
+ * never perturbs itself, so a caller relying on high resonance to self-start
+ * from nothing will see no oscillation without an outside kick -- a real
+ * ladder circuit has a thermal noise floor to do that; this state does not.
+ */
 export function createLadderState(): LadderState {
   return { s: [0, 0, 0, 0] }
 }
