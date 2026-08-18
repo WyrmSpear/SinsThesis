@@ -1,8 +1,8 @@
-import { createOscState, hardSync, oscSample, type OscShape } from '../dsp/polyblep'
+import { createOscState, hardSync, oscSample, pitchToFreq, type OscShape } from '../dsp/wavetable'
 
 const SHAPES: OscShape[] = ['saw', 'pulse', 'tri', 'sine']
 
-/** Thin shell. All the math lives in dsp/polyblep, which Node tests directly. */
+/** Thin shell. All the math lives in dsp/wavetable, which Node tests directly. */
 class VcoProcessor extends AudioWorkletProcessor {
   private readonly state = createOscState()
   private lastSync = 0
@@ -44,10 +44,7 @@ class VcoProcessor extends AudioWorkletProcessor {
       this.lastSync = sync
 
       const cv = (pitchCv?.[i] ?? 0) + (fmCv?.[i] ?? 0) * fmAmount
-      // Octave and tune alone reach 28 kHz, and pitch CV goes further. Past
-      // Nyquist the phase increment stops wrapping meaningfully, so clamp at
-      // the module boundary and leave the core a plain function of its inputs.
-      const freq = Math.min(base * Math.pow(2, cv), sampleRate * 0.49)
+      const freq = pitchToFreq(base, cv, sampleRate)
       out[i] = oscSample(this.state, shape, freq, sampleRate, pw)
     }
     return true

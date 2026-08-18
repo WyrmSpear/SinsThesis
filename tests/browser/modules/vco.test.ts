@@ -35,13 +35,34 @@ describe('VCO module', () => {
   // along with the real harmonics. Render at the module's default A4 tuning
   // instead and locate the fundamental with peakHz rather than assuming it.
   //
-  // This is the same PolyBLEP saw measured at 441 Hz in the node-side
-  // polyblep.test.ts baseline (~-43 dB); a follow-up task will raise it to
-  // the professional bar via minBLEP.
-  it('holds the saw alias floor at its honest pre-minBLEP baseline at A4', async () => {
-    const out = await renderGraph(0.3, (_ctx, g) => g.addModule('vco', 'osc'))
-    // Measured: -42.8 dB. Margin of ~3 dB below that.
-    expect(aliasFloorDb(out, SR, peakHz(out, SR))).toBeLessThan(-40)
+  // This oscillator is now the wavetable core (dsp/wavetable.ts), not
+  // PolyBLEP -- see task-M2-report.md for the full measured table. The
+  // -40 dB bar here was honest for PolyBLEP; it's trivially satisfied now
+  // and would hide a regression back to something PolyBLEP-grade.
+  //
+  // A tiny tune offset (~0.007 semitones, inaudible) nudges the fundamental
+  // onto an exact FFT bin for this render length: without it, the
+  // Blackman-Harris window's own ~-92 dB sidelobe smears 440 Hz's energy
+  // into neighboring bins and the test would read a window-leakage floor
+  // around -95 dB instead of the oscillator's real one -- the same trap
+  // aliasFloorDb's own doc comment warns about for un-bin-aligned tones,
+  // just via window leakage rather than a small-integer SR/f0 ratio. See
+  // the identical fix (and full writeup) in tests/node/dsp/wavetable.test.ts.
+  it('holds the saw alias floor at its wavetable-core measured reality at A4', async () => {
+    const N = 65536
+    const binSpacing = SR / N
+    const alignedHz = Math.round(440 / binSpacing) * binSpacing
+    const tune = 12 * Math.log2(alignedHz / 440)
+    const out = await renderGraph(N / SR, (_ctx, g) => {
+      const id = g.addModule('vco', 'osc')
+      g.setParam(id, 'tune', tune)
+      return id
+    })
+    // Measured: -143.7 dB. Margin of over 40 dB below that -- see
+    // task-M2-report.md for why the bar is set well below the measured
+    // figure rather than right up against it (browser-render jitter across
+    // machines/CI, not a hedge against the oscillator's own quality).
+    expect(aliasFloorDb(out, SR, peakHz(out, SR))).toBeLessThan(-100)
   })
 
   it('produces sound on every shape', async () => {

@@ -2,11 +2,11 @@ import {
   createEnvState, envSample, createSampleHoldState, sampleHold,
   createSequencerState, sequencerStep,
 } from '../dsp/segment'
-import { createOscState, oscSample, hardSync, type OscShape } from '../dsp/polyblep'
+import { createOscState, oscSample, hardSync, type OscShape } from '../dsp/wavetable'
 
-/** Thin shell. All the math lives in dsp/segment and dsp/polyblep, which Node
- *  tests directly. One bundle registers all four processors because they
- *  share the segment core and change together. */
+/** Thin shell. All the math lives in dsp/segment and dsp/wavetable, which
+ *  Node tests directly. One bundle registers all four processors because
+ *  they share the segment core and change together. */
 class AdsrProcessor extends AudioWorkletProcessor {
   private readonly state = createEnvState()
 

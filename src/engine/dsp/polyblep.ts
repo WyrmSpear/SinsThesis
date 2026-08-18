@@ -1,12 +1,25 @@
 /**
  * PolyBLEP oscillator core.
  *
+ * SUPERSEDED, KEPT AS REFERENCE ONLY -- do not import this from a worklet or
+ * any live signal path. The VCO worklet and the LFO processor both read from
+ * dsp/wavetable.ts now: mipmapped band-limited wavetables measured 50-90 dB
+ * better alias rejection at roughly 1/15th the CPU (see
+ * .superpowers/sdd/2026-08-18-phase1a-engine/minblep-spec.md section 7 and
+ * task-M2-report.md for the numbers). This file stays in the tree because
+ * its honest, unimproved alias floor is the baseline the wavetable core is
+ * measured against -- its tests below still pass and should keep passing,
+ * but nothing should import `oscSample` from here again. Don't delete it as
+ * dead code, and don't resurrect it as a live path without re-running that
+ * comparison.
+ *
  * A naive saw or pulse steps discontinuously once per cycle, and that step
  * folds energy back below Nyquist as audible alias tones. PolyBLEP subtracts a
  * polynomial approximation of a band-limited step at each discontinuity, which
  * buys roughly 60 dB of alias rejection for a few arithmetic operations.
  *
- * Pure by design: no audio context, no DOM. The worklet is a shell over this.
+ * Pure by design: no audio context, no DOM. It has no worklet shell anymore
+ * (see above) but stays a pure module on the same principle.
  */
 
 export type OscShape = 'saw' | 'pulse' | 'tri' | 'sine'
