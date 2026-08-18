@@ -17,6 +17,7 @@ interface GraphNode {
   type: string
   instance: ModuleInstance | null // null for ghosts
   params: Record<string, number>
+  slot: [number, number]
 }
 
 /** WebAudio permits a cycle only through a DelayNode; one render quantum is
@@ -55,7 +56,7 @@ export class PatchGraph {
       instance.setParam(p.id, p.default)
     }
 
-    this.nodes.set(moduleId, { type, instance, params })
+    this.nodes.set(moduleId, { type, instance, params, slot: [0, 0] })
     return moduleId
   }
 
@@ -67,7 +68,7 @@ export class PatchGraph {
     if (this.nodes.has(id)) {
       throw new Error(`addGhost: id "${id}" is already in the patch`)
     }
-    this.nodes.set(id, { type, instance: null, params: { ...params } })
+    this.nodes.set(id, { type, instance: null, params: { ...params }, slot: [0, 0] })
   }
 
   getInstance(id: string): ModuleInstance | undefined {
@@ -91,7 +92,19 @@ export class PatchGraph {
     node.instance?.setParam(paramId, value)
   }
 
-  connect(from: [string, string], to: [string, string]): Cable {
+  getSlot(id: string): [number, number] {
+    const node = this.nodes.get(id)
+    if (!node) throw new Error(`getSlot: no module "${id}"`)
+    return [...node.slot] as [number, number]
+  }
+
+  setSlot(id: string, slot: [number, number]): void {
+    const node = this.nodes.get(id)
+    if (!node) throw new Error(`setSlot: no module "${id}"`)
+    node.slot = [...slot] as [number, number]
+  }
+
+  connect(from: readonly [string, string], to: readonly [string, string]): Cable {
     const [fromId, fromPort] = from
     const [toId, toPort] = to
     const source = this.nodes.get(fromId)
