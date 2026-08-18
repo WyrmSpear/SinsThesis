@@ -105,7 +105,7 @@ sample-exact.
 
 ## 6. The Phase 1 module set
 
-Thirteen modules, chosen so the rack can make music rather than demonstrate a
+Fifteen modules, chosen so the rack can make music rather than demonstrate a
 sine wave.
 
 **Sources** — VCO (PolyBLEP saw, pulse, triangle, sine; PWM; exponential and
