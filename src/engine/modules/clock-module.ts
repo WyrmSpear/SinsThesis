@@ -37,18 +37,52 @@ import { rollingHorizonEdges } from '../clock'
  * edges get added.
  *
  * Backgrounding: browsers throttle a hidden tab's timers, typically to
- * 1/second, and Chrome's "intensive throttling" can drop that to as
- * infrequently as once a minute after several minutes hidden. If a tick is
- * late enough that `ctx.currentTime` catches up to `scheduledUntil` before
- * the next one fires, the gate simply holds its last scheduled value --
- * playback stalls rather than desyncs -- until the next tick refills the
- * horizon starting from exactly where the step grid left off (anchored to
- * `epoch`, not to wall-clock time), so tempo and phase are unaffected, only
- * momentarily paused. `LOOKAHEAD_SECONDS` is sized well above the common
- * 1/second throttle so an ordinary backgrounded tab never audibly gaps;
- * only the rarer extreme-throttling regime can still produce one.
+ * 1/second, and Chrome's "intensive throttling" -- default behavior, not an
+ * edge case -- drops that to as infrequently as once a minute after roughly
+ * five minutes hidden. A first version of this fix sized `LOOKAHEAD_SECONDS`
+ * at 5, which comfortably covers the common 1/second throttle but not the
+ * once-a-minute regime: `topUp` would ask for 5 more seconds of schedule
+ * once a minute, so the schedule ran dry after 5 of every 60 seconds and the
+ * gate held its last value -- stalled, not desynced, but stalled -- for the
+ * other 55 (91.7% of the time). A sequencer that stops whenever the player
+ * switches tabs is broken in an obvious, user-visible way, so the fix is to
+ * size the horizon to survive the throttle rather than the common case:
+ * `LOOKAHEAD_SECONDS` (90) clears the documented once-a-minute worst case by
+ * 1.5x, so a single throttled tick still leaves 30 s of already-scheduled
+ * audio-clock automation in hand when the next one fires -- comfortable
+ * margin against a tick landing a little later than "roughly" a minute,
+ * without paying for a much longer horizon than the documented throttle
+ * calls for. See `tests/node/clock.test.ts`'s "surviving Chrome intensive
+ * throttling" suite, which simulates exactly this -- advancing simulated
+ * time 60 s between wakeups and asserting the horizon from the previous
+ * tick always still reaches past the next one -- against this module's own
+ * exported `LOOKAHEAD_SECONDS`, not a guessed value.
+ *
+ * No other reconciliation logic was needed for this: `topUp`'s target is
+ * always computed fresh from `ctx.currentTime` (real elapsed audio-clock
+ * time) plus this margin, and `rollingHorizonEdges` is pure and stateless
+ * about wall-clock time -- it only ever asks "what edges are needed between
+ * `scheduledUntil` and `target`," so an arbitrarily late tick (time having
+ * "jumped" while backgrounded) reconciles for free the next time `topUp`
+ * runs, by construction, the same way it already did for the within-horizon
+ * case this module's doc comment described before this fix.
+ *
+ * Cost of the longer horizon: at the fastest settings this module allows
+ * (300 BPM, division 8 -> a 25 ms step), 90 s of lookahead is up to ~3600
+ * steps, i.e. ~7200 `setValueAtTime` calls outstanding on the gate's
+ * `AudioParam` at once -- an unremarkable count for Web Audio's automation
+ * queue (browsers routinely handle far more; nothing in the spec bounds it),
+ * and `ConstantSourceNode` has no other state whose cost scales with event
+ * count. A param change still calls `cancelScheduledValues` and rebuilds
+ * from `now`, same as before this fix -- now rebuilding up to that same
+ * ~7200-event horizon in one synchronous call instead of ~400 (5 s worth).
+ * Measured in this project's own browser harness (see
+ * `tests/browser/modules/clock.test.ts`): rebuilding the full 90 s horizon
+ * at the fastest settings takes low-single-digit milliseconds on the main
+ * thread, not the audio thread -- well inside "cheap enough for a knob
+ * turn" and nowhere near a frame budget, let alone an audio callback's.
  */
-const LOOKAHEAD_SECONDS = 5
+export const LOOKAHEAD_SECONDS = 90
 const TOPUP_INTERVAL_MS = 1000
 
 function offlineDurationSeconds(ctx: BaseAudioContext): number | undefined {

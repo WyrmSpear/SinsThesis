@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { stepDuration, scheduleSteps, rollingHorizonEdges } from '../../src/engine/clock'
+import { LOOKAHEAD_SECONDS } from '../../src/engine/modules/clock-module'
 
 describe('stepDuration', () => {
   it('gives half a second per beat at 120 BPM', () => {
@@ -80,5 +81,58 @@ describe('rollingHorizonEdges', () => {
     const { edges } = rollingHorizonEdges(0, 0, 2, 120, 1, 0.25)
     // stepDuration(120, 1) = 0.5s; pulseWidth 0.25 -> 0.125s pulse.
     expect(edges[0]).toEqual({ on: 0, off: 0.125 })
+  })
+})
+
+// A2 follow-up: Chrome's documented "intensive throttling" caps a hidden
+// tab's timers to about once a minute after roughly five minutes hidden --
+// default behavior, not an edge case. clock-module.ts's `topUp` asks for
+// `ctx.currentTime + LOOKAHEAD_SECONDS` every time its timer fires; if
+// LOOKAHEAD_SECONDS is smaller than the gap between two wakeups, the
+// schedule runs dry before the next tick arrives and the gate holds its
+// last value -- silently stalled -- until the tick after that. The old
+// LOOKAHEAD_SECONDS (5) stalled 55 of every 60 seconds under this exact
+// throttle (91.7% of the time). This simulates that throttle directly
+// against clock-module.ts's real, deployed constant (not a guessed value)
+// by driving rollingHorizonEdges the same way `topUp` does, advancing the
+// clock 60 s between wakeups and asserting the schedule is always still
+// ahead of "now" the moment each tick fires -- i.e. the gate is never
+// caught with nothing scheduled.
+describe('surviving Chrome intensive throttling (once-a-minute timer ticks)', () => {
+  const THROTTLED_TICK_SECONDS = 60
+  const bpm = 120
+  const division = 1
+  const pulseWidth = 0.5
+
+  it('keeps the horizon ahead of "now" at every throttled wakeup', () => {
+    let epoch = 0
+    let scheduledUntil = epoch
+    let now = epoch
+
+    // First tick, same as clock-module.ts's creation-time rescheduleGate.
+    ;({ scheduledUntil } = rollingHorizonEdges(
+      epoch, scheduledUntil, now + LOOKAHEAD_SECONDS, bpm, division, pulseWidth,
+    ))
+
+    // 30 simulated minutes of a backgrounded, throttled tab: one wakeup
+    // every 60 s, nothing in between (no earlier ticks ever fire -- that is
+    // what "intensive throttling" means).
+    for (let tick = 0; tick < 30; tick++) {
+      now += THROTTLED_TICK_SECONDS
+      // The audio clock has already reached `now` by the time this wakeup
+      // runs. If the horizon from the previous tick didn't reach this far,
+      // the gate already stalled before this line even executes.
+      expect(scheduledUntil).toBeGreaterThan(now)
+      ;({ scheduledUntil } = rollingHorizonEdges(
+        epoch, scheduledUntil, now + LOOKAHEAD_SECONDS, bpm, division, pulseWidth,
+      ))
+    }
+  })
+
+  it('LOOKAHEAD_SECONDS itself clears the documented worst-case tick interval with margin', () => {
+    // Not just "greater than" -- a comfortable margin, so a tick landing a
+    // little late (the throttle is described as "roughly" once a minute,
+    // not exactly) still doesn't stall.
+    expect(LOOKAHEAD_SECONDS).toBeGreaterThanOrEqual(THROTTLED_TICK_SECONDS * 1.5)
   })
 })

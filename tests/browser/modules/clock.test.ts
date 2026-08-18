@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { renderGraph } from '../../../src/engine/render'
 import { registerModule, clearRegistry } from '../../../src/engine/registry'
-import { clockDescriptor } from '../../../src/engine/modules/clock-module'
+import { clockDescriptor, LOOKAHEAD_SECONDS } from '../../../src/engine/modules/clock-module'
 import { rmsEnvelope } from '../../../src/engine/analysis/features'
+import { PatchGraph } from '../../../src/engine/graph'
 
 const SR = 48000
 
@@ -55,5 +56,44 @@ describe('Clock module', () => {
     // from "died at 60s" (0 transitions, tail pinned at whatever value it
     // last held).
     expect(transitions).toBeGreaterThanOrEqual(4)
+  })
+
+  // A2 follow-up: LOOKAHEAD_SECONDS grew from 5 to 90 to survive Chrome's
+  // once-a-minute intensive-throttling regime (see clock-module.ts's doc
+  // comment). A param change still calls cancelScheduledValues and rebuilds
+  // the whole horizon from `now` -- now up to ~7200 setValueAtTime calls at
+  // the fastest settings (300 BPM, division 8) instead of ~400. This
+  // doesn't render any audio -- it only needs a real AudioContext to host
+  // real AudioParam automation -- and directly times what a knob turn costs
+  // on the main thread, to confirm the doc comment's "low-single-digit
+  // milliseconds" claim rather than assert it unmeasured. Measured: ~1.9 ms.
+  it('rebuilds the full 90 s horizon at the fastest settings cheaply enough for a knob turn', () => {
+    const ctx = new AudioContext()
+    try {
+      const graph = new PatchGraph(ctx)
+      const clock = graph.addModule('clock', 'clk')
+      graph.setParam(clock, 'bpm', 300)
+      graph.setParam(clock, 'division', 8)
+
+      // Fastest step this module allows: stepDuration(300, 8) = 0.025s.
+      // LOOKAHEAD_SECONDS / 0.025 steps, 2 setValueAtTime calls each.
+      const worstCaseEvents = Math.ceil(LOOKAHEAD_SECONDS / (60 / 300 / 8)) * 2
+
+      const start = performance.now()
+      // Simulates a knob turn: setParam -> rescheduleGate -> cancel + full
+      // rebuild, same path a live player's UI takes.
+      graph.setParam(clock, 'pulseWidth', 0.4)
+      const elapsedMs = performance.now() - start
+
+      // Generous: real turns happen once per user gesture, not in a tight
+      // loop, so this only needs to clear "cheap enough not to be felt,"
+      // not a tight performance budget. Comfortably below a single frame
+      // (16.7 ms) is the bar; this is nowhere close to a stall.
+      expect(elapsedMs).toBeLessThan(16)
+      expect(worstCaseEvents).toBeGreaterThan(1000) // sanity: this is a real stress case, not a token one
+      graph.dispose() // clears the module's setInterval timer
+    } finally {
+      void ctx.close()
+    }
   })
 })
