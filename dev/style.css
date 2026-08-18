@@ -1,0 +1,173 @@
+:root {
+  --bg: #0a0d0b;
+  --panel: #101512;
+  --border: #223027;
+  --fg: #d3ffe6;
+  --dim: #6c8a7a;
+  --accent: #3ef07c;
+  --accent-dim: #1f7d47;
+  --warn: #f0a83e;
+  font-family: 'IBM Plex Mono', 'JetBrains Mono', ui-monospace, 'Cascadia Code', 'Fira Code', Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+
+/* An author `display` rule on the same element (`.power-section` below
+   sets `display: flex`) otherwise beats the UA stylesheet's `[hidden] {
+   display: none }` at equal specificity, since normal author rules always
+   win over UA rules regardless of specificity ties -- found live, the
+   power section stayed on screen next to the revealed rack after power-on
+   set its `hidden` attribute. */
+[hidden] { display: none !important; }
+
+body {
+  margin: 0;
+  padding: 1.5rem;
+  background: var(--bg);
+  color: var(--fg);
+  min-height: 100vh;
+}
+
+.dim { color: var(--dim); }
+
+.masthead h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.15rem;
+  letter-spacing: 0.12em;
+  font-weight: 600;
+}
+
+.masthead p {
+  margin: 0 0 1.25rem;
+  font-size: 0.8rem;
+}
+
+.power-section {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 2rem 0;
+}
+
+.power-btn {
+  font-family: inherit;
+  font-size: 1.1rem;
+  letter-spacing: 0.15em;
+  font-weight: 700;
+  padding: 0.9rem 2.2rem;
+  background: var(--accent-dim);
+  color: #04140a;
+  border: 2px solid var(--accent);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.power-btn:hover:not(:disabled) { background: var(--accent); }
+.power-btn:disabled { opacity: 0.6; cursor: default; }
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.9rem 1rem 1.1rem;
+  margin-bottom: 1rem;
+}
+
+.panel h2 {
+  margin: 0 0 0.7rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.keyboard-panel p { margin: 0 0 0.5rem; font-size: 0.8rem; }
+
+.keys-held {
+  min-height: 1.6rem;
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.key-chip {
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  border-radius: 3px;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.78rem;
+}
+
+.scope-panel {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.scope-block { flex: 1 1 300px; min-width: 260px; }
+
+canvas {
+  width: 100%;
+  height: auto;
+  display: block;
+  background: #050805;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+}
+
+.preset-buttons { display: flex; gap: 0.6rem; }
+
+.preset-btn {
+  font-family: inherit;
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  padding: 0.5rem 1.1rem;
+  background: transparent;
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.preset-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+.rack {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 1rem;
+}
+
+.controls { display: flex; flex-direction: column; gap: 0.65rem; }
+
+.ctl { display: flex; flex-direction: column; gap: 0.2rem; }
+
+.ctl-label-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+}
+
+.ctl-label { color: var(--dim); text-transform: uppercase; }
+.ctl-readout { color: var(--accent); font-variant-numeric: tabular-nums; }
+
+.ctl-slider {
+  width: 100%;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.toggle-row { margin-bottom: 0.5rem; }
+
+.ctl-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.78rem;
+  color: var(--dim);
+  cursor: pointer;
+}
+
+.ctl-toggle input { accent-color: var(--warn); cursor: pointer; }
+.ctl-toggle.active { color: var(--warn); }

@@ -1,4 +1,5 @@
 import type { ModuleDescriptor, ModuleInstance } from '../types'
+import { scheduleParam } from '../param-smoothing'
 
 export const wavefolderDescriptor: ModuleDescriptor = {
   type: 'wavefolder',
@@ -36,11 +37,17 @@ export const wavefolderDescriptor: ModuleDescriptor = {
     return {
       inputs: new Map<string, AudioNode | AudioParam>([['in', audioIn], ['foldCv', cvIn]]),
       outputs: new Map([['out', node as AudioNode]]),
+      // drive, symmetry and foldCvAmount are all continuous -- no
+      // discrete/switch param on this module -- so every one smooths, same
+      // as every other module with a scheduleParam-eligible param set (B3).
+      // This module previously wrote `.value` directly instead, the one
+      // module in the set that did: found live, turning the drive knob
+      // fast produced an audible step at every animation frame instead of
+      // the ramp every other continuous param gets.
       setParam(id, value, atTime) {
         const param = node.parameters.get(id)
         if (!param) return
-        if (atTime === undefined) param.value = value
-        else param.setValueAtTime(value, atTime)
+        scheduleParam(param, value, ctx, atTime)
       },
       dispose() {
         node.disconnect()

@@ -1,6 +1,18 @@
 import type { ModuleDescriptor, ModuleInstance } from '../types'
 import { scheduleParam } from '../param-smoothing'
 
+/**
+ * The output module's own instance, widened with the `AnalyserNode` it
+ * builds internally. `ModuleInstance` has no room for a module-specific
+ * extra handle (see `KeyboardMidiInstance` for the same pattern with
+ * `handleKey`), so a caller that wants to feed a scope or spectrum display
+ * -- there is exactly one such caller today, the dev harness -- narrows
+ * `PatchGraph.getInstance()`'s return to this type itself.
+ */
+export interface OutputInstance extends ModuleInstance {
+  readonly analyser: AnalyserNode
+}
+
 export const outputDescriptor: ModuleDescriptor = {
   type: 'output',
   name: 'Output',
@@ -15,7 +27,7 @@ export const outputDescriptor: ModuleDescriptor = {
     { kind: 'jack', ref: 'in', x: 0, y: 3 },
     { kind: 'jack', ref: 'out', x: 2, y: 3 },
   ],
-  create(ctx): ModuleInstance {
+  create(ctx): OutputInstance {
     const level = ctx.createGain()
     level.gain.value = 1
 
@@ -29,6 +41,7 @@ export const outputDescriptor: ModuleDescriptor = {
     return {
       inputs: new Map<string, AudioNode | AudioParam>([['in', level]]),
       outputs: new Map([['out', level as AudioNode]]),
+      analyser,
       // The only param, level, is a continuous master fader. B3.
       setParam(id, value, atTime) {
         if (id === 'level') scheduleParam(level.gain, value, ctx, atTime)

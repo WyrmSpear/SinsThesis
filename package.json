@@ -4,10 +4,11 @@
   "type": "module",
   "engines": { "node": ">=22" },
   "scripts": {
+    "dev": "npm run build:worklets && vite",
     "test": "vitest run --project node",
     "test:watch": "vitest --project node",
     "build:worklets": "node scripts/build-worklets.mjs",
-    "test:browser": "npm run build:worklets && vitest run --project browser",
+    "test:browser": "npm run build:worklets && vitest run --project browser --project e2e",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
