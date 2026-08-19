@@ -1,5 +1,7 @@
 import { fftMagnitude } from '../src/engine/analysis/fft'
 import { rmsEnvelope, db as toDb } from '../src/engine/analysis/features'
+import { trackPitch, type PitchFrame } from '../src/engine/analysis/pitch-track'
+import { hzToMidi, midiToHz, hzToNoteName } from '../src/engine/analysis/note'
 
 /**
  * The "show the miss" overlay for match-this-sound: the player's render
@@ -14,12 +16,23 @@ import { rmsEnvelope, db as toDb } from '../src/engine/analysis/features'
  * static ones instead of reinventing it: the target trace dashed and dim
  * (a ghost to aim at), the player's trace solid in the theme's accent
  * color (the same one every other live signal in this rack draws in).
+ *
+ * A third canvas -- pitch over time -- is the actual point of "show the
+ * miss": the spectrum and envelope above say *what* is off, but not
+ * whether a player's pitch is drifting, wobbling, or sitting a steady
+ * semitone away from the target the whole render. Same ghost-vs-solid
+ * convention, and the same note-labelled vertical axis (gridlines at each
+ * octave) `rack/pitch-display.ts` draws for a single capture -- reused
+ * here for two contours at once, both from `trackPitch`
+ * (src/engine/analysis/pitch-track.ts) run once per buffer.
  */
 
 const SPEC_WIDTH = 320
 const SPEC_HEIGHT = 140
 const ENV_WIDTH = 320
 const ENV_HEIGHT = 90
+const PITCH_WIDTH = 320
+const PITCH_HEIGHT = 140
 
 const MAX_DB = 0
 const MIN_DB = -100
@@ -168,10 +181,104 @@ function drawEnvelopeOverlay(
   trace(normalized(player), token('--text-accent'), false)
 }
 
-/** Builds the whole overlay -- a legend, a labeled spectrum comparison, and
- *  a labeled envelope comparison -- into `container`, replacing whatever it
- *  held. Called once per Check result, not animated: both buffers are
- *  fixed renders by the time this runs. */
+/** Nearest C at or below `midi` -- see rack/pitch-display.ts's own copy of
+ *  this for why gridlines land on octave boundaries. Small enough (and
+ *  tied closely enough to the y-axis math right below it) that duplicating
+ *  it here reads clearer than threading a shared import for one line. */
+function floorToC(midi: number): number {
+  const m = Math.round(midi)
+  return m - (((m % 12) + 12) % 12)
+}
+
+/** Unlike rack/pitch-display.ts's single-buffer version, this ranges over
+ *  *both* the target's and the player's voiced frames together -- an
+ *  overlay only shows the miss if both contours share one y-scale, not
+ *  each auto-fit to its own range (which would make a target and player a
+ *  full octave apart look like they're sitting on the same line). */
+function pitchRange(frameSets: readonly (readonly PitchFrame[])[]): { minMidi: number; maxMidi: number } {
+  let min = Infinity
+  let max = -Infinity
+  for (const frames of frameSets) {
+    for (const f of frames) {
+      if (f.hz === undefined) continue
+      const midi = hzToMidi(f.hz)
+      if (midi < min) min = midi
+      if (midi > max) max = midi
+    }
+  }
+  if (!Number.isFinite(min)) return { minMidi: 48, maxMidi: 72 } // C3..C5
+  const low = floorToC(min - 2)
+  const high = Math.max(floorToC(max + 2) + 12, low + 12)
+  return { minMidi: low, maxMidi: high }
+}
+
+function drawPitchOverlay(
+  cctx: CanvasRenderingContext2D, target: Float32Array, player: Float32Array, sampleRate: number,
+): void {
+  const { width, height } = cctx.canvas
+  cctx.fillStyle = token('--surface-recess')
+  cctx.fillRect(0, 0, width, height)
+
+  const targetFrames = trackPitch(target, sampleRate)
+  const playerFrames = trackPitch(player, sampleRate)
+  const durationSec = Math.max(target.length, player.length) / sampleRate
+
+  const { minMidi, maxMidi } = pitchRange([targetFrames, playerFrames])
+  const yForMidi = (midi: number): number => height - ((midi - minMidi) / (maxMidi - minMidi)) * height
+
+  const gridColor = token('--panel-border')
+  const textColor = token('--text-dim')
+  cctx.font = '8px var(--font-mono, monospace)'
+  for (let midi = minMidi; midi <= maxMidi; midi += 12) {
+    const y = yForMidi(midi)
+    cctx.strokeStyle = gridColor
+    cctx.beginPath()
+    cctx.moveTo(0, y)
+    cctx.lineTo(width, y)
+    cctx.stroke()
+    const note = hzToNoteName(midiToHz(midi))
+    cctx.fillStyle = textColor
+    cctx.fillText(`${note.letter}${note.octave}`, 1, Math.min(Math.max(8, y - 1), height - 2))
+  }
+
+  const targetVoiced = targetFrames.some((f) => f.hz !== undefined)
+  const playerVoiced = playerFrames.some((f) => f.hz !== undefined)
+  if (!targetVoiced && !playerVoiced) {
+    cctx.fillStyle = textColor
+    cctx.font = '10px var(--font-mono, monospace)'
+    cctx.textAlign = 'center'
+    cctx.fillText('no pitch detected', width / 2, height / 2)
+    cctx.textAlign = 'left'
+    return
+  }
+
+  // Short segments between consecutive voiced frames, same "never bridge
+  // an unvoiced gap with an invented value" rule as rack/pitch-display.ts.
+  function trace(frames: readonly PitchFrame[], color: string, dashed: boolean): void {
+    cctx.strokeStyle = color
+    cctx.lineWidth = dashed ? 1.25 : 1.5
+    cctx.setLineDash(dashed ? [4, 3] : [])
+    for (let i = 1; i < frames.length; i++) {
+      const prev = frames[i - 1]!
+      const cur = frames[i]!
+      if (prev.hz === undefined || cur.hz === undefined) continue
+      cctx.beginPath()
+      cctx.moveTo((prev.timeSec / durationSec) * width, yForMidi(hzToMidi(prev.hz)))
+      cctx.lineTo((cur.timeSec / durationSec) * width, yForMidi(hzToMidi(cur.hz)))
+      cctx.stroke()
+    }
+    cctx.setLineDash([])
+  }
+
+  trace(targetFrames, token('--text-dim'), true)
+  trace(playerFrames, token('--text-accent'), false)
+}
+
+/** Builds the whole overlay -- a legend, a labeled spectrum comparison, a
+ *  labeled envelope comparison, and a labeled pitch-over-time comparison --
+ *  into `container`, replacing whatever it held. Called once per Check
+ *  result, not animated: both buffers are fixed renders by the time this
+ *  runs. */
 export function renderMatchOverlay(
   container: HTMLElement, target: Float32Array, player: Float32Array, sampleRate: number,
 ): void {
@@ -203,10 +310,21 @@ export function renderMatchOverlay(
   envCanvas.height = ENV_HEIGHT
   envCanvas.dataset['testid'] = 'academy-match-envelope'
 
-  container.append(legend, specLabel, specCanvas, envLabel, envCanvas)
+  const pitchLabel = document.createElement('p')
+  pitchLabel.className = 'match-overlay-label'
+  pitchLabel.textContent = 'Pitch over time'
+  const pitchCanvas = document.createElement('canvas')
+  pitchCanvas.className = 'match-overlay-canvas'
+  pitchCanvas.width = PITCH_WIDTH
+  pitchCanvas.height = PITCH_HEIGHT
+  pitchCanvas.dataset['testid'] = 'academy-match-pitch'
+
+  container.append(legend, specLabel, specCanvas, envLabel, envCanvas, pitchLabel, pitchCanvas)
 
   const specCtx = specCanvas.getContext('2d')
   const envCtx = envCanvas.getContext('2d')
+  const pitchCtx = pitchCanvas.getContext('2d')
   if (specCtx) drawSpectrumOverlay(specCtx, target, player, sampleRate)
   if (envCtx) drawEnvelopeOverlay(envCtx, target, player, sampleRate)
+  if (pitchCtx) drawPitchOverlay(pitchCtx, target, player, sampleRate)
 }

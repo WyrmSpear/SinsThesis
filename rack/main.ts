@@ -18,6 +18,7 @@ import { buildScopePanel } from './scope-panel'
 import { enableReorder } from './reorder'
 import { downloadPatch, downloadWav, readPatchFile, saveAutosave, loadAutosave, debounce } from './patch-io'
 import { renderStudioPanel, type StudioPanelState } from './studio-panel'
+import { renderPitchDisplay } from './pitch-display'
 import { initThemeSwitcher } from './theme-switcher'
 import { LEVELS, getLevel, type Level } from '../academy/levels'
 import { loadProgress, markComplete, type AcademyProgress } from '../academy/progress'
@@ -95,6 +96,7 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
   const paletteDrawer = $('palette-drawer')
   const academyPanel = $('academy-panel')
   const studioPanelEl = $('studio-panel')
+  const pitchDisplayEl = $('pitch-display')
   const statusBanner = $('status-banner')
   const patchNameInput = $<HTMLInputElement>('patch-name')
   const paletteToggle = $<HTMLButtonElement>('palette-toggle')
@@ -272,6 +274,7 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
       },
       onExport: doExport,
     })
+    renderPitchDisplay(pitchDisplayEl, lastCapture && { samples: lastCapture.samples, sampleRate: lastCapture.sampleRate })
   }
 
   /** Record button: taps whatever the rack's first Output module currently

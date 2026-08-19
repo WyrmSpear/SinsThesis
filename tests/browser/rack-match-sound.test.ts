@@ -187,11 +187,14 @@ describe('academy: match-this-sound', () => {
     expect(feedbackText).toMatch(/Cut knob|Attack|Res knob|waveform/)
     expect(feedbackText).not.toMatch(/^\s*\d+(\.\d+)?\s*%?\s*$/) // never a bare number
 
-    // "Show the miss": the overlay actually rendered onto the page.
+    // "Show the miss": the overlay actually rendered onto the page,
+    // including the pitch-over-time contour (the player's tuning laid
+    // over the target's, not just spectrum/envelope).
     const overlay = page.getByTestId('academy-match-overlay')
     await overlay.waitFor({ state: 'visible' })
     expect(await page.getByTestId('academy-match-spectrum').isVisible()).toBe(true)
     expect(await page.getByTestId('academy-match-envelope').isVisible()).toBe(true)
+    expect(await page.getByTestId('academy-match-pitch').isVisible()).toBe(true)
 
     // Now tune it to the target's actual values (the same wiring, so this
     // proves param values -- not topology -- were what failed above) and
