@@ -157,3 +157,68 @@ describe('trackPitch: a noise burst has no fundamental', () => {
     expect(voicedFraction).toBeLessThan(0.2)
   })
 })
+
+// Audit round two, finding 1: fed 1600-3000 Hz tones through the *old*
+// default (maxHz: 1500), every one came back as a confident, silent
+// octave-down error -- 2093 Hz (C7) reported 1046.6 Hz at confidence
+// 0.999, because maxHz clamped the lag search's short end so the true
+// (short) period was never a candidate and the search locked onto the
+// subharmonic instead. C7 sits well inside a synth's playable range, and
+// the module's own doc comment says a frame with nothing detectable must
+// get `hz: undefined`, not a confidence-zero -- let alone confidence-1 --
+// guess. Fixed by raising the default ceiling to 8000 Hz (above C8, the
+// top of an 88-key keyboard) and having the search itself decline whenever
+// a shorter, genuinely-periodic lag exists above the configured ceiling,
+// rather than accept the first dip it's willing to consider.
+describe('trackPitch: above the old 1500 Hz ceiling, across a synth-playable range', () => {
+  // 65-1318 Hz is covered by the harmonic-heavy sweep above; this table is
+  // exactly the audit's own repro table, one octave error apiece under the
+  // old default. None of these divide sampleRate near-integer (48000/f):
+  // 1600 -> 30.0 (excluded on purpose, see below), 1809 -> 26.5..., etc.
+  const cases = [1609, 1811, 2093, 2647, 3011] // 2093 Hz = C7, the audit's headline repro
+  for (const f0 of cases) {
+    it(`${f0} Hz reports the true fundamental, not the octave-down fold`, () => {
+      const samples = gen(SR * 0.3, (i) => Math.sin((2 * Math.PI * f0 * i) / SR))
+      const frames = trackPitch(samples, SR)
+      const voiced = frames.filter((f) => f.hz !== undefined)
+      expect(voiced.length).toBeGreaterThan(frames.length * 0.5)
+      const dominant = dominantPitchHz(frames)
+      expect(dominant).toBeDefined()
+      const cents = 1200 * Math.log2(dominant! / f0)
+      expect(Math.abs(cents)).toBeLessThan(10) // nowhere near the ~1200-cent octave error
+      // No voiced frame confidently reports the old fold (f0/2).
+      const confidentFold = voiced.filter((f) => f.confidence > 0.8 && Math.abs(f.hz! - f0 / 2) < 20)
+      expect(confidentFold).toHaveLength(0)
+    })
+  }
+})
+
+describe('trackPitch: a tone genuinely above the (now 8000 Hz) ceiling declines honestly', () => {
+  const cases = [9013, 11003, 15007, 19993] // safely above the new ceiling, not near-integer divisors
+  for (const f0 of cases) {
+    it(`${f0} Hz reports no confident pitch rather than an octave-down fold`, () => {
+      const samples = gen(SR * 0.3, (i) => Math.sin((2 * Math.PI * f0 * i) / SR))
+      const frames = trackPitch(samples, SR)
+      const voiced = frames.filter((f) => f.hz !== undefined)
+      // Never a confident reading anywhere near f0/2, f0/3, ... -- the
+      // failure mode being fixed, not merely "usually right."
+      for (const f of voiced) {
+        if (f.confidence > 0.8) {
+          const ratio = f0 / f.hz!
+          expect(Math.abs(ratio - Math.round(ratio))).toBeGreaterThan(0.02)
+        }
+      }
+    })
+  }
+})
+
+describe('trackPitch: a caller-supplied maxHz below the default also declines honestly', () => {
+  it('2093 Hz with maxHz: 1500 (the old default) declines instead of folding to 1046.6', () => {
+    const f0 = 2093
+    const samples = gen(SR * 0.3, (i) => Math.sin((2 * Math.PI * f0 * i) / SR))
+    const frames = trackPitch(samples, SR, { maxHz: 1500 })
+    const voiced = frames.filter((f) => f.hz !== undefined)
+    const confidentFold = voiced.filter((f) => f.confidence > 0.8 && Math.abs(f.hz! - f0 / 2) < 20)
+    expect(confidentFold).toHaveLength(0)
+  })
+})

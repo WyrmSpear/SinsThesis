@@ -36,6 +36,26 @@ import { rms } from './features'
  * confidence-zero guess: a noise burst genuinely has no fundamental, and
  * reporting one anyway -- even a low-confidence one -- would draw a lie on
  * a display built to show where pitch is real.
+ *
+ * **The ceiling above `maxHz` declines rather than folds.** `maxHz` bounds
+ * the *search* -- lags shorter than `sampleRate/maxHz` are never candidates
+ * -- which used to mean a tone genuinely above it (nothing here to find at
+ * its real, short period) locked onto the first dip the search *could* see,
+ * almost always the subharmonic at ~2x the true period: a confident,
+ * silent octave-down error (2093 Hz reporting 1046.6 Hz at confidence
+ * 0.999 was the repro that found this). Fixed by checking, before
+ * accepting that subharmonic, whether the difference function it computed
+ * anyway (down to lag 1, regardless of `minLag`) also dips below threshold
+ * at a lag *shorter* than the search floor -- if so, a period shorter than
+ * `maxHz` allows is genuinely present and the candidate the search did
+ * accept is that period's own subharmonic, so the frame declines
+ * (`hz: undefined`) instead of reporting it. `maxHz`'s default is now 8000
+ * Hz -- comfortably above C8 (4186 Hz), the top note of a full 88-key
+ * keyboard -- rather than 1500, which folded notes as ordinary as C7
+ * (2093 Hz). Accuracy still degrades gracefully approaching the ceiling
+ * (interpolating a handful of samples per period is inherently less
+ * precise than interpolating hundreds), but the octave is never wrong and
+ * a tone truly above the ceiling is reported as absent, not invented.
  */
 
 export interface PitchFrame {
@@ -59,8 +79,11 @@ export interface PitchTrackOptions {
   /** Lowest frequency YIN will report. Default 60 Hz -- below a synth
    *  bass note, comfortably above mains hum. */
   minHz?: number
-  /** Highest frequency YIN will report. Default 1500 Hz -- above the
-   *  fundamental of any note this project's academy levels use. */
+  /** Highest frequency YIN will report. Default 8000 Hz -- above C8
+   *  (4186 Hz), the top note of a full 88-key keyboard. A frame whose true
+   *  period is shorter than this (i.e. a tone genuinely above `maxHz`)
+   *  reports `hz: undefined` rather than the subharmonic fold a naive
+   *  lag-search ceiling would produce -- see the module doc comment above. */
   maxHz?: number
   /** YIN's absolute threshold on the cumulative mean normalized
    *  difference function -- the paper's own default. Lower is stricter
@@ -77,7 +100,7 @@ const DEFAULTS: Required<PitchTrackOptions> = {
   frameSize: 2048,
   hopSize: 512,
   minHz: 60,
-  maxHz: 1500,
+  maxHz: 8000,
   threshold: 0.15,
   silenceRms: 1e-3,
 }
@@ -116,6 +139,20 @@ function yinFrame(
     cmnd[tau] = runningSum > 0 ? (d[tau]! * tau) / runningSum : 1
   }
 
+  // A dip below threshold at a lag *shorter* than minLag means a period
+  // shorter than sampleRate/maxHz is genuinely present -- a true
+  // fundamental above the ceiling this call was configured to trust. Left
+  // unchecked, the search below starts at minLag and would happily accept
+  // whatever dip it finds first at or beyond minLag, which for a tone
+  // above maxHz is the *subharmonic* at roughly twice the true period: a
+  // confident, wrong, octave-down answer (see pitch-track.ts's own doc
+  // comment on why that's worse than declining). d/cmnd are already
+  // computed down to tau=1 regardless of minLag, so this costs one more
+  // linear scan, not another difference-function pass.
+  for (let tau = 1; tau < minLag; tau++) {
+    if (cmnd[tau]! < threshold) return { hz: undefined, confidence: 0 }
+  }
+
   // Step 3-4: absolute threshold, first dip below it, refined to that
   // dip's own local minimum -- not the global minimum over all lags. This
   // is precisely what keeps a loud second harmonic from winning: a
@@ -134,7 +171,7 @@ function yinFrame(
 
   // Step 5: parabolic interpolation around the chosen lag, for sub-sample
   // period resolution -- otherwise pitch is quantized to sampleRate/integer.
-  const left = Math.max(minLag, tauEstimate - 1)
+  const left = Math.max(1, tauEstimate - 1)
   const right = Math.min(maxLag, tauEstimate + 1)
   let refinedTau = tauEstimate
   if (left !== tauEstimate && right !== tauEstimate) {
