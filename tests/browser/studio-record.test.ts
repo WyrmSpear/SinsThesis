@@ -248,12 +248,77 @@ describe('studio: live recording and offline bounce', () => {
     expect(Math.abs(bounceHz - expectedHz)).toBeLessThan(10)
     expect(Math.abs(bounceHz - liveHz)).toBeLessThan(10)
 
-    // The bounce rendered ~1s at the fixed match/bounce sample rate, exactly
-    // -- an offline render, unlike the live tap, has no real-time slack to
+    // The bounce rendered ~1s at the context's own sample rate, exactly --
+    // an offline render, unlike the live tap, has no real-time slack to
     // account for.
     expect(bounceWav.channels[0]!.length / bounceWav.sampleRate).toBeCloseTo(1, 1)
 
     expect(consoleErrors, `console errors: ${consoleErrors.join('\n')}`).toEqual([])
     await page.close()
   })
+
+  // Audit round two, finding 4: the bounce hardcoded 48000 (`rack/main.ts`'s
+  // MATCH_SAMPLE_RATE, deliberately fixed for match-this-sound but reused
+  // here by accident) while live recording already followed `ctx.sampleRate`
+  // -- untested until now because every page in this suite runs on whatever
+  // sample rate Chromium's default output device reports, which is 48000 in
+  // this environment. `page.addInitScript` (already used the same way in
+  // rack-match-sound.test.ts) installs a subclass that forces the real
+  // `AudioContext` rack/main.ts constructs to 44100 -- a real, legal
+  // Web-Audio-API sample rate, just not the one every other test in this
+  // file happens to run at -- before rack/main.ts's own `new AudioContext()`
+  // call ever executes, so nothing here depends on the test machine's actual
+  // audio hardware.
+  it('bounces at the context sample rate, not a hardcoded 48000, on a 44100 Hz context', async () => {
+    const page: Page = await browser.newPage()
+    const consoleErrors: string[] = []
+    page.on('console', (msg) => { if (msg.type() === 'error') consoleErrors.push(msg.text()) })
+    page.on('pageerror', (err) => consoleErrors.push(String(err)))
+
+    await page.addInitScript(() => {
+      const Orig = window.AudioContext
+      // Test-only: forces a non-48000 context sample rate before any page
+      // script (rack/main.ts included) constructs one.
+      window.AudioContext = class extends Orig {
+        constructor(options?: AudioContextOptions) {
+          super({ ...options, sampleRate: 44100 })
+        }
+      }
+    })
+
+    await powerOn(page)
+    const ctxSampleRate = await page.evaluate(
+      () => (window as unknown as { __sinsthesis: { ctx: AudioContext } }).__sinsthesis.ctx.sampleRate,
+    )
+    expect(ctxSampleRate).toBe(44100) // the override actually took, or the rest of this test proves nothing
+
+    const { expectedHz } = await buildKnownToneVoice(page, 16) // ~1108.7 Hz, this project's own safe test frequency
+
+    const lengthInput = page.getByTestId('bounce-length')
+    await lengthInput.fill('1')
+    await lengthInput.dispatchEvent('change')
+    await page.getByTestId('bounce-btn').click()
+    await page.waitForFunction(() => document.querySelector('[data-testid="bounce-btn"]')?.textContent === 'Render', { timeout: 10000 })
+    expect(await page.getByTestId('export-panel').isVisible()).toBe(true)
+
+    await page.getByTestId('save-sinp-checkbox').uncheck()
+    const bounceWav = decodeWav(await captureWavDownload(page, 'export-wav-btn'))
+    const bounceHz = peakHz(bounceWav.channels[0]!, bounceWav.sampleRate)
+
+    console.log(
+      `studio-record bounce @ 44100Hz context: wav.sampleRate=${bounceWav.sampleRate} expectedHz=${expectedHz.toFixed(1)} measuredHz=${bounceHz.toFixed(1)}`,
+    )
+    // The bug: this used to be 48000 unconditionally, regardless of what the
+    // live context actually ran at.
+    expect(bounceWav.sampleRate).toBe(44100)
+    expect(Math.abs(bounceHz - expectedHz)).toBeLessThan(10)
+    // Exactly 1s of audio at the *bounce's own* sample rate -- confirms the
+    // WAV header and the sample count agree, not just that the header claims
+    // 44100 while still holding a 48000-length buffer.
+    expect(bounceWav.channels[0]!.length / bounceWav.sampleRate).toBeCloseTo(1, 1)
+
+    expect(consoleErrors, `console errors: ${consoleErrors.join('\n')}`).toEqual([])
+    await page.close()
+  })
 })
+

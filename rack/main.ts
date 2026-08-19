@@ -326,7 +326,18 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
    *  academy (see this file's `getTargetBuffer`) -- serialize-then-render,
    *  reusing the exact round trip `.sinp` save/load already exercises,
    *  rather than trying to clone the live graph. Faster than real time, no
-   *  dropout risk, because nothing here runs against a real-time deadline. */
+   *  dropout risk, because nothing here runs against a real-time deadline.
+   *
+   *  Sample rate: `ctx.sampleRate`, the live `AudioContext`'s own rate --
+   *  audit round two, finding 4. This used to hardcode `MATCH_SAMPLE_RATE`
+   *  (48000), the constant match-this-sound deliberately fixes so a target
+   *  rendered once stays comparable all session (see that constant's own
+   *  doc comment). The bounce has no such comparability requirement -- it's
+   *  a one-shot export of *this* patch -- and live recording already uses
+   *  `ctx.sampleRate` (`LiveRecorder`, below), so on hardware running at
+   *  44100 Hz instead of 48000, a bounce and a live recording of the same
+   *  patch used to disagree at the sample level despite both WAV headers
+   *  independently being internally correct. */
   async function doBounce(): Promise<void> {
     if (bounceBusy || recording) return
     bounceBusy = true
@@ -334,8 +345,9 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
     renderStudio()
     try {
       const patch = serializePatch(graph, { name: currentPatchName })
-      const samples = await renderPatch(patch, bounceLengthSeconds, { sampleRate: MATCH_SAMPLE_RATE })
-      lastCapture = { samples, sampleRate: MATCH_SAMPLE_RATE, source: 'bounce', seconds: bounceLengthSeconds, truncated: false }
+      const bounceSampleRate = ctx.sampleRate
+      const samples = await renderPatch(patch, bounceLengthSeconds, { sampleRate: bounceSampleRate })
+      lastCapture = { samples, sampleRate: bounceSampleRate, source: 'bounce', seconds: bounceLengthSeconds, truncated: false }
       studioStatus = `Bounced ${bounceLengthSeconds.toFixed(1)}s. Ready to export.`
     } catch (err) {
       showBanner('error', `Bounce failed: ${(err as Error).message}`)
