@@ -1,7 +1,7 @@
 # SinsThesis — continuation
 
 **Updated:** 2026-08-19. Engine, rack, analysis and the academy's first mode all shipped.
-**Branch:** `master` — 72 commits.
+**Branch:** `master` — 74 commits.
 **State:** 322 tests pass (257 node + 65 browser), `typecheck` clean, tree clean.
 
 **Run it:** `npm run dev`, open the URL, POWER ON.
@@ -39,22 +39,32 @@ npm run typecheck
 ## What exists
 
 The audio engine, plus two pages that play it: the rack (the product's front
-door) and the dev harness (kept for engine work — it has the scope and
-spectrum the rack doesn't).
+door, the academy lives inside it) and the dev harness (kept for engine
+work — it has the scope and spectrum the rack doesn't).
 
 ```
 src/engine/
   analysis/   fft.ts, features.ts, inspector.ts    measurement + the academy's grader
-  dsp/        wavetable.ts, ladder.ts, wavefolder.ts, segment.ts, polyblep.ts
-  worklets/   vco, ladder, wavefolder, segment, passthrough + audioworklet-globals.d.ts
-  modules/    fifteen descriptors + index.ts
-  graph.ts  patch.ts  cycle.ts  render.ts  clock.ts  midi.ts  types.ts  registry.ts
-rack/         main.ts, panel.ts, knob.ts, switch.ts, cables.ts, palette.ts,
-              patch-io.ts, theme-switcher.ts, style.css, theme-*.css (4 themes)
-dev/          main.ts, piano.ts, controls.ts, presets.ts, scope.ts, style.css
+  dsp/        wavetable.ts, ladder.ts, wavefolder.ts, segment.ts, polyblep.ts (unimported, kept as reference)
+  worklets/   vco, ladder, wavefolder, segment, passthrough, peak-tap (test-only)
+              + registry.ts (WORKLET_MODULES) + audioworklet-globals.d.ts
+  modules/    sixteen descriptors + index.ts
+  graph.ts  patch.ts  cycle.ts  render.ts  clock.ts  midi.ts  param-smoothing.ts
+  types.ts  registry.ts  version.ts
+rack/         main.ts, panel.ts, ghost-panel.ts, knob.ts, slider.ts, switch.ts,
+              curve.ts, cables.ts, cable-inspector.ts, palette.ts, reorder.ts,
+              keyboard-panel.ts, sequencer-panel.ts, scope-panel.ts, academy-panel.ts,
+              patch-io.ts, theme-switcher.ts, style.css, theme-*.css (8 themes:
+              Reaktor Dark, Moog Wood, Phosphor Lab, Ableton Live, Circuit/PCB,
+              Geist Groovebox, Casiotone, Korg MS-20)
+academy/      levels.ts, feedback.ts, progress.ts, sinp-raw.d.ts,
+              levels/ (5 levels, each a .sinp solution + a .rubric.json)
+dev/          main.ts, piano.ts, controls.ts, presets.ts, scope.ts,
+              thump-harness.ts (test-only, see tests/browser/startup-thump.test.ts), style.css
 index.html    the rack — npm run dev — the product's front door
 harness.html  the dev harness — engine work, scope + spectrum
 scripts/build-worklets.mjs    one Rollup bundle per worklet
+README.md                                    front door for a fresh clone
 docs/superpowers/specs/2026-08-18-sinsthesis-phase1-design.md    the binding spec
 docs/superpowers/plans/2026-08-18-phase1a-engine.md              the 18-task plan
 docs/audio/PHASE1A-LEDGER.md                 every ruling, finding and measurement
@@ -132,23 +142,27 @@ oversampling scoped to the fold. Plain ADAA alone was prototyped and rejected on
 measurement — it bought 4–8 dB, because its local-linearity assumption fails
 once the kink rate approaches the sample rate.
 
-## What to do next
+## What happened after Phase 1A closed
 
-1. **`superpowers:finishing-a-development-branch`** — the branch is clean, both
-   audits are satisfied, and the only outstanding audio finding is documented
-   rather than hidden.
-2. **Phase 1B, the UI**: rack, panels, eight themes, the power switch. Its plan
-   is not written. Write it against this working engine, not speculatively —
-   that was the point of splitting Phase 1 in two.
+This section originally flagged two risks Phase 1B would hit immediately.
+Both are resolved — recorded here so nobody goes looking for them as open
+problems:
 
-Two things Phase 1B will immediately need, both known:
+- `PatchGraph.dispose()` is now called on every graph swap. `rack/main.ts`'s
+  `mountGraph()` calls `graph?.dispose()` before mounting the replacement, on
+  initial boot, an explicit Load, and autosave restore alike — so an
+  abandoned clock's interval is torn down instead of scheduling onto a
+  discarded node forever.
+- A default patch exists. `rack/main.ts`'s `buildDefaultPatch()` wires
+  Keyboard → VCO → VCF → (ADSR → VCA) → Output and mounts it on first boot
+  when no autosave is present, satisfying spec acceptance criterion 1 (press
+  power, hear something) — proven by `tests/browser/rack-page.test.ts`'s
+  "makes sound on a real keydown through the rack keyboard module".
 
-- **`PatchGraph.dispose()` is the only thing that clears the clock's interval,
-  and nothing in `src/` calls it.** Harmless while everything is offline. The
-  moment the UI swaps patches live, every abandoned clock keeps a timer
-  scheduling onto a discarded node forever.
-- **No default patch exists**, so spec acceptance criterion 1 ("open the site,
-  press power, hear something") has nothing to test against yet.
+Phase 1B (the rack itself) and Phase 2's first slice (the scope module, the
+cable inspector, and the academy's first mode) are both built — see the two
+sections below for what each proved. What remains open is listed under
+"Still to build" and "Smaller things" further down.
 
 ---
 
@@ -157,10 +171,11 @@ Two things Phase 1B will immediately need, both known:
 The spec made two architectural bets. Both were tested by building, and both
 held.
 
-**Panels are declarative.** One renderer in `rack/panel.ts` draws all fifteen
-modules from `ports`/`params`/`layout`/`hp`. No module is special-cased; the
-keyboard and sequencer use the `customPanel` escape hatch the spec provided,
-and even they get generic knobs and jacks.
+**Panels are declarative.** One renderer in `rack/panel.ts` draws every
+module from `ports`/`params`/`layout`/`hp`. No module is special-cased; the
+keyboard, sequencer, and (added in Phase 2) the scope use the `customPanel`
+escape hatch the spec provided, and even they get generic knobs and jacks
+where they don't need bespoke UI.
 
 **A theme is a token file.** Eight themes ship — Reaktor Dark, Moog Wood,
 Phosphor Lab, Ableton Live, Circuit/PCB, Geist Groovebox, Casiotone, Korg
@@ -222,21 +237,32 @@ provides.
 
 ## Smaller things, recorded but not urgent
 
-- `keyboard-midi.ts` has zero tests. `midi.ts`'s pure helpers are well covered;
-  nothing proves `handleKey` moves the pitch and gate nodes.
+- `handleKey` is proven only end-to-end: `tests/browser/dev-page.test.ts` and
+  `tests/browser/rack-page.test.ts` both drive a real trusted keydown and
+  assert sound starts and stops, which exercises `handleKey` through the
+  whole engine. Nothing isolates it as a unit, and nothing proves `octave`
+  moves the right note. `handleMidiEvent` (the actual MIDI-controller path)
+  has no coverage at any level beyond `midi.ts`'s pure `parseMidiMessage`
+  helper — no test ever constructs a keyboard module instance and calls
+  `handleMidiEvent` on it, so spec acceptance criterion 4's "MIDI
+  controller" half is unproven even though "computer keyboard" now is.
 - `registerAllModules()` throws on a second call — breaks HMR and a second
-  engine instance.
+  engine instance. Both `dev/main.ts` and `rack/main.ts` work around it with
+  an `if (!getModule('vco')) registerAllModules()` guard rather than fixing
+  the registry.
 - `loadPatch` throws when a cable names a port a known module no longer has.
   Ghosts cover unknown *types* but not removed *ports*, so partial version drift
   loses the whole file.
-- The sequencer's `glide` param is a live knob wired to nothing. Hide or remove
-  it before the UI renders it.
-- No default patch exists, so spec criterion 1 has nothing to test.
 - The wavetable set is duplicated per worklet bundle (~384 KB) — accepted cost
-  of one-bundle-per-worklet.
+  of one-bundle-per-worklet. `dsp/wavetable.ts` is pulled into both
+  `vco.worklet.ts` and `segment.worklet.ts`.
 - Noise module: exactly-periodic 2 s loop, and `color` is a binary
   20 kHz/1200 Hz switch behind a continuous-looking knob. It snaps at the
   midpoint.
+- Spec section 11's "worklet fails to load → native approximation + badge"
+  and "CPU overload → load meter" failure modes were never built.
+  `ensureWorklets()` just rethrows; nothing counts render-quantum overruns.
+  Found during this documentation audit, not fixed by it.
 
 ---
 
