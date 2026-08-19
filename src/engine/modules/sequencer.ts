@@ -35,8 +35,12 @@ export const sequencerDescriptor: ModuleDescriptor = {
   group: 'control',
   customPanel: 'sequencer',
   ports: [
-    { id: 'clock', dir: 'in', signal: 'gate', label: 'Clock', pos: [0, 3] },
-    { id: 'reset', dir: 'in', signal: 'gate', label: 'Reset', pos: [1, 3] },
+    // 'Clock' clipped by a couple of px in the widest-tracking themes
+    // (reported live); 'Clk' is the standard sequencer abbreviation.
+    { id: 'clock', dir: 'in', signal: 'gate', label: 'Clk', pos: [0, 3] },
+    // Same 'Rst' shortening as clock-module.ts's reset port, for the same
+    // sub-pixel-overflow reason.
+    { id: 'reset', dir: 'in', signal: 'gate', label: 'Rst', pos: [1, 3] },
     { id: 'cv', dir: 'out', signal: 'cv', label: 'CV', pos: [0, 4] },
     { id: 'gate', dir: 'out', signal: 'gate', label: 'Gate', pos: [1, 4] },
   ],

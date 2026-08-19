@@ -101,7 +101,11 @@ export const clockDescriptor: ModuleDescriptor = {
   group: 'control',
   ports: [
     { id: 'gate', dir: 'out', signal: 'gate', label: 'Gate', pos: [0, 3] },
-    { id: 'reset', dir: 'out', signal: 'gate', label: 'Reset', pos: [1, 3] },
+    // 'Reset' overflowed its jack column by a sub-pixel margin in
+    // korg-ms20's font metrics (actual glyph-run width vs. rounded
+    // scrollWidth/clientWidth disagreed right at the edge); 'Rst' is the
+    // standard hardware abbreviation.
+    { id: 'reset', dir: 'out', signal: 'gate', label: 'Rst', pos: [1, 3] },
   ],
   params: [
     { id: 'bpm', label: 'BPM', min: 20, max: 300, default: 120, curve: 'lin', unit: '' },

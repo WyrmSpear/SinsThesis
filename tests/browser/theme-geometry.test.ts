@@ -32,6 +32,14 @@ import { fileURLToPath } from 'node:url'
  * for the same reason: a real Vite dev server plus Playwright's
  * CDP-backed input is what a `getBoundingClientRect()` measurement needs to
  * reflect actual layout rather than jsdom's approximation.
+ *
+ * Extended for the rack's physical-fidelity pass (see
+ * .superpowers/sdd/rack-3u-report.md): every panel now also gets a fixed
+ * `height` from `PANEL_HEIGHT_PX` (rack/panel.ts), the same "3U regardless
+ * of width" rule a real Eurorack case enforces. The assertions below check
+ * that claim two ways -- every panel in one theme shares the exact same
+ * height, and each panel's height stays pixel-identical across all eight
+ * themes, mirroring how width was already checked.
  */
 
 const root = fileURLToPath(new URL('../..', import.meta.url))
@@ -222,6 +230,19 @@ describe('theme geometry (Section 8)', () => {
       const reference = geometries['reaktor-dark']!
       expect(reference.length).toBeGreaterThanOrEqual(paletteTypes.length)
 
+      // Every Eurorack module is 3U tall regardless of width -- the rack's
+      // other half of "panel widths, knob sizes, jack positions stay
+      // identical." Assert it two ways: every panel in the reference theme
+      // shares one exact height (the rail claim itself -- VCO and Output
+      // seated on the same line, not tops flush and bottoms ragged), and
+      // then, in the cross-theme loop below, that height stays pixel-
+      // identical per panel across all eight themes the same way width
+      // already does.
+      const referenceHeight = reference[0]!.height
+      for (const panel of reference) {
+        expect(panel.height, `reaktor-dark: ${panel.type} panel height (every module is 3U)`).toBe(referenceHeight)
+      }
+
       for (const theme of THEMES.slice(1)) {
         const g = geometries[theme]!
         expect(g.length, `${theme}: panel count`).toBe(reference.length)
@@ -230,6 +251,7 @@ describe('theme geometry (Section 8)', () => {
           const themePanel = g[i]!
           expect(themePanel.type, `${theme}: panel ${i} type`).toBe(refPanel.type)
           expect(themePanel.width, `${theme}: ${refPanel.type} panel width`).toBe(refPanel.width)
+          expect(themePanel.height, `${theme}: ${refPanel.type} panel height`).toBe(refPanel.height)
           expect(themePanel.controls.length, `${theme}: ${refPanel.type} control count`).toBe(
             refPanel.controls.length,
           )

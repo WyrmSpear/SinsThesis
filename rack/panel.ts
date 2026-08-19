@@ -141,6 +141,38 @@ function buildFallbackControl(kind: 'switch' | 'button' | 'display', ref: string
 const HP_PX = 16
 const MIN_PANEL_PX = 120
 
+/**
+ * Every Eurorack module is exactly 3U tall regardless of width -- that is
+ * the whole point of the format, and it was the one dimension this rack
+ * still got wrong: panels shrank to their own content's natural height, so
+ * VCO (5 rows: 3 knob rows, 2 jack rows) stood roughly twice as tall as
+ * Output (1 knob row, 2 jack rows), tops flush and bottoms ragged, which no
+ * physical case looks like. Fixed here the same way `HP_PX` fixes width:
+ * one arbitrary-but-fixed px constant, applied to every panel's `height`
+ * regardless of its own content, so a sparse module (Noise, Output) simply
+ * has empty panel below its jacks -- exactly what sparse hardware looks
+ * like -- rather than a shorter box.
+ *
+ * The number itself is not a guess: with every row's line-heights already
+ * pinned px-fixed (see rack/style.css's `.knob-label`/`.knob-readout`/etc.
+ * comments), each of the fifteen descriptors' natural (unconstrained)
+ * height was measured live across all eight themes. VCO is the tallest at
+ * an invariant 383.375px in every theme (its five rows are all fixed
+ * controls, nothing free-text that could wrap) -- the tallest *genuine*
+ * need in the set, not an outlier caused by wrapping prose. 392 rounds that
+ * up past the nearest whole pixel and leaves an ~8.6px margin for
+ * measurement/rendering variance, without adding enough slack to read as
+ * "inflated" the way the prior hp-inflation round did. Every other
+ * descriptor's natural height -- including Keyboard/MIDI's, whose
+ * instructional hint paragraph is free prose and does wrap a different
+ * number of lines per theme's font metrics (367-377px measured) -- clears
+ * 392 with room to spare in all eight themes. No descriptor in the current
+ * set needs more than 3U at its current `hp`; see
+ * .superpowers/sdd/rack-3u-report.md for the full per-module measurement
+ * table this number was derived from.
+ */
+const PANEL_HEIGHT_PX = 392
+
 export function buildPanel(
   descriptor: ModuleDescriptor,
   moduleId: string,
@@ -177,6 +209,17 @@ export function buildPanel(
   // (see keyboard-midi.ts) -- there is no longer a shrink-to-fit safety
   // net for it either.
   panel.style.width = `${Math.max(MIN_PANEL_PX, descriptor.hp * HP_PX)}px`
+  // Every module is 3U -- see PANEL_HEIGHT_PX's own comment. `height`, not
+  // `min-height`, for the identical reason `width` above is not
+  // `min-width`: a floor lets a panel grow past it, and growth here would
+  // silently readmit exactly the "tops flush, bottoms ragged" bug this
+  // fixes the moment some future descriptor's content got taller than
+  // today's tallest (VCO). A hard height makes that case fail loudly
+  // instead -- content overflowing the panel's border is a visible,
+  // unmissable signal that a descriptor needs restructuring (fewer rows,
+  // shorter free text) or does not belong at 3U, not something to silently
+  // absorb by making every other panel in the rack taller too.
+  panel.style.height = `${PANEL_HEIGHT_PX}px`
 
   const header = document.createElement('div')
   header.className = 'module-header'

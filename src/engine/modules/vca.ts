@@ -14,7 +14,13 @@ export const vcaDescriptor: ModuleDescriptor = {
   ],
   params: [
     { id: 'level', label: 'Level', min: 0, max: 1, default: 1, curve: 'lin', unit: '' },
-    { id: 'cvAmount', label: 'CV Amt', min: 0, max: 1, default: 0, curve: 'lin', unit: '' },
+    // 'CV Amt' overflowed its column by a sub-pixel margin in some themes
+    // (subpixel text-run width vs. rounded scrollWidth/clientWidth can
+    // disagree right at the edge -- caught by measuring actual glyph-run
+    // width, not the rounded DOM metrics). 'Amt' alone is the standard
+    // synth abbreviation and is not ambiguous next to this panel's 'CV'
+    // jack -- one is a knob's depth control, the other a socket.
+    { id: 'cvAmount', label: 'Amt', min: 0, max: 1, default: 0, curve: 'lin', unit: '' },
   ],
   layout: [
     { kind: 'knob', ref: 'level', x: 0, y: 0 },

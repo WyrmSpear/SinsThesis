@@ -18,9 +18,12 @@ export const mixerDescriptor: ModuleDescriptor = {
     { id: 'in4', dir: 'in', signal: 'audio', label: 'In 4', pos: [1, 4] },
     { id: 'out', dir: 'out', signal: 'audio', label: 'Out', pos: [0, 5] },
   ],
+  // 'Level N' clipped at this 2x2 knob grid's column width (reported live
+  // as truncation across several themes); 'Lvl' is the standard mixer-strip
+  // abbreviation.
   params: CHANNELS.map((n) => ({
     id: `level${n}`,
-    label: `Level ${n}`,
+    label: `Lvl ${n}`,
     min: -1,
     max: 1,
     // Attenuverters: unity by default, so patching a cable in is audible

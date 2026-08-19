@@ -14,11 +14,17 @@ export const adsrDescriptor: ModuleDescriptor = {
     { id: 'gate', dir: 'in', signal: 'gate', label: 'Gate', pos: [0, 3] },
     { id: 'out', dir: 'out', signal: 'cv', label: 'Out', pos: [1, 3] },
   ],
+  // Labels are the standard three-letter synth abbreviations (ATT/DEC/SUS/
+  // REL), not the spelled-out param names -- a real ADSR panel says "SUS",
+  // never "SUSTAIN", because panel space is scarce. At this panel's actual
+  // column width (~50px at hp=8), "Sustain" and "Release" clipped to
+  // "SUSTA…"/"RELEA…" (reported live); the full words never fit at a
+  // legible type size, so the fix is honest labels, not a smaller font.
   params: [
-    { id: 'attack', label: 'Attack', min: 0.001, max: 10, default: 0.01, curve: 'exp', unit: 's' },
-    { id: 'decay', label: 'Decay', min: 0.001, max: 10, default: 0.1, curve: 'exp', unit: 's' },
-    { id: 'sustain', label: 'Sustain', min: 0, max: 1, default: 0.7, curve: 'lin', unit: '' },
-    { id: 'release', label: 'Release', min: 0.001, max: 10, default: 0.2, curve: 'exp', unit: 's' },
+    { id: 'attack', label: 'Att', min: 0.001, max: 10, default: 0.01, curve: 'exp', unit: 's' },
+    { id: 'decay', label: 'Dec', min: 0.001, max: 10, default: 0.1, curve: 'exp', unit: 's' },
+    { id: 'sustain', label: 'Sus', min: 0, max: 1, default: 0.7, curve: 'lin', unit: '' },
+    { id: 'release', label: 'Rel', min: 0.001, max: 10, default: 0.2, curve: 'exp', unit: 's' },
   ],
   layout: [
     { kind: 'knob', ref: 'attack', x: 0, y: 0 },

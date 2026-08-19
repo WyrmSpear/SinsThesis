@@ -31,7 +31,10 @@ export const vcoDescriptor: ModuleDescriptor = {
       default: 0,
       curve: 'lin',
       unit: '',
-      labels: ['Saw', 'Pulse', 'Triangle', 'Sine'],
+      // Same 'Tri' shortening as lfo.ts, and for the same reason: the
+      // switch readout's column is not wide enough for "Triangle" at a
+      // legible size.
+      labels: ['Saw', 'Pulse', 'Tri', 'Sine'],
     },
     { id: 'pulseWidth', label: 'Width', min: 0.01, max: 0.99, default: 0.5, curve: 'lin', unit: '' },
     { id: 'fmAmount', label: 'FM', min: 0, max: 4, default: 0, curve: 'lin', unit: '' },

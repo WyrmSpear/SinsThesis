@@ -9,13 +9,17 @@ export const wavefolderDescriptor: ModuleDescriptor = {
   group: 'shaping',
   ports: [
     { id: 'in', dir: 'in', signal: 'audio', label: 'In', pos: [0, 3] },
-    { id: 'foldCv', dir: 'in', signal: 'cv', label: 'Fold CV', pos: [1, 3] },
+    // Same 'CV' shortening as vcf.ts's cutoffCv, for the same reason: this
+    // module has exactly one CV input, so the bare word is unambiguous
+    // and 'Fold CV' clipped at this jack column's width.
+    { id: 'foldCv', dir: 'in', signal: 'cv', label: 'CV', pos: [1, 3] },
     { id: 'out', dir: 'out', signal: 'audio', label: 'Out', pos: [0, 4] },
   ],
   params: [
     { id: 'drive', label: 'Drive', min: 0.1, max: 20, default: 1, curve: 'exp', unit: '' },
     { id: 'symmetry', label: 'Sym', min: -1, max: 1, default: 0, curve: 'lin', unit: '' },
-    { id: 'foldCvAmount', label: 'CV Amt', min: 0, max: 10, default: 0, curve: 'lin', unit: '' },
+    // Same 'Amt' shortening as vca.ts's cvAmount, for the same reason.
+    { id: 'foldCvAmount', label: 'Amt', min: 0, max: 10, default: 0, curve: 'lin', unit: '' },
   ],
   layout: [
     { kind: 'knob', ref: 'drive', x: 0, y: 0 },

@@ -25,7 +25,10 @@ export const lfoDescriptor: ModuleDescriptor = {
       default: 2,
       curve: 'lin',
       unit: '',
-      labels: ['Saw', 'Pulse', 'Triangle', 'Sine'],
+      // 'Triangle' clipped to "TRIAN…" in the switch readout at this
+      // column's width (reported live); 'Tri' is the standard synth
+      // abbreviation, matching Saw/Pulse/Sine's own brevity.
+      labels: ['Saw', 'Pulse', 'Tri', 'Sine'],
     },
     { id: 'depth', label: 'Depth', min: 0, max: 1, default: 1, curve: 'lin', unit: '' },
   ],
