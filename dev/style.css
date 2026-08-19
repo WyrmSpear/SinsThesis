@@ -171,3 +171,109 @@ canvas {
 
 .ctl-toggle input { accent-color: var(--warn); cursor: pointer; }
 .ctl-toggle.active { color: var(--warn); }
+
+/* ---- hold / drone toggle: the first control anyone should reach for,
+   so it gets power-button-grade visual weight rather than a small
+   checkbox like the other patch-cable toggles. ---- */
+.hold-panel {
+  padding: 0.7rem 1rem;
+}
+
+.hold-btn {
+  font-family: inherit;
+  font-size: 0.95rem;
+  letter-spacing: 0.12em;
+  font-weight: 700;
+  padding: 0.7rem 1.4rem;
+  width: 100%;
+  background: transparent;
+  color: var(--dim);
+  border: 2px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.hold-sub {
+  font-weight: 400;
+  letter-spacing: normal;
+  font-size: 0.75rem;
+  text-transform: none;
+}
+
+.hold-btn:hover { border-color: var(--warn); }
+
+.hold-btn.engaged {
+  background: var(--warn);
+  color: #1a0f00;
+  border-color: var(--warn);
+  box-shadow: 0 0 12px 1px rgba(240, 168, 62, 0.55);
+}
+
+.hold-btn.engaged .hold-sub { color: #1a0f00; opacity: 0.75; }
+
+.note-readout {
+  font-size: 0.8rem;
+  margin: 0.6rem 0 0.7rem;
+}
+
+.note-readout strong { color: var(--accent); font-variant-numeric: tabular-nums; }
+
+/* ---- on-screen piano ---- */
+.piano-mount { width: 100%; }
+
+.piano {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 130px;
+  background: #050805;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  user-select: none;
+}
+
+.piano-key {
+  box-sizing: border-box;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 0.4rem;
+  cursor: pointer;
+}
+
+.piano-key-white {
+  position: relative;
+  height: 100%;
+  background: #e8fff2;
+  border: 1px solid #0a0d0b;
+  border-radius: 0 0 3px 3px;
+  color: #0a0d0b;
+}
+
+.piano-key-white:hover { background: #cdf5df; }
+.piano-key-white.held { background: var(--accent); }
+
+.piano-key-black {
+  position: absolute;
+  top: 0;
+  height: 62%;
+  z-index: 2;
+  background: #0e1712;
+  border: 1px solid #0a0d0b;
+  border-radius: 0 0 3px 3px;
+  color: var(--fg);
+}
+
+.piano-key-black:hover { background: #1c2e23; }
+.piano-key-black.held { background: var(--accent-dim); color: #04140a; }
+
+.piano-key-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  min-height: 1em;
+}
+
+.piano-key-label.has-key { opacity: 1; }
+.piano-key-label:not(.has-key) { opacity: 0.25; }

@@ -19,13 +19,22 @@
   </section>
 
   <main id="app" hidden data-testid="app">
+    <section class="panel hold-panel">
+      <button id="hold-btn" data-testid="hold" class="hold-btn" type="button" aria-pressed="false">
+        HOLD <span class="dim hold-sub">(drone -- gate stays open after release)</span>
+      </button>
+    </section>
+
     <section class="panel keyboard-panel">
       <h2>KEYBOARD</h2>
       <p class="dim">
-        A W S E D F T G Y H U J K O L is the piano — Z / X shift octave.
+        A W S E D F T G Y H U J K O L is the piano — Z / X shift octave, or click/drag the
+        keys below.
         <span class="dim">octave: <strong id="octave-readout">4</strong></span>
       </p>
       <div id="keys-held" class="keys-held" data-testid="keys-held"></div>
+      <div class="note-readout dim">sounding: <strong id="note-readout" data-testid="note-readout">—</strong></div>
+      <div id="piano-mount" class="piano-mount" data-testid="piano-mount"></div>
     </section>
 
     <section class="panel scope-panel">

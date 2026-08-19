@@ -12,6 +12,16 @@ import { NoteStack, noteToPitchCv, keyToNote, type MidiEvent } from '../midi'
 export interface KeyboardMidiInstance extends ModuleInstance {
   handleMidiEvent(e: MidiEvent): void
   handleKey(code: string, down: boolean): void
+  /** Press an absolute MIDI note under a caller-chosen id, sharing the same
+   *  NoteStack and last-note priority as `handleKey`. The dev harness's
+   *  on-screen piano and touch input use this instead of `handleKey`
+   *  because they address notes directly rather than through a computer
+   *  key code and the current octave. */
+  pressNote(id: string, note: number): void
+  releaseNote(id: string): void
+  /** The note currently sounding by last-note priority, across every input
+   *  source -- undefined when nothing is held. */
+  currentNote(): number | undefined
 }
 
 export const keyboardMidiDescriptor: ModuleDescriptor = {
@@ -45,9 +55,27 @@ export const keyboardMidiDescriptor: ModuleDescriptor = {
 
     const settings = { octave: 4, glide: 0 }
     const notes = new NoteStack()
-    // Computer-keyboard keys press MIDI-shaped note numbers into the same
-    // stack, so last-note priority is shared between both input paths.
-    const keyToNoteNumbers = new Map<string, number>()
+    // Every input path -- computer-keyboard keys and whatever calls
+    // `pressNote`/`releaseNote` (the on-screen piano) -- presses into this
+    // same map, keyed by an id namespaced per source (`key:<code>` vs
+    // `ext:<id>`) so the two can't collide. That is what keeps last-note
+    // priority shared across mouse and keyboard: both funnel through the
+    // one `notes` NoteStack via `noteOn`/`noteOff` below, never a second
+    // parallel path.
+    const noteIdMap = new Map<string, number>()
+
+    function trigger(id: string, note: number): void {
+      if (noteIdMap.has(id)) return // repeat guard: id already sounding
+      noteIdMap.set(id, note)
+      noteOn(note, 1)
+    }
+
+    function untrigger(id: string): void {
+      const note = noteIdMap.get(id)
+      if (note === undefined) return
+      noteIdMap.delete(id)
+      noteOff(note)
+    }
 
     function setPitch(note: number): void {
       const now = ctx.currentTime
@@ -82,18 +110,28 @@ export const keyboardMidiDescriptor: ModuleDescriptor = {
     }
 
     function handleKey(code: string, down: boolean): void {
+      const id = `key:${code}`
       if (down) {
-        if (keyToNoteNumbers.has(code)) return // key-repeat guard
         const note = keyToNote(code, settings.octave)
         if (note === undefined) return
-        keyToNoteNumbers.set(code, note)
-        noteOn(note, 1)
+        trigger(id, note)
       } else {
-        const note = keyToNoteNumbers.get(code)
-        if (note === undefined) return
-        keyToNoteNumbers.delete(code)
-        noteOff(note)
+        untrigger(id)
       }
+    }
+
+    // The on-screen piano's entry point: an id the caller controls (so a
+    // mouse drag across keys and a multi-touch chord each get their own
+    // id) and an absolute MIDI note, bypassing `keyToNote`'s octave
+    // lookup entirely. Namespaced `ext:` so it can never collide with a
+    // computer-keyboard id above, but it presses into the very same
+    // `noteIdMap` / `notes` NoteStack.
+    function pressNote(id: string, note: number): void {
+      trigger(`ext:${id}`, note)
+    }
+
+    function releaseNote(id: string): void {
+      untrigger(`ext:${id}`)
     }
 
     return {
@@ -117,6 +155,9 @@ export const keyboardMidiDescriptor: ModuleDescriptor = {
       },
       handleMidiEvent,
       handleKey,
+      pressNote,
+      releaseNote,
+      currentNote: () => notes.current(),
     }
   },
 }
