@@ -1,0 +1,79 @@
+/**
+ * Reaktor Dark -- the spec's default theme (Section 8), and the only one
+ * this slice implements. Every color, material and type-scale value the
+ * rack draws with lives here, as CSS custom properties, and nowhere else.
+ * `rack/style.css` never contains a literal color: it only ever reads one
+ * of these tokens. That is the test of the theme system -- a second theme
+ * is a second file exactly like this one, swapped in, with zero component
+ * changes.
+ *
+ * Geometry (panel widths, knob sizes, jack positions) is deliberately
+ * absent here -- Section 8 states it stays identical across all eight
+ * themes, so it lives as plain constants in rack/panel.ts and rack/knob.ts
+ * instead of as a token.
+ */
+:root {
+  /* ---- surfaces ---- */
+  --surface-rack: #16191b;
+  --surface-panel: #1d2124;
+  --surface-panel-alt: #23282b;
+  --surface-recess: #101314;
+
+  /* ---- engraving: hairline strokes and shadow ---- */
+  --panel-border: #33393d;
+  --panel-border-strong: #454c51;
+  --shadow-panel: rgba(0, 0, 0, 0.5);
+  --shadow-ambient: rgba(0, 0, 0, 0.35);
+  --shadow-inset: rgba(0, 0, 0, 0.6);
+  --highlight-edge: rgba(255, 255, 255, 0.04);
+
+  /* ---- type ---- */
+  --font-mono: 'IBM Plex Mono', 'JetBrains Mono', ui-monospace, 'Cascadia Code', 'Fira Code', Consolas, monospace;
+  --text-primary: #e6ecee;
+  --text-dim: #77858a;
+  --text-faint: #4c5559;
+  --text-accent: #3fe0cb;
+  --text-warn: #e3ad55;
+  --text-2xs: 0.62rem;
+  --text-xs: 0.7rem;
+  --text-sm: 0.8rem;
+  --text-md: 0.95rem;
+  --text-lg: 1.2rem;
+  --tracking-label: 0.1em;
+  --tracking-title: 0.14em;
+
+  /* ---- knob material ---- */
+  --knob-body: #2b3134;
+  --knob-body-hi: #3d454a;
+  --knob-ring: #4a5257;
+  --knob-indicator: #3fe0cb;
+  --knob-indicator-glow: rgba(63, 224, 203, 0.55);
+  --knob-readout: #3fe0cb;
+  --knob-readout-drag: #7cf2e2;
+
+  /* ---- jacks ---- */
+  --jack-socket: #0c0e0f;
+  --jack-ring: #4a5257;
+  --jack-ring-hover: #8a949a;
+
+  /* ---- cables, colored by the source port's signal type (Section 5) ---- */
+  --cable-audio: #3fe0cb;
+  --cable-cv: #e3ad55;
+  --cable-gate: #c46bdc;
+  --cable-preview: #8fa1a6;
+  --cable-delayed-glow: rgba(227, 173, 85, 0.85);
+  --cable-hover-glow: rgba(255, 255, 255, 0.4);
+  --cable-inactive: #4c5559;
+
+  /* ---- lamps: power switch, hold/drone, module-active indicators ---- */
+  --lamp-on: #3fe0cb;
+  --lamp-on-glow: rgba(63, 224, 203, 0.6);
+  --lamp-off: #2b3134;
+  --lamp-off-border: #454c51;
+  --lamp-warn: #e3ad55;
+  --lamp-warn-glow: rgba(227, 173, 85, 0.6);
+
+  /* ---- rack surfaces: rail, screws ---- */
+  --rail-surface: #101314;
+  --screw: #55606566;
+}

@@ -1,0 +1,383 @@
+/**
+ * Structural styling for the rack. Every color, shadow and type value here
+ * is a `var(--token)` read from rack/theme-reaktor-dark.css -- nothing in
+ * this file names a literal color. That split is the actual test of
+ * Section 8's theme claim: swapping the token file (and nothing else)
+ * would be the entire cost of a second theme.
+ *
+ * Geometry (panel width, knob size, jack size, grid row height) is set
+ * either here as plain non-color CSS or in rack/panel.ts and rack/knob.ts
+ * as pixel constants -- deliberately not tokenized, since Section 8 states
+ * geometry stays identical across every theme.
+ */
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 1.5rem;
+  background: var(--surface-rack);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  min-height: 100vh;
+}
+
+[hidden] { display: none !important; }
+
+.dim { color: var(--text-dim); }
+
+.masthead h1 {
+  margin: 0 0 0.25rem;
+  font-size: var(--text-md);
+  letter-spacing: var(--tracking-title);
+  font-weight: 600;
+}
+
+.masthead p {
+  margin: 0 0 1.25rem;
+  font-size: var(--text-sm);
+}
+
+/* ---- power switch: a lamp, not a workaround (Section 11) ---- */
+.power-section {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 2rem 0;
+}
+
+.power-btn {
+  font-family: inherit;
+  font-size: var(--text-md);
+  letter-spacing: var(--tracking-title);
+  font-weight: 700;
+  padding: 0.9rem 2.2rem;
+  background: var(--lamp-off);
+  color: var(--text-primary);
+  border: 2px solid var(--lamp-off-border);
+  border-radius: 4px;
+  cursor: pointer;
+  box-shadow: 0 2px 6px var(--shadow-ambient);
+}
+
+.power-btn:hover:not(:disabled) {
+  border-color: var(--lamp-on);
+  color: var(--lamp-on);
+  box-shadow: 0 0 14px 1px var(--lamp-on-glow);
+}
+
+.power-btn:disabled { opacity: 0.6; cursor: default; }
+
+/* ---- the rack itself ---- */
+.rack-surface {
+  position: relative;
+  background: var(--rail-surface);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  box-shadow: inset 0 0 24px var(--shadow-inset);
+}
+
+.rack-modules {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 1.8rem 1.4rem;
+  padding: 2.2rem 1.8rem;
+  /* The flex container's own box spans every row's gaps too, not just the
+   * panels inside it. Left at the default `auto`, that transparent box
+   * would still win every hit-test over the cable layer beneath it
+   * (z-index does not care that nothing is painted there) -- so a cable
+   * sagging through a gap between panels would be un-clickable everywhere
+   * except the handful of pixels outside every row's bounding rect. `none`
+   * here, with `auto` restored on `.module-panel` below, makes empty rack
+   * space pass clicks through to the cables underneath while every panel
+   * (and everything on it -- knobs, jacks) stays fully interactive. */
+  pointer-events: none;
+}
+
+.cable-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  overflow: visible;
+}
+
+/* ---- module panel ---- */
+.module-panel {
+  position: relative;
+  pointer-events: auto;
+  background: linear-gradient(180deg, var(--surface-panel) 0%, var(--surface-panel-alt) 100%);
+  border: 1px solid var(--panel-border);
+  border-top-color: var(--panel-border-strong);
+  border-radius: 5px;
+  padding: 0.6rem 0.55rem 0.75rem;
+  box-shadow: 0 3px 10px var(--shadow-panel), inset 0 1px 0 var(--highlight-edge);
+}
+
+.module-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.55rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.module-name {
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-title);
+  text-transform: uppercase;
+  color: var(--text-accent);
+  font-weight: 600;
+  text-align: center;
+}
+
+.module-grid {
+  display: grid;
+  gap: 0.3rem 0.2rem;
+}
+
+/* ---- knob ---- */
+.knob-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+}
+
+.knob-label {
+  font-size: var(--text-2xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--text-dim);
+  text-align: center;
+  line-height: 1.1;
+}
+
+.knob-dial {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 28%, var(--knob-body-hi), var(--knob-body) 72%);
+  border: 1px solid var(--knob-ring);
+  box-shadow: 0 2px 4px var(--shadow-ambient), inset 0 1px 1px var(--highlight-edge);
+  cursor: ns-resize;
+  touch-action: none;
+  outline: none;
+}
+
+.knob-dial:focus-visible {
+  border-color: var(--knob-indicator);
+  box-shadow: 0 0 0 2px var(--knob-indicator-glow);
+}
+
+.knob-indicator {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 2px;
+  height: 14px;
+  background: var(--knob-indicator);
+  border-radius: 1px;
+  transform-origin: 50% 1px;
+  transform: translate(-50%, -1px) rotate(var(--knob-angle, -135deg));
+  box-shadow: 0 0 4px var(--knob-indicator-glow);
+}
+
+.knob-readout {
+  font-size: var(--text-2xs);
+  color: var(--knob-readout);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.knob-wrap.dragging .knob-readout {
+  color: var(--knob-readout-drag);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.knob-wrap.dragging .knob-dial {
+  box-shadow: 0 0 0 3px var(--knob-indicator-glow), 0 2px 4px var(--shadow-ambient);
+}
+
+/* ---- jacks ---- */
+.jack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.2rem;
+  cursor: crosshair;
+}
+
+.jack-socket {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--jack-socket);
+  border: 2px solid var(--jack-ring);
+  box-shadow: inset 0 1px 2px var(--shadow-inset);
+}
+
+.jack:hover .jack-socket { border-color: var(--jack-ring-hover); }
+
+.jack.signal-audio .jack-socket { border-color: var(--cable-audio); }
+.jack.signal-cv .jack-socket { border-color: var(--cable-cv); }
+.jack.signal-gate .jack-socket { border-color: var(--cable-gate); }
+
+.jack-label {
+  font-size: var(--text-2xs);
+  letter-spacing: var(--tracking-label);
+  color: var(--text-dim);
+  text-transform: uppercase;
+  text-align: center;
+  line-height: 1.1;
+}
+
+/* ---- layout kinds no Phase 1 descriptor currently emits (see panel.ts) ---- */
+.fallback-control {
+  font-size: var(--text-2xs);
+  color: var(--text-faint);
+  border: 1px dashed var(--panel-border-strong);
+  border-radius: 3px;
+  text-align: center;
+  padding: 0.2rem;
+}
+
+/* ---- custom-panel escape hatch ---- */
+.custom-panel-content { margin-top: 0.6rem; }
+
+.custom-panel-missing {
+  margin-top: 0.5rem;
+  font-size: var(--text-2xs);
+  color: var(--text-warn);
+  border: 1px dashed var(--text-warn);
+  border-radius: 3px;
+  padding: 0.3rem;
+}
+
+/* ---- keyboard module's custom content ---- */
+.keyboard-panel-content { width: 100%; min-width: 420px; }
+
+.kb-hint {
+  margin: 0 0 0.4rem;
+  font-size: var(--text-2xs);
+  color: var(--text-dim);
+}
+
+.kb-note-readout {
+  font-size: var(--text-sm);
+  color: var(--text-accent);
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 0.5rem;
+}
+
+/* ---- on-screen piano (dev/piano.ts's DOM, themed here) ---- */
+.piano {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 110px;
+  background: var(--surface-recess);
+  border: 1px solid var(--panel-border);
+  border-radius: 3px;
+  user-select: none;
+}
+
+.piano-key {
+  box-sizing: border-box;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 0.35rem;
+  cursor: pointer;
+}
+
+.piano-key-white {
+  position: relative;
+  height: 100%;
+  background: var(--text-primary);
+  border: 1px solid var(--surface-recess);
+  border-radius: 0 0 3px 3px;
+  color: var(--surface-recess);
+}
+
+.piano-key-white:hover { background: var(--surface-panel-alt); }
+.piano-key-white.held { background: var(--lamp-on); }
+
+.piano-key-black {
+  position: absolute;
+  top: 0;
+  height: 62%;
+  z-index: 2;
+  background: var(--surface-panel);
+  border: 1px solid var(--surface-recess);
+  border-radius: 0 0 3px 3px;
+  color: var(--text-primary);
+}
+
+.piano-key-black:hover { background: var(--surface-panel-alt); }
+.piano-key-black.held { background: var(--knob-indicator-glow); color: var(--surface-recess); }
+
+.piano-key-label {
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-label);
+  min-height: 1em;
+}
+
+.piano-key-label.has-key { opacity: 1; }
+.piano-key-label:not(.has-key) { opacity: 0.25; }
+
+/* ---- patch cables ---- */
+.cable-visible {
+  fill: none;
+  stroke-width: 2.5px;
+  pointer-events: none;
+  stroke: var(--cable-preview);
+}
+
+.cable-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 14px;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+.cable.signal-audio .cable-visible { stroke: var(--cable-audio); }
+.cable.signal-cv .cable-visible { stroke: var(--cable-cv); }
+.cable.signal-gate .cable-visible { stroke: var(--cable-gate); }
+.cable.cable-inactive .cable-visible { stroke: var(--cable-inactive); stroke-dasharray: 2 4; }
+
+/* Marks a cable that closes a feedback loop and carries the 128-sample
+ * delay (Section 5) -- distinct dash pattern plus a warm glow, so the
+ * operator can see at a glance which cable costs them the 2.7ms. */
+.cable.cable-delayed .cable-visible {
+  stroke-dasharray: 7 5;
+  filter: drop-shadow(0 0 4px var(--cable-delayed-glow));
+}
+
+.cable:hover .cable-visible {
+  stroke-width: 3.5px;
+  filter: drop-shadow(0 0 6px var(--cable-hover-glow));
+}
+
+.cable-preview {
+  fill: none;
+  stroke-width: 2.5px;
+  stroke-dasharray: 4 4;
+  stroke: var(--cable-preview);
+  opacity: 0.85;
+}
+
+.cable-preview.signal-audio { stroke: var(--cable-audio); }
+.cable-preview.signal-cv { stroke: var(--cable-cv); }
+.cable-preview.signal-gate { stroke: var(--cable-gate); }

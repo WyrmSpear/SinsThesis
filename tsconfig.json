@@ -9,5 +9,5 @@
     "noEmit": true,
     "types": ["vitest/globals", "node"]
   },
-  "include": ["src", "tests", "dev", "vitest.config.ts"]
+  "include": ["src", "tests", "dev", "rack", "vitest.config.ts"]
 }

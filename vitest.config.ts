@@ -21,7 +21,11 @@ export default defineConfig({
           // APIs to spawn a dev server and a Chromium instance -- neither
           // exists inside this project's own sandboxed browser tab. It
           // gets its own "e2e" project below instead.
-          exclude: ['tests/browser/dev-page.test.ts', 'tests/browser/startup-thump.test.ts'],
+          exclude: [
+            'tests/browser/dev-page.test.ts',
+            'tests/browser/startup-thump.test.ts',
+            'tests/browser/rack-page.test.ts',
+          ],
           browser: {
             enabled: true,
             provider: 'playwright',
@@ -34,7 +38,11 @@ export default defineConfig({
         test: {
           name: 'e2e',
           environment: 'node',
-          include: ['tests/browser/dev-page.test.ts', 'tests/browser/startup-thump.test.ts'],
+          include: [
+            'tests/browser/dev-page.test.ts',
+            'tests/browser/startup-thump.test.ts',
+            'tests/browser/rack-page.test.ts',
+          ],
           // Boots a Vite dev server and a Chromium instance; slower than
           // the unit-style browser tests above.
           testTimeout: 30000,

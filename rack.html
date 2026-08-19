@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="/rack/theme-reaktor-dark.css" />
+  <link rel="stylesheet" href="/rack/style.css" />
+  <title>SinsThesis — rack</title>
+</head>
+<body>
+  <header class="masthead">
+    <h1>SINSTHESIS <span class="dim">// rack</span></h1>
+    <p class="dim">descriptor-driven panels, draggable patch cables — Reaktor Dark.</p>
+  </header>
+
+  <section id="power-section" class="power-section">
+    <button id="power-btn" data-testid="power" class="power-btn">POWER ON</button>
+    <p class="dim">audio requires a user gesture — nothing runs until this is pressed.</p>
+  </section>
+
+  <main id="app" hidden data-testid="app">
+    <div id="rack-surface" class="rack-surface" data-testid="rack-surface">
+      <div id="rack-modules" class="rack-modules" data-testid="rack-modules"></div>
+    </div>
+  </main>
+
+  <script type="module" src="/rack/main.ts"></script>
+</body>
+</html>
