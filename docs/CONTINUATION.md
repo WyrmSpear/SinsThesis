@@ -1,13 +1,18 @@
 # SinsThesis — continuation
 
-**Updated:** 2026-08-19. Phase 1A engine merged; Phase 1B rack is playable.
-**Branch:** `master` — 66 commits.
-**State:** 266 tests pass (211 node + 55 browser), `typecheck` clean, tree clean.
+**Updated:** 2026-08-19. Engine, rack, analysis and the academy's first mode all shipped.
+**Branch:** `master` — 72 commits.
+**State:** 322 tests pass (257 node + 65 browser), `typecheck` clean, tree clean.
 
-**You can play it.** `npm run dev`, open the URL, POWER ON. A modular rack:
-fifteen modules in a palette, drag-to-patch cables, drag-to-reorder, eight
-themes, `.sinp` save/load with autosave. The dev harness with scope and
-spectrum is still at `/harness.html` for engine work.
+**Run it:** `npm run dev`, open the URL, POWER ON.
+
+- **Free play** — a modular rack. Sixteen modules in a palette, drag-to-patch
+  cables, drag-to-reorder, eight themes, `.sinp` save/load with autosave, a
+  programmable 16-step sequencer, and a Scope module.
+- **Academy** — five build-this-patch levels that teach subtractive synthesis,
+  graded on the actual patch graph, with failures phrased in the player's own
+  words.
+- **Dev harness** at `/harness.html` — scope and spectrum for engine work.
 
 Read this file first. Then `docs/audio/PHASE1A-LEDGER.md` for every decision made
 and why.
@@ -179,6 +184,41 @@ That solved the symptom and broke the unit — `hp` is real Eurorack horizontal
 pitch, and a 26 HP ADSR is nonsense. The actual bug was that every `layout`
 put its knobs on one row. Layouts now stack, `hp` values are realistic (4–38),
 and panels are a uniform 3U as hardware is.
+
+## Phase 2 and the academy
+
+**Phase 2, first slice.** A `scope` module (the sixteenth) with `in` and `thru`
+so it inserts mid-patch like hardware, drawing a zero-crossing-triggered
+waveform and a dB-labelled spectrum. Clicking a cable inspects what is flowing
+on it — waveform, fundamental and RMS — via a parallel `AnalyserNode` attached
+on select and detached on deselect. Removal moved to an explicit button in that
+popover, so inspecting and deleting are no longer the same gesture.
+
+`engine/analysis` needed no extension to serve it. The spec bet that one
+measurement layer would serve tests, displays and graders alike; two of the
+three consumers now exist and `peakHz`/`rms` dropped straight in.
+
+**The academy's first mode.** Five levels — First Sound, Shape It, Play Notes,
+Modulate the Filter, Push the Resonance — each a real `.sinp` solution plus a
+rubric, chained so each starts from the previous level's proven-passing patch.
+Graded by `inspect()`, which was written for this and finally has a caller.
+The palette filters to a level's granted modules; progress persists.
+
+Two things this exposed and closed:
+
+- `inspect` addressed modules by exact id, so rubrics only worked because the
+  palette happened to number ids `${type}-1`. A player who deleted and re-added
+  a module would be told they were wrong when they were right. It now accepts
+  type refs, resolving "any VCO" consistently across clauses.
+- Feedback spoke engine identifiers to beginners — "vco-1.out is not patched to
+  output-1.in" — while the brief said "the VCO's Out jack". A presentation layer
+  in `academy/feedback.ts` now renders `InspectorResult.detail` using
+  descriptor names and port labels: "patch the VCO's \"Out\" jack into the
+  Output's \"In\" jack". The engine still returns id-based sentences for tests.
+
+Still to build: match-this-sound and constrained-challenge grading modes. Both
+need feature extraction over a rendered buffer, which `engine/analysis` already
+provides.
 
 ## Smaller things, recorded but not urgent
 
