@@ -7,6 +7,7 @@ export const mixerDescriptor: ModuleDescriptor = {
   type: 'mixer',
   name: 'Mixer',
   hp: 8,
+  group: 'utility',
   ports: [
     { id: 'in1', dir: 'in', signal: 'audio', label: 'In 1', pos: [0, 3] },
     { id: 'in2', dir: 'in', signal: 'audio', label: 'In 2', pos: [1, 3] },

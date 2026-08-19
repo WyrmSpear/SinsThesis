@@ -22,6 +22,7 @@ export const sequencerDescriptor: ModuleDescriptor = {
   type: 'seq',
   name: 'Sequencer',
   hp: 24,
+  group: 'control',
   customPanel: 'sequencer',
   ports: [
     { id: 'clock', dir: 'in', signal: 'gate', label: 'Clock', pos: [0, 3] },

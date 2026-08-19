@@ -2,6 +2,9 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { createServer, type ViteDevServer } from 'vite'
 import { chromium, type Browser, type Page } from 'playwright'
 import { fileURLToPath } from 'node:url'
+import { writeFileSync, unlinkSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 /**
  * Drives the real rack page (rack.html + rack/main.ts) in an actual
@@ -46,9 +49,17 @@ async function settleAfterBoot(page: Page): Promise<void> {
 
 interface DebugHook {
   graph: {
-    cables: ReadonlyArray<{ id: string; from: readonly [string, string]; to: readonly [string, string]; delayed: boolean }>
+    moduleIds: readonly string[]
+    cables: ReadonlyArray<{ id: string; from: readonly [string, string]; to: readonly [string, string]; delayed: boolean; active: boolean }>
+    getParams(id: string): Record<string, number>
   }
   rms(): number
+}
+
+function moduleIdsOf(page: Page): Promise<readonly string[]> {
+  return page.evaluate(
+    () => (window as unknown as { __sinsthesis: DebugHook }).__sinsthesis.graph.moduleIds,
+  ) as unknown as Promise<readonly string[]>
 }
 
 async function powerOn(page: Page): Promise<void> {
@@ -158,8 +169,14 @@ describe('rack page', () => {
     if (!target) throw new Error('expected a starter vco -> vcf cable')
     expect(before).toHaveLength(6)
 
-    const fromJack = page.getByTestId('jack-vco-out')
-    const toJack = page.getByTestId('jack-vcf-in')
+    // The rendered curve is anchored at each jack's `.jack-socket` circle,
+    // not the wider `.jack` element that also carries its label
+    // (`anchorOf` in rack/cables.ts) -- exactly matching that anchor, not
+    // approximating it from the outer element, is what keeps this
+    // midpoint on the actual 14px-wide hit-stroke regardless of how tall
+    // the label below the socket happens to render.
+    const fromJack = page.getByTestId('jack-vco-out').locator('.jack-socket')
+    const toJack = page.getByTestId('jack-vcf-in').locator('.jack-socket')
     const fromBox = await fromJack.boundingBox()
     const toBox = await toJack.boundingBox()
     if (!fromBox || !toBox) throw new Error('jack has no bounding box')
@@ -298,6 +315,200 @@ describe('rack page', () => {
       `rack-page.test.ts RMS: silence(before)=${silenceBefore.toExponential(3)} ` +
         `held=${rmsHeld.toExponential(3)} silence(after release)=${rmsAfterRelease.toExponential(3)}`,
     )
+
+    expect(consoleErrors, `console errors: ${consoleErrors.join('\n')}`).toEqual([])
+    await page.close()
+  })
+
+  it('adds a module from the palette into the graph and onto the rack', async () => {
+    const page: Page = await browser.newPage()
+    const consoleErrors: string[] = []
+    page.on('console', (msg) => { if (msg.type() === 'error') consoleErrors.push(msg.text()) })
+    page.on('pageerror', (err) => consoleErrors.push(String(err)))
+
+    await powerOn(page)
+
+    const before = await moduleIdsOf(page)
+    expect(before).toHaveLength(7)
+
+    // The palette is read from `listModules()` (rack/palette.ts), never a
+    // hardcoded list -- adding "noise" here exercises a module the starter
+    // patch itself never instantiates, proving the palette isn't just
+    // re-adding the same seven.
+    await page.getByTestId('palette-toggle').click()
+    await page.getByTestId('palette-add-noise').click()
+
+    const after = await moduleIdsOf(page)
+    expect(after).toHaveLength(8)
+    const newId = after.find((id) => !before.includes(id))
+    expect(newId).toBeDefined()
+    expect(newId).toMatch(/^noise-\d+$/)
+
+    // Really on screen, not just in the graph -- the generic renderer drew
+    // a real panel for it.
+    expect(await page.getByTestId(`module-${newId}`).isVisible()).toBe(true)
+    expect(await page.getByTestId(`jack-${newId}-out`).isVisible()).toBe(true)
+
+    expect(consoleErrors, `console errors: ${consoleErrors.join('\n')}`).toEqual([])
+    await page.close()
+  })
+
+  it('removes a module and drops every cable that touched it, on screen and in the graph', async () => {
+    const page: Page = await browser.newPage()
+    const consoleErrors: string[] = []
+    page.on('console', (msg) => { if (msg.type() === 'error') consoleErrors.push(msg.text()) })
+    page.on('pageerror', (err) => consoleErrors.push(String(err)))
+
+    await powerOn(page)
+
+    // The VCO carries two of the starter patch's six cables (keyboard ->
+    // vco.pitch, vco.out -> vcf.in) -- removing it should drop both,
+    // re-read from the graph rather than tracked separately by the view
+    // (rack/cables.ts's `syncFromGraph`).
+    const before = await cablesOf(page)
+    expect(before).toHaveLength(6)
+
+    await page.getByTestId('remove-vco').click()
+
+    const after = await cablesOf(page)
+    expect(after).toHaveLength(4)
+    expect(after.some((c) => c.from[0] === 'vco' || c.to[0] === 'vco')).toBe(false)
+
+    const ids = await moduleIdsOf(page)
+    expect(ids).not.toContain('vco')
+    expect(await page.getByTestId('module-vco').count()).toBe(0)
+
+    // Not just absent from the graph's cable list -- the SVG cable
+    // elements that used to represent them are gone too.
+    await expect.poll(() => page.locator('.cable').count()).toBe(4)
+
+    expect(consoleErrors, `console errors: ${consoleErrors.join('\n')}`).toEqual([])
+    await page.close()
+  })
+
+  it('a save/load round trip reproduces the same modules, params and cables', async () => {
+    const page: Page = await browser.newPage()
+    const consoleErrors: string[] = []
+    page.on('console', (msg) => { if (msg.type() === 'error') consoleErrors.push(msg.text()) })
+    page.on('pageerror', (err) => consoleErrors.push(String(err)))
+
+    await powerOn(page)
+
+    // Change a param and add a module first, so the round trip has more to
+    // lose than the untouched starter patch would prove.
+    const knob = page.getByTestId('knob-cutoff')
+    const box = await knob.boundingBox()
+    if (!box) throw new Error('knob has no bounding box')
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 - 40, { steps: 8 })
+    await page.mouse.up()
+    await page.getByTestId('palette-toggle').click()
+    await page.getByTestId('palette-add-noise').click()
+
+    interface PatchSnapshot { moduleIds: string[]; cables: Array<{ from: readonly [string, string]; to: readonly [string, string] }>; cutoff: number }
+    const readSnapshot = (): Promise<PatchSnapshot> =>
+      page.evaluate(() => {
+        const g = (window as unknown as { __sinsthesis: DebugHook }).__sinsthesis.graph
+        return {
+          moduleIds: [...g.moduleIds].sort(),
+          cables: g.cables.map((c) => ({ from: c.from, to: c.to })).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))),
+          cutoff: g.getParams('vcf')['cutoff'],
+        }
+      }) as unknown as Promise<PatchSnapshot>
+
+    const before = await readSnapshot()
+    expect(before.cutoff).toBeGreaterThan(1000) // the drag actually moved it
+
+    // Save: capture what would have downloaded, without touching a real
+    // filesystem download dialog -- `URL.createObjectURL` is the one seam
+    // `downloadPatch` (rack/patch-io.ts) offers for this.
+    const patchText = await page.evaluate(
+      () =>
+        new Promise<string>((resolve) => {
+          const orig = URL.createObjectURL.bind(URL)
+          URL.createObjectURL = (blob: Blob) => {
+            void blob.text().then(resolve)
+            return orig(blob)
+          }
+          ;(document.getElementById('save-patch') as HTMLButtonElement).click()
+        }),
+    )
+
+    const tmpPath = join(tmpdir(), `rack-roundtrip-${Date.now()}-${Math.random().toString(36).slice(2)}.sinp`)
+    writeFileSync(tmpPath, patchText)
+
+    try {
+      // Mutate the live rack before loading, so a passing test proves the
+      // load actually rebuilt state rather than the state having never
+      // changed.
+      await page.getByTestId('remove-lfo').click()
+      expect(await moduleIdsOf(page)).not.toEqual(before.moduleIds.sort())
+
+      await page.getByTestId('load-patch').click()
+      await page.getByTestId('load-file-input').setInputFiles(tmpPath)
+      await page.waitForTimeout(200)
+
+      const after = await readSnapshot()
+      expect(after).toEqual(before)
+      expect(await page.getByTestId('status-banner').isHidden()).toBe(true)
+    } finally {
+      unlinkSync(tmpPath)
+    }
+
+    expect(consoleErrors, `console errors: ${consoleErrors.join('\n')}`).toEqual([])
+    await page.close()
+  })
+
+  it('loads a file naming an unknown module type as a ghost with its cables intact', async () => {
+    const page: Page = await browser.newPage()
+    const consoleErrors: string[] = []
+    page.on('console', (msg) => { if (msg.type() === 'error') consoleErrors.push(msg.text()) })
+    page.on('pageerror', (err) => consoleErrors.push(String(err)))
+
+    await powerOn(page)
+
+    // A hand-built fixture, not something this build ever produced --
+    // "quantum-resonator" is a type no descriptor registers, and the
+    // fixture cables it to a real vco so the test can check the cable
+    // round-trips even though one end is unknown.
+    const fixture = {
+      version: 1,
+      meta: { name: 'Ghost Fixture', created: new Date().toISOString(), author: '' },
+      modules: [
+        { id: 'vco', type: 'vco', slot: [0, 0], params: {} },
+        { id: 'mystery', type: 'quantum-resonator', slot: [0, 1], params: { drive: 5 } },
+      ],
+      cables: [{ from: ['vco', 'out'], to: ['mystery', 'in'] }],
+    }
+    const tmpPath = join(tmpdir(), `rack-ghost-${Date.now()}-${Math.random().toString(36).slice(2)}.sinp`)
+    writeFileSync(tmpPath, JSON.stringify(fixture))
+
+    try {
+      await page.getByTestId('load-patch').click()
+      await page.getByTestId('load-file-input').setInputFiles(tmpPath)
+      await page.waitForTimeout(200)
+
+      const banner = page.getByTestId('status-banner')
+      expect(await banner.isVisible()).toBe(true)
+      expect(await banner.textContent()).toContain('quantum-resonator')
+
+      const ghostPanel = page.getByTestId('module-mystery')
+      expect(await ghostPanel.isVisible()).toBe(true)
+      expect(await ghostPanel.getAttribute('data-ghost')).toBe('true')
+
+      const cables = await cablesOf(page)
+      expect(cables).toHaveLength(1)
+      expect(cables[0]!.from).toEqual(['vco', 'out'])
+      expect(cables[0]!.to).toEqual(['mystery', 'in'])
+      expect(cables[0]!.active).toBe(false) // one end is a ghost -- no audio flows
+
+      // The cable is drawn too, not just present in the graph -- the
+      // ghost's jack got a real DOM anchor for it to attach to.
+      await expect.poll(() => page.locator('.cable').count()).toBe(1)
+    } finally {
+      unlinkSync(tmpPath)
+    }
 
     expect(consoleErrors, `console errors: ${consoleErrors.join('\n')}`).toEqual([])
     await page.close()

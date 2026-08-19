@@ -4,6 +4,7 @@ export const multipleDescriptor: ModuleDescriptor = {
   type: 'multiple',
   name: 'Mult',
   hp: 4,
+  group: 'utility',
   ports: [
     { id: 'in', dir: 'in', signal: 'audio', label: 'In', pos: [0, 3] },
     { id: 'out1', dir: 'out', signal: 'audio', label: 'Out 1', pos: [0, 4] },

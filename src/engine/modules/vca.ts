@@ -5,6 +5,7 @@ export const vcaDescriptor: ModuleDescriptor = {
   type: 'vca',
   name: 'VCA',
   hp: 6,
+  group: 'shaping',
   ports: [
     { id: 'in', dir: 'in', signal: 'audio', label: 'In', pos: [0, 3] },
     { id: 'cv', dir: 'in', signal: 'cv', label: 'CV', pos: [1, 3] },

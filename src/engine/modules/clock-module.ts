@@ -95,6 +95,7 @@ export const clockDescriptor: ModuleDescriptor = {
   type: 'clock',
   name: 'Clock',
   hp: 6,
+  group: 'control',
   ports: [
     { id: 'gate', dir: 'out', signal: 'gate', label: 'Gate', pos: [0, 3] },
     { id: 'reset', dir: 'out', signal: 'gate', label: 'Reset', pos: [1, 3] },

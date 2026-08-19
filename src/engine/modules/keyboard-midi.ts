@@ -28,6 +28,7 @@ export const keyboardMidiDescriptor: ModuleDescriptor = {
   type: 'keyboard',
   name: 'Keyboard/MIDI',
   hp: 10,
+  group: 'control',
   customPanel: 'keyboard',
   ports: [
     { id: 'pitch', dir: 'out', signal: 'cv', label: 'Pitch', pos: [0, 3] },

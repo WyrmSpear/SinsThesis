@@ -17,6 +17,7 @@ export const outputDescriptor: ModuleDescriptor = {
   type: 'output',
   name: 'Output',
   hp: 6,
+  group: 'utility',
   ports: [
     { id: 'in', dir: 'in', signal: 'audio', label: 'In', pos: [0, 3] },
     { id: 'out', dir: 'out', signal: 'audio', label: 'Out', pos: [2, 3] },

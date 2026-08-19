@@ -7,6 +7,7 @@ export const delayDescriptor: ModuleDescriptor = {
   type: 'delay',
   name: 'Delay',
   hp: 10,
+  group: 'shaping',
   ports: [
     { id: 'in', dir: 'in', signal: 'audio', label: 'In', pos: [0, 3] },
     { id: 'timeCv', dir: 'in', signal: 'cv', label: 'Time CV', pos: [1, 3] },

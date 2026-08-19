@@ -5,6 +5,7 @@ export const lfoDescriptor: ModuleDescriptor = {
   type: 'lfo',
   name: 'LFO',
   hp: 8,
+  group: 'modulation',
   ports: [
     { id: 'sync', dir: 'in', signal: 'gate', label: 'Sync', pos: [0, 3] },
     { id: 'out', dir: 'out', signal: 'cv', label: 'Out', pos: [3, 3] },

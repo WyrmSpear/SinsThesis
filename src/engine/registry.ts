@@ -4,13 +4,19 @@
  * in a port id or a default outside its own range should fail loudly right
  * there, not silently corrupt a patch loaded three screens later.
  */
-import type { ModuleDescriptor } from './types'
+import { MODULE_GROUPS, type ModuleDescriptor } from './types'
 
 const descriptors = new Map<string, ModuleDescriptor>()
 
 function validate(d: ModuleDescriptor): void {
   if (descriptors.has(d.type)) {
     throw new Error(`registerModule: type "${d.type}" is already registered`)
+  }
+
+  if (d.group !== undefined && !MODULE_GROUPS.includes(d.group)) {
+    throw new Error(
+      `registerModule: "${d.type}" group "${d.group}" is not one of ${MODULE_GROUPS.join(', ')}`,
+    )
   }
 
   const portIds = new Set<string>()

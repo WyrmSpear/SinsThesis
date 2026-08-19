@@ -40,6 +40,13 @@ export class CableLayer {
   private dragFrom: JackRef | null = null
   private dragPreview: SVGPathElement | null = null
   private readonly resizeObserver: ResizeObserver
+  private readonly onWindowResize = (): void => this.reflow()
+
+  /** Called after a drag or a cable-click changes the graph -- the same
+   *  kind of change-notification hook `buildPanel` takes, so a caller (the
+   *  rack's autosave) has one place to hear about every kind of patch
+   *  edit instead of hooking each gesture separately. */
+  onChange?: () => void
 
   constructor(
     private readonly container: HTMLElement,
@@ -53,7 +60,50 @@ export class CableLayer {
     window.addEventListener('pointerup', this.onDragEnd)
     this.resizeObserver = new ResizeObserver(() => this.reflow())
     this.resizeObserver.observe(container)
-    window.addEventListener('resize', () => this.reflow())
+    window.addEventListener('resize', this.onWindowResize)
+  }
+
+  /** Tears down every listener and observer this layer registered, plus
+   *  its own SVG element -- the counterpart `new CableLayer(...)` needs
+   *  when a patch load discards the current graph and rebuilds a fresh
+   *  one. Without this, each load would leak a `pointermove`/`pointerup`/
+   *  `resize` listener and a `ResizeObserver` bound to a container that
+   *  may itself be gone. */
+  destroy(): void {
+    window.removeEventListener('pointermove', this.onDragMove)
+    window.removeEventListener('pointerup', this.onDragEnd)
+    window.removeEventListener('resize', this.onWindowResize)
+    this.resizeObserver.disconnect()
+    this.svg.remove()
+    this.jacks.clear()
+    this.cableGroups.clear()
+  }
+
+  /** Drop every jack this module registered -- called when its panel is
+   *  removed so a stale `JackRef` (pointing at a detached DOM element)
+   *  cannot linger in `this.jacks` and be offered as a drag target. */
+  removeModuleJacks(moduleId: string): void {
+    for (const key of [...this.jacks.keys()]) {
+      if (key.startsWith(`${moduleId}:`)) this.jacks.delete(key)
+    }
+  }
+
+  /**
+   * Reconcile the drawn cables against `graph.cables` -- the engine's own
+   * list, not anything this layer tracked independently. Removing a
+   * module drops its cables inside `PatchGraph.removeModule` before this
+   * is ever called; this only makes the screen agree with what the graph
+   * already did, the same "engine decides, view redraws" split every
+   * other mutation here follows.
+   */
+  syncFromGraph(): void {
+    const liveIds = new Set(this.graph.cables.map((c) => c.id))
+    for (const id of [...this.cableGroups.keys()]) {
+      if (!liveIds.has(id)) this.removeCable(id)
+    }
+    for (const cable of this.graph.cables) {
+      if (!this.cableGroups.has(cable.id)) this.renderCable(cable)
+    }
   }
 
   /** Handed to `buildPanel` so jacks register themselves as they're built. */
@@ -102,6 +152,7 @@ export class CableLayer {
     hit.addEventListener('click', () => {
       this.graph.disconnect(cable.id)
       this.removeCable(cable.id)
+      this.onChange?.()
     })
   }
 
@@ -197,5 +248,6 @@ export class CableLayer {
     }
     const cable = this.graph.connect([from.moduleId, from.portId], [to.moduleId, to.portId])
     this.renderCable(cable)
+    this.onChange?.()
   }
 }

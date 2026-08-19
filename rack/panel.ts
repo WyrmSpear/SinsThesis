@@ -28,6 +28,16 @@ export type CustomPanelBuilder = (moduleId: string, graph: PatchGraph) => HTMLEl
 export interface BuildPanelOptions {
   jacks: JackRegistry
   customPanels?: Record<string, CustomPanelBuilder>
+  /** Called after any control on this panel changes the graph -- a knob
+   *  drag, a switch click. The renderer stays ignorant of *why* a caller
+   *  wants to know (autosave, in this app); it only ever plumbs the one
+   *  hook through, the same way it already plumbs `jacks`. */
+  onChange?: () => void
+  /** When present, the panel grows a remove control (the header's own
+   *  corner, not a module-specific button) that calls back with this
+   *  module's id. Omit to render a panel with no way to remove itself --
+   *  used for ghosts, which manage their own removal affordance. */
+  onRemove?: (moduleId: string) => void
 }
 
 interface RowPlan {
@@ -160,6 +170,17 @@ export function buildPanel(
   name.textContent = descriptor.name
   header.append(name)
 
+  if (opts.onRemove) {
+    const removeBtn = document.createElement('button')
+    removeBtn.type = 'button'
+    removeBtn.className = 'module-remove'
+    removeBtn.dataset['testid'] = `remove-${moduleId}`
+    removeBtn.title = `Remove ${descriptor.name}`
+    removeBtn.textContent = '×'
+    removeBtn.addEventListener('click', () => opts.onRemove!(moduleId))
+    header.append(removeBtn)
+  }
+
   const plan = planRows(descriptor)
   const grid = document.createElement('div')
   grid.className = 'module-grid'
@@ -171,7 +192,10 @@ export function buildPanel(
 
   function buildParamControl(spec: ParamSpec): HTMLElement {
     const initial = graph.getParams(moduleId)[spec.id] ?? spec.default
-    const onChange = (value: number): void => graph.setParam(moduleId, spec.id, value)
+    const onChange = (value: number): void => {
+      graph.setParam(moduleId, spec.id, value)
+      opts.onChange?.()
+    }
     // A param with `labels` is discrete, not continuous (src/engine/types.ts)
     // -- draw the switch, not the knob, regardless of which `layout.kind`
     // the descriptor used to reach it. The decision lives entirely in the

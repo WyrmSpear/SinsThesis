@@ -69,6 +69,156 @@ body {
 
 .power-btn:disabled { opacity: 0.6; cursor: default; }
 
+/* ---- toolbar: add/save/load, patch name ---- */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.9rem;
+  flex-wrap: wrap;
+}
+
+.toolbar-btn {
+  font-family: inherit;
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  padding: 0.45rem 0.8rem;
+  background: var(--surface-panel);
+  color: var(--text-primary);
+  border: 1px solid var(--panel-border-strong);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.toolbar-btn:hover {
+  border-color: var(--knob-indicator);
+  color: var(--knob-indicator);
+}
+
+.patch-name-input {
+  font-family: inherit;
+  font-size: var(--text-sm);
+  padding: 0.4rem 0.6rem;
+  background: var(--surface-recess);
+  color: var(--text-primary);
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  min-width: 12ch;
+}
+
+.patch-name-input:focus-visible {
+  outline: none;
+  border-color: var(--knob-indicator);
+}
+
+/* ---- module palette drawer ---- */
+.palette-drawer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.2rem;
+  margin-bottom: 0.9rem;
+  padding: 0.9rem 1rem;
+  background: var(--surface-panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+}
+
+.palette-section {
+  min-width: 140px;
+}
+
+.palette-section-title {
+  margin: 0 0 0.4rem;
+  font-size: var(--text-2xs);
+  letter-spacing: var(--tracking-title);
+  text-transform: uppercase;
+  color: var(--text-accent);
+}
+
+.palette-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.palette-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  font-family: inherit;
+  font-size: var(--text-xs);
+  padding: 0.35rem 0.5rem;
+  background: var(--surface-recess);
+  color: var(--text-primary);
+  border: 1px solid var(--panel-border);
+  border-radius: 3px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.palette-entry:hover {
+  border-color: var(--knob-indicator);
+  color: var(--knob-indicator);
+}
+
+.palette-entry-hp {
+  color: var(--text-dim);
+  font-size: var(--text-2xs);
+}
+
+/* ---- status banner: ghost warnings, load errors ---- */
+.status-banner {
+  margin-bottom: 0.9rem;
+  padding: 0.6rem 0.8rem;
+  font-size: var(--text-sm);
+  border-radius: 4px;
+  border: 1px solid var(--text-warn);
+  color: var(--text-warn);
+  background: var(--surface-panel);
+}
+
+.status-banner-error {
+  border-color: var(--lamp-warn);
+  color: var(--lamp-warn);
+}
+
+/* ---- ghost modules: a placeholder for a type this build does not know ---- */
+.module-panel-ghost {
+  border-style: dashed;
+  border-color: var(--text-warn);
+}
+
+.module-panel-ghost .module-name { color: var(--text-warn); }
+
+.ghost-note {
+  margin: 0 0 0.5rem;
+  font-size: var(--text-2xs);
+  color: var(--text-dim);
+  max-width: 22ch;
+}
+
+.ghost-params {
+  margin: 0 0 0.5rem;
+  font-size: var(--text-2xs);
+  color: var(--text-dim);
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 0.1rem 0.5rem;
+}
+
+.ghost-params dt { color: var(--text-dim); }
+.ghost-params dd { margin: 0; color: var(--text-primary); text-align: right; }
+
+.ghost-jacks {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.jack.signal-unknown .jack-socket { border-color: var(--cable-inactive); }
+
 /* ---- the rack itself ---- */
 .rack-surface {
   position: relative;
@@ -139,12 +289,41 @@ body {
 }
 
 .module-header {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   margin-bottom: 0.55rem;
   padding-bottom: 0.4rem;
   border-bottom: 1px solid var(--panel-border);
+}
+
+/* Absolutely positioned in the header's own corner so it never pushes the
+ * centered module name off-center -- the header stays a one-child flex row
+ * for layout purposes, and this floats on top of it. */
+.module-remove {
+  position: absolute;
+  right: 0;
+  top: -0.15rem;
+  width: 1.1rem;
+  height: 1.1rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: inherit;
+  font-size: var(--text-sm);
+  color: var(--text-dim);
+  background: transparent;
+  border: 1px solid var(--panel-border);
+  border-radius: 3px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.module-remove:hover {
+  color: var(--text-warn);
+  border-color: var(--text-warn);
 }
 
 .module-name {
@@ -356,6 +535,19 @@ body {
   text-align: center;
   line-height: 1.2;
   overflow-wrap: break-word;
+  /* `.jack` already paints above `.cable-layer` (z-index 2 vs 1, see the
+   * comment on `.cable-layer` above) -- confirmed live with
+   * `elementFromPoint`, the label really is the topmost element at every
+   * point a sagging cable crosses it. The bug is legibility, not stacking
+   * order: this text is thin and `--text-dim`, a sagging cable is a
+   * saturated 2.5px stroke, and a transparent span lets that stroke's
+   * color bleed straight through the glyphs' own anti-aliased edges --
+   * "on top" in the DOM, unreadable on screen. An opaque backing chip
+   * (not a transparent one) is what actually fixes reading a label with a
+   * cable crossing under it, independent of paint order. */
+  background: var(--surface-panel-alt);
+  border-radius: 2px;
+  padding: 0.04rem 0.22rem;
 }
 
 /* ---- layout kinds no Phase 1 descriptor currently emits (see panel.ts) ---- */

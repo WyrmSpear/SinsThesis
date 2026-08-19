@@ -4,6 +4,7 @@ export const shDescriptor: ModuleDescriptor = {
   type: 'sh',
   name: 'S&H',
   hp: 6,
+  group: 'modulation',
   ports: [
     { id: 'in', dir: 'in', signal: 'cv', label: 'In', pos: [0, 3] },
     { id: 'trigger', dir: 'in', signal: 'gate', label: 'Trig', pos: [1, 3] },

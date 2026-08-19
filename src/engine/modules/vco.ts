@@ -10,6 +10,7 @@ export const vcoDescriptor: ModuleDescriptor = {
   type: 'vco',
   name: 'VCO',
   hp: 12,
+  group: 'source',
   ports: [
     { id: 'pitch', dir: 'in', signal: 'cv', label: '1V/Oct', pos: [0, 3] },
     { id: 'fm', dir: 'in', signal: 'cv', label: 'FM', pos: [1, 3] },

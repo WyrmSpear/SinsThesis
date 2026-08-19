@@ -63,6 +63,7 @@ panels.
 ```ts
 interface ModuleDescriptor {
   type: string; name: string; hp: number;
+  group?: 'source' | 'shaping' | 'modulation' | 'utility' | 'control';
   ports:  PortSpec[];    // {id, dir, signal: 'audio'|'cv'|'gate', label, pos}
   params: ParamSpec[];   // {id, min, max, default, curve, unit, labels?}
   layout: LayoutItem[];  // {kind, ref, x, y}
@@ -86,6 +87,19 @@ registration time, the same way it already rejects an out-of-range default.
 
 Modules that genuinely need bespoke UI — the sequencer and, in Phase 2, the
 scope — declare a custom panel component instead of a layout grid.
+
+`group` sorts a module into one of the rack's five palette sections —
+source, shaping, modulation, utility, control — the same five names the
+palette UI groups its module list under. It lives on the descriptor rather
+than being inferred in the UI from `type` or `name`, for the same reason
+`labels` lives on `ParamSpec` rather than being guessed from a param's
+range: the descriptor is the one place a module's own author states what
+it is, so the palette never drifts out of sync with a name-matching rule
+maintained separately in the UI layer. It is optional — a hand-rolled test
+descriptor need not classify itself — but every shipped module sets one.
+The registry rejects a `group` that is not one of the five known values at
+registration time, the same way it already rejects an out-of-range default
+or a mismatched `labels` length.
 
 `ModuleInstance` is the seam that makes the planned engine upgrade real.
 Today each instance wraps native nodes and worklets. Later an instance can

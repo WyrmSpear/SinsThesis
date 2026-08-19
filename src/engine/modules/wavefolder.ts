@@ -5,6 +5,7 @@ export const wavefolderDescriptor: ModuleDescriptor = {
   type: 'wavefolder',
   name: 'Wavefolder',
   hp: 8,
+  group: 'shaping',
   ports: [
     { id: 'in', dir: 'in', signal: 'audio', label: 'In', pos: [0, 3] },
     { id: 'foldCv', dir: 'in', signal: 'cv', label: 'Fold CV', pos: [1, 3] },

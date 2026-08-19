@@ -5,6 +5,7 @@ export const noiseDescriptor: ModuleDescriptor = {
   type: 'noise',
   name: 'Noise',
   hp: 4,
+  group: 'source',
   ports: [{ id: 'out', dir: 'out', signal: 'audio', label: 'Out', pos: [0, 3] }],
   params: [{ id: 'color', label: 'Color', min: 0, max: 1, default: 0, curve: 'lin', unit: '' }],
   layout: [

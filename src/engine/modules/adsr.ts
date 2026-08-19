@@ -5,6 +5,7 @@ export const adsrDescriptor: ModuleDescriptor = {
   type: 'adsr',
   name: 'ADSR',
   hp: 8,
+  group: 'modulation',
   ports: [
     { id: 'gate', dir: 'in', signal: 'gate', label: 'Gate', pos: [0, 3] },
     { id: 'out', dir: 'out', signal: 'cv', label: 'Out', pos: [3, 3] },

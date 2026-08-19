@@ -29,6 +29,13 @@ export interface ParamSpec {
   labels?: readonly string[]
 }
 
+/** The five palette sections the rack groups modules into. A closed set
+ *  (not a free string) so every descriptor's `group` sorts into the same
+ *  bucket a human would expect, rather than each module author inventing
+ *  its own label and the palette silently growing a sixth column. */
+export const MODULE_GROUPS = ['source', 'shaping', 'modulation', 'utility', 'control'] as const
+export type ModuleGroup = (typeof MODULE_GROUPS)[number]
+
 export interface LayoutItem {
   kind: 'knob' | 'jack' | 'switch' | 'button' | 'display'
   /** A port id or a param id. */
@@ -47,6 +54,10 @@ export interface ModuleDescriptor {
   name: string
   /** Panel width in horizontal pitch units, as in a physical rack. */
   hp: number
+  /** Which palette section this module sorts into. Optional so a
+   *  hand-rolled test descriptor need not classify itself; every shipped
+   *  module in `src/engine/modules/` sets one. */
+  group?: ModuleGroup
   ports: PortSpec[]
   params: ParamSpec[]
   layout: LayoutItem[]

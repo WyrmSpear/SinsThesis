@@ -5,6 +5,7 @@ export const vcfDescriptor: ModuleDescriptor = {
   type: 'vcf',
   name: 'Ladder VCF',
   hp: 12,
+  group: 'shaping',
   ports: [
     { id: 'in', dir: 'in', signal: 'audio', label: 'In', pos: [0, 3] },
     { id: 'cutoffCv', dir: 'in', signal: 'cv', label: 'Cutoff CV', pos: [1, 3] },
