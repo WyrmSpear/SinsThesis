@@ -43,7 +43,7 @@ There is no single command that runs both test suites — `npm test` covers
   modular rack with sixteen module types in a palette (VCO, Noise, ladder
   VCF, VCA, Wavefolder, ADSR, LFO, Sample & Hold, Mixer, Multiple, Delay,
   Clock, 16-step Sequencer, Keyboard/MIDI, Output, Scope), drag-to-patch
-  cables, drag-to-reorder panels, eight switchable themes, and `.sinp`
+  cables, drag-to-reorder panels, nine switchable themes, and `.sinp`
   save/load with autosave. Click a cable to see what's actually flowing on
   it — waveform, fundamental, RMS.
 - **The academy** (inside the rack) — five build-this-patch levels that

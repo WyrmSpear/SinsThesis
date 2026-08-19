@@ -1,0 +1,132 @@
+/**
+ * Brimstone -- the ninth theme, and the first to acknowledge the pun in the
+ * project's own name. Oxblood and charcoal, hot ember red, sulfur yellow,
+ * sharp angular forms: a demon's workshop, not a cathedral. Same rule as
+ * every theme file before it: nothing but CSS custom properties,
+ * `rack/style.css` and every `rack/*.ts` component untouched, geometry
+ * unaffected (`rack/panel.ts`, `rack/knob.ts` own that instead).
+ *
+ * ---- the motif: heretic's forks, carried entirely through two tokens ----
+ *
+ * The brief asked for a *figurative* repeating silhouette -- the heretic's
+ * fork (the two-pronged, double-ended iron collar; historical, public
+ * domain, no studio mark on it) -- rather than the abstract scanlines/wood
+ * grain/trace-grid every earlier theme's texture trick produced. That
+ * turned out to still be zero component changes, same call sites as always:
+ * `body`'s `background` and `.rack-surface`'s `background` in
+ * rack/style.css are each a bare `var(--surface-rack)` / `var(--rail-surface)`
+ * with no gradient wrapped around them (see Moog Wood's and Phosphor Lab's
+ * own header comments for why that matters), and the CSS `background`
+ * shorthand accepts an arbitrary list of comma-separated layers -- an
+ * `url(...)` image layer is exactly as legal there as another
+ * `repeating-linear-gradient`. A tiny inline SVG, base64-encoded into a
+ * `data:` URI and tiled via `background-size`, is still "a token file hands
+ * back a background value" -- the same trick every prior theme used, just
+ * with a figurative image layer instead of a procedural gradient one. No
+ * new token, no component edit, and it proves the token set can carry an
+ * actual pictorial motif, not just texture -- which was the open question
+ * this theme exists to answer.
+ *
+ * The SVG itself: a vertical shaft flanked by two diverging tines at each
+ * end (an hourglass of two Y-shapes, point-to-point) with a small collar
+ * bar at the waist -- the two-pronged-at-both-ends silhouette that
+ * distinguishes a heretic's fork from an ordinary pitchfork or trident.
+ * Stroked in a low-alpha oxblood so it reads as a watermark, not a graphic --
+ * "subtle enough to sit behind panels without fighting the controls," per
+ * the brief. `--surface-rack` (the page, seen only at the rack's margins)
+ * tiles it large and sparse; `--rail-surface` (the case behind the modules,
+ * more visible in the gaps between panels) tiles it smaller and a touch
+ * denser -- the same large-tile/small-tile split Circuit/PCB already used
+ * between its two grid layers, reused here for the same reason: more
+ * visible surface gets the same motif at a scale that doesn't read as
+ * empty.
+ *
+ * IP note: this is an original theme in a genre (adult animated-comedy
+ * Hell), not a reproduction of any studio's logo, character, wordmark or
+ * published design. The heretic's fork is a real medieval device, centuries
+ * out of copyright; nothing here names or draws a specific show, character
+ * or insignia.
+ */
+:root[data-theme='brimstone'] {
+  /* ---- surfaces: oxblood-charcoal, heretic's-fork watermark ---- */
+  --surface-rack:
+    url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI3MiIgaGVpZ2h0PSIxMDQiIHZpZXdCb3g9IjAgMCA3MiAxMDQiPgo8ZyBmaWxsPSJub25lIiBzdHJva2U9InJnYmEoMTY4LDY0LDM2LDAuNCkiIHN0cm9rZS13aWR0aD0iMi4yIiBzdHJva2UtbGluZWNhcD0icm91bmQiPgo8cGF0aCBkPSJNMzYgNDAgTDM2IDY0Ii8+CjxwYXRoIGQ9Ik0zNiA0MCBMMTggMTAiLz4KPHBhdGggZD0iTTM2IDQwIEw1NCAxMCIvPgo8cGF0aCBkPSJNMzYgNjQgTDE4IDk0Ii8+CjxwYXRoIGQ9Ik0zNiA2NCBMNTQgOTQiLz4KPC9nPgo8ZyBmaWxsPSJyZ2JhKDE2OCw2NCwzNiwwLjQpIj4KPGNpcmNsZSBjeD0iMTgiIGN5PSIxMCIgcj0iMi40Ii8+CjxjaXJjbGUgY3g9IjU0IiBjeT0iMTAiIHI9IjIuNCIvPgo8Y2lyY2xlIGN4PSIxOCIgY3k9Ijk0IiByPSIyLjQiLz4KPGNpcmNsZSBjeD0iNTQiIGN5PSI5NCIgcj0iMi40Ii8+CjxyZWN0IHg9IjMyLjUiIHk9IjQ5IiB3aWR0aD0iNyIgaGVpZ2h0PSI2IiByeD0iMSIvPgo8L2c+Cjwvc3ZnPgo=')
+      0 0 / 180px 260px repeat,
+    radial-gradient(ellipse at 50% 0%, rgba(232, 76, 40, 0.07), transparent 62%),
+    linear-gradient(160deg, #241318 0%, #170d10 100%);
+  --surface-panel: #241418;
+  --surface-panel-alt: #2f181d;
+  --surface-recess: #150b0c;
+
+  /* ---- engraving: hairline strokes and shadow ---- */
+  --panel-border: #3d1e19;
+  --panel-border-strong: #6b3226;
+  --shadow-panel: rgba(10, 2, 2, 0.75);
+  --shadow-ambient: rgba(10, 2, 2, 0.55);
+  --shadow-inset: rgba(6, 1, 1, 0.82);
+  --highlight-edge: rgba(255, 106, 56, 0.1);
+
+  /* ---- type: an industrial slab, more bite than the neutral monospace,
+   * with a solid monospace fallback chain so tabular readouts still line
+   * up wherever the slab isn't installed. ---- */
+  --font-mono: 'Rockwell', 'Roboto Slab', 'Cascadia Mono', Consolas, 'DejaVu Sans Mono', ui-monospace, monospace;
+  --text-primary: #e9d9c8;
+  /* Brightened from an initial #8a5a48 (2.9-3.4:1 against the panel
+   * surfaces -- checked, not assumed) up to a measured 4.2-5.2:1 across
+   * --surface-panel/-alt/-recess, matching or beating every other theme's
+   * own --text-dim contrast (Reaktor Dark 4.25:1, Circuit/PCB 4.66:1,
+   * Moog Wood 3.60:1). This is the color knob labels, jack labels and
+   * palette entries render in at 0.62rem -- the smallest type on the
+   * page -- so it got a WCAG contrast pass the other tokens below didn't
+   * need. */
+  --text-dim: #ab7860;
+  --text-faint: #6b4032;
+  --text-accent: #e0bd45;
+  --text-warn: #ff6a3c;
+  --text-2xs: 0.62rem;
+  --text-xs: 0.7rem;
+  --text-sm: 0.8rem;
+  --text-md: 0.95rem;
+  --text-lg: 1.2rem;
+  --tracking-label: 0.07em;
+  --tracking-title: 0.13em;
+
+  /* ---- knob material: charcoal body, ember pointer and value arc ---- */
+  --knob-body: #2a1519;
+  --knob-body-hi: #3f2024;
+  --knob-ring: #7a3323;
+  --knob-indicator: #e8461f;
+  --knob-indicator-glow: rgba(232, 70, 31, 0.6);
+  --knob-readout: #e8461f;
+  --knob-readout-drag: #ff9159;
+
+  /* ---- jacks: blackened iron, ember on hover ---- */
+  --jack-socket: #150a0b;
+  --jack-ring: #6b2f20;
+  --jack-ring-hover: #e8461f;
+
+  /* ---- cables by signal type: audio ember, CV sulfur, gate bone white ---- */
+  --cable-audio: #e8461f;
+  --cable-cv: #d9c04a;
+  --cable-gate: #e8dcc8;
+  --cable-preview: #9a6350;
+  --cable-delayed-glow: rgba(217, 192, 74, 0.85);
+  --cable-hover-glow: rgba(255, 214, 168, 0.4);
+  --cable-inactive: #5a352a;
+
+  /* ---- lamps: sulfur, the "anything active or selected" color ---- */
+  --lamp-on: #e0c24a;
+  --lamp-on-glow: rgba(224, 194, 74, 0.75);
+  --lamp-off: #2a1518;
+  --lamp-off-border: #4a231c;
+  --lamp-warn: #e8461f;
+  --lamp-warn-glow: rgba(232, 70, 31, 0.65);
+
+  /* ---- rack surfaces: rail, screws -- the same fork motif, smaller and
+   * a touch denser since this surface shows through every panel gap. ---- */
+  --rail-surface:
+    url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI3MiIgaGVpZ2h0PSIxMDQiIHZpZXdCb3g9IjAgMCA3MiAxMDQiPgo8ZyBmaWxsPSJub25lIiBzdHJva2U9InJnYmEoMTY4LDY0LDM2LDAuNCkiIHN0cm9rZS13aWR0aD0iMi4yIiBzdHJva2UtbGluZWNhcD0icm91bmQiPgo8cGF0aCBkPSJNMzYgNDAgTDM2IDY0Ii8+CjxwYXRoIGQ9Ik0zNiA0MCBMMTggMTAiLz4KPHBhdGggZD0iTTM2IDQwIEw1NCAxMCIvPgo8cGF0aCBkPSJNMzYgNjQgTDE4IDk0Ii8+CjxwYXRoIGQ9Ik0zNiA2NCBMNTQgOTQiLz4KPC9nPgo8ZyBmaWxsPSJyZ2JhKDE2OCw2NCwzNiwwLjQpIj4KPGNpcmNsZSBjeD0iMTgiIGN5PSIxMCIgcj0iMi40Ii8+CjxjaXJjbGUgY3g9IjU0IiBjeT0iMTAiIHI9IjIuNCIvPgo8Y2lyY2xlIGN4PSIxOCIgY3k9Ijk0IiByPSIyLjQiLz4KPGNpcmNsZSBjeD0iNTQiIGN5PSI5NCIgcj0iMi40Ii8+CjxyZWN0IHg9IjMyLjUiIHk9IjQ5IiB3aWR0aD0iNyIgaGVpZ2h0PSI2IiByeD0iMSIvPgo8L2c+Cjwvc3ZnPgo=')
+      0 0 / 128px 185px repeat,
+    #150b0c;
+  --screw: #7a332388;
+}

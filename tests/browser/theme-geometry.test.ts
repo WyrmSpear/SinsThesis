@@ -38,7 +38,7 @@ import { fileURLToPath } from 'node:url'
  * `height` from `PANEL_HEIGHT_PX` (rack/panel.ts), the same "3U regardless
  * of width" rule a real Eurorack case enforces. The assertions below check
  * that claim two ways -- every panel in one theme shares the exact same
- * height, and each panel's height stays pixel-identical across all eight
+ * height, and each panel's height stays pixel-identical across all nine
  * themes, mirroring how width was already checked.
  */
 
@@ -63,8 +63,10 @@ afterAll(async () => {
   await server?.close()
 })
 
-// All eight themes Section 8 names. Reaktor Dark is the default and serves
-// as the reference every other theme is compared against.
+// The eight themes Section 8 names, plus Brimstone (the ninth, added after
+// Section 8 was written -- see rack/theme-brimstone.css). Reaktor Dark is
+// the default and serves as the reference every other theme is compared
+// against.
 const THEMES = [
   'reaktor-dark',
   'moog-wood',
@@ -74,6 +76,7 @@ const THEMES = [
   'geist-groovebox',
   'casiotone',
   'korg-ms20',
+  'brimstone',
 ] as const
 
 interface Size {
@@ -169,7 +172,7 @@ function assertNoOverflowOrOverlap(panels: PanelGeometry[]): void {
 
 describe('theme geometry (Section 8)', () => {
   it(
-    'switching every theme changes tokens and holds panel width, control size and jack position pixel-identical across all eight',
+    'switching every theme changes tokens and holds panel width, control size and jack position pixel-identical across all nine',
     async () => {
       const page: Page = await browser.newPage()
       const consoleErrors: string[] = []
@@ -237,7 +240,7 @@ describe('theme geometry (Section 8)', () => {
       // shares one exact height (the rail claim itself -- VCO and Output
       // seated on the same line, not tops flush and bottoms ragged), and
       // then, in the cross-theme loop below, that height stays pixel-
-      // identical per panel across all eight themes the same way width
+      // identical per panel across all nine themes the same way width
       // already does.
       const referenceHeight = reference[0]!.height
       for (const panel of reference) {
@@ -266,7 +269,7 @@ describe('theme geometry (Section 8)', () => {
         }
       }
 
-      // Reload with the last theme (Korg MS-20) already in localStorage and
+      // Reload with the last theme (Brimstone) already in localStorage and
       // confirm it persists across a full page load, per the task's
       // "persists across reloads" requirement -- and via the *inline*
       // bootstrap in index.html specifically, not this module's own JS: the

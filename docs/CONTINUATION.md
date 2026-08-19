@@ -1,13 +1,14 @@
 # SinsThesis — continuation
 
-**Updated:** 2026-08-19. Engine, rack, analysis and the academy's first mode all shipped.
-**Branch:** `master` — 74 commits.
+**Updated:** 2026-08-19. Engine, rack, analysis, the academy's first mode and a
+ninth theme all shipped.
+**Branch:** `master` — 75 commits.
 **State:** 322 tests pass (257 node + 65 browser), `typecheck` clean, tree clean.
 
 **Run it:** `npm run dev`, open the URL, POWER ON.
 
 - **Free play** — a modular rack. Sixteen modules in a palette, drag-to-patch
-  cables, drag-to-reorder, eight themes, `.sinp` save/load with autosave, a
+  cables, drag-to-reorder, nine themes, `.sinp` save/load with autosave, a
   programmable 16-step sequencer, and a Scope module.
 - **Academy** — five build-this-patch levels that teach subtractive synthesis,
   graded on the actual patch graph, with failures phrased in the player's own
@@ -54,9 +55,9 @@ src/engine/
 rack/         main.ts, panel.ts, ghost-panel.ts, knob.ts, slider.ts, switch.ts,
               curve.ts, cables.ts, cable-inspector.ts, palette.ts, reorder.ts,
               keyboard-panel.ts, sequencer-panel.ts, scope-panel.ts, academy-panel.ts,
-              patch-io.ts, theme-switcher.ts, style.css, theme-*.css (8 themes:
+              patch-io.ts, theme-switcher.ts, style.css, theme-*.css (9 themes:
               Reaktor Dark, Moog Wood, Phosphor Lab, Ableton Live, Circuit/PCB,
-              Geist Groovebox, Casiotone, Korg MS-20)
+              Geist Groovebox, Casiotone, Korg MS-20, Brimstone)
 academy/      levels.ts, feedback.ts, progress.ts, sinp-raw.d.ts,
               levels/ (5 levels, each a .sinp solution + a .rubric.json)
 dev/          main.ts, piano.ts, controls.ts, presets.ts, scope.ts,
@@ -177,11 +178,28 @@ keyboard, sequencer, and (added in Phase 2) the scope use the `customPanel`
 escape hatch the spec provided, and even they get generic knobs and jacks
 where they don't need bespoke UI.
 
-**A theme is a token file.** Eight themes ship — Reaktor Dark, Moog Wood,
+**A theme is a token file.** Nine themes ship — Reaktor Dark, Moog Wood,
 Phosphor Lab, Ableton Live, Circuit/PCB, Geist Groovebox, Casiotone, Korg
-MS-20 — and adding the last seven forced **zero** new tokens and **zero**
-component edits. Panel widths, knob sizes, jack positions and panel height are
-pixel-identical across all eight, asserted by test.
+MS-20, Brimstone — and adding the last eight forced **zero** new tokens and
+**zero** component edits. Panel widths, knob sizes, jack positions and panel
+height are pixel-identical across all nine, asserted by test.
+
+**Brimstone (the ninth) was the harder test.** Every theme before it carried
+its texture (scanlines, wood grain, a PCB trace grid) as a procedural CSS
+gradient smuggled through `--surface-rack`/`--rail-surface` — both tokens are
+substituted as an entire `background` value in `rack/style.css`, with no
+gradient wrapped around them, so a token can hand back more than a flat
+color. Brimstone's brief asked for something harder: a *figurative* repeating
+silhouette (a heretic's fork), not an abstract pattern. It turned out to be
+the same trick: the CSS `background` shorthand accepts a `url(...)` layer
+exactly as readily as a `repeating-linear-gradient` one, so a small inline
+SVG, base64-encoded into a `data:` URI, rides through those same two tokens
+unchanged. Zero new tokens, zero component edits, nine for nine — see
+`rack/theme-brimstone.css`'s own header comment and
+`.superpowers/sdd/brimstone-theme-report.md` for the full account, including
+where the single `--knob-indicator` token had to arbitrate between the
+brief's two accent colors (ember for indicators, sulfur for "active") and a
+`--text-dim` contrast pass the other eight themes didn't need.
 
 Two contract gaps the build exposed, both since closed:
 
