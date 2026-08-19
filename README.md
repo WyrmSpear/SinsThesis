@@ -135,3 +135,7 @@ Beyond that:
   architectures, measured against each other, and why wavetables won.
 - `.claude/agents/audio-engineer-critic.md` — the audio critic used
   throughout this project's history to keep the numbers above honest.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
