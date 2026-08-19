@@ -32,6 +32,7 @@ export default defineConfig({
             'tests/browser/rack-match-sound.test.ts',
             'tests/browser/studio-record.test.ts',
             'tests/browser/pitch-display.test.ts',
+            'tests/browser/rack-keyboard-zones.test.ts',
           ],
           browser: {
             enabled: true,
@@ -56,6 +57,7 @@ export default defineConfig({
             'tests/browser/rack-match-sound.test.ts',
             'tests/browser/studio-record.test.ts',
             'tests/browser/pitch-display.test.ts',
+            'tests/browser/rack-keyboard-zones.test.ts',
           ],
           // Boots a Vite dev server and a Chromium instance; slower than
           // the unit-style browser tests above.

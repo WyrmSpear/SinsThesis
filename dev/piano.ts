@@ -45,6 +45,12 @@ export interface PianoHandle {
   setHeld(note: number, held: boolean): void
   /** Re-run `labelFor` across every key -- call after the octave changes. */
   refreshLabels(): void
+  /** Dims every key outside [low, high] (inclusive) -- a Keyboard module's
+   *  own key-range zone, made visible so a split you can't see isn't a
+   *  split you'll fight. Nobody has to call this: a piano nobody ever
+   *  zones (the dev harness's single always-full-range keyboard) just
+   *  never gets the class, identical to today. */
+  setZone(low: number, high: number): void
 }
 
 export function buildPiano(opts: PianoOptions): PianoHandle {
@@ -147,5 +153,8 @@ export function buildPiano(opts: PianoOptions): PianoHandle {
       keyByNote.get(note)?.classList.toggle('held', held)
     },
     refreshLabels,
+    setZone(low, high) {
+      for (const [note, key] of keyByNote) key.classList.toggle('out-of-zone', note < low || note > high)
+    },
   }
 }

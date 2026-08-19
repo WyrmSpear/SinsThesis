@@ -1121,11 +1121,44 @@ body {
   color: var(--text-dim);
 }
 
+.kb-readout-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.3rem;
+}
+
 .kb-note-readout {
   font-size: var(--text-sm);
   color: var(--text-accent);
   font-variant-numeric: tabular-nums;
-  margin-bottom: 0.3rem;
+}
+
+/* Same small-toolbar-button vocabulary as `.toolbar-btn`, scaled down to
+ * fit this panel's own width, and the same "engaged" treatment
+ * `.mode-toggle-btn-active` already uses (surface-recess + knob-indicator)
+ * rather than inventing a third way to say "this is on" in this file. */
+.kb-hold-btn {
+  font-family: inherit;
+  font-size: var(--text-2xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  padding: 0.25rem 0.5rem;
+  background: var(--surface-panel);
+  color: var(--text-dim);
+  border: 1px solid var(--panel-border-strong);
+  border-radius: 4px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.kb-hold-btn:hover { border-color: var(--knob-indicator); color: var(--knob-indicator); }
+
+.kb-hold-btn.engaged {
+  background: var(--surface-recess);
+  color: var(--knob-indicator);
+  border-color: var(--knob-indicator);
 }
 
 /* ---- on-screen piano (dev/piano.ts's DOM, themed here) ----
@@ -1188,6 +1221,17 @@ body {
 
 .piano-key-label.has-key { opacity: 1; }
 .piano-key-label:not(.has-key) { opacity: 0.25; }
+
+/* A split you can't see is a split you'll fight: dims every key outside
+ * this Keyboard module's own [rangeLow, rangeHigh] zone (rack/keyboard-
+ * panel.ts polls the two params and calls `piano.setZone`). Opacity only,
+ * same dimming convention `.piano-key-label:not(.has-key)` already uses
+ * above -- no new color token, so this reads correctly in every theme
+ * without a theme file change. Held state (`.held`, above) still shows
+ * through underneath: a key pressed outside the zone visibly lights up
+ * *and* stays dim, which is exactly the tell that it was pressed but
+ * ignored, not that nothing happened. */
+.piano-key.out-of-zone { opacity: 0.35; }
 
 /* ---- patch cables ---- */
 .cable-visible {

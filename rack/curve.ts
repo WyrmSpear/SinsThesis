@@ -1,4 +1,5 @@
 import type { ParamSpec } from '../src/engine/types'
+import { hzToNoteName, midiToHz } from '../src/engine/analysis/note'
 
 /**
  * Normalized-position <-> real-value mapping for a knob, honoring
@@ -43,6 +44,15 @@ export function fromNormalized(t: number, spec: Pick<ParamSpec, 'min' | 'max' | 
  *  three significant digits either -- a synth player reads a knob's
  *  position, not its value to the thousandth. */
 export function formatValue(value: number, unit: string): string {
+  // `unit: 'note'` (the keyboard module's rangeLow/rangeHigh) is a MIDI
+  // note number underneath, but a knob reading "36" tells nobody which key
+  // that is -- musical, not raw, per this task's brief. Round first: a
+  // knob mid-drag can sit at a fractional note before release snaps it,
+  // and there is no such thing as a fractional note name.
+  if (unit === 'note') {
+    const { letter, octave } = hzToNoteName(midiToHz(Math.round(value)))
+    return `${letter}${octave}`
+  }
   const abs = Math.abs(value)
   const digits = abs >= 100 ? 0 : abs >= 10 ? 1 : abs >= 1 ? 1 : 2
   const suffix = unit ? ` ${unit}` : ''
