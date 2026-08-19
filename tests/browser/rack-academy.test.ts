@@ -14,9 +14,12 @@ import { fileURLToPath } from 'node:url'
  * academy is reachable from the rack UI at all (Section 3's "academy mode
  * in the rack"), that entering a level really does filter the palette
  * (Section 12's "a level can grant four modules and withhold the rest"),
- * that a failed Check surfaces `inspect`'s own sentence rather than a bare
- * score (Section 4: "show the miss"), and that completing a level
- * persists and unlocks the next one across a reload.
+ * that a failed Check surfaces player-facing feedback rather than a bare
+ * score (Section 4: "show the miss") -- built by academy/feedback.ts from
+ * `inspect`'s structured result, in the module names and port labels the
+ * brief itself uses, not `inspect`'s own engine-facing id sentence -- and
+ * that completing a level persists and unlocks the next one across a
+ * reload.
  */
 
 const root = fileURLToPath(new URL('../..', import.meta.url))
@@ -109,7 +112,7 @@ describe('academy mode', () => {
     await page.close()
   })
 
-  it('an incomplete patch fails Check with inspect\'s own sentence, and the right patch passes', async () => {
+  it('an incomplete patch fails Check with player-facing feedback, and the right patch passes', async () => {
     const page: Page = await browser.newPage()
     const consoleErrors: string[] = []
     page.on('console', (msg) => { if (msg.type() === 'error') consoleErrors.push(msg.text()) })
@@ -128,8 +131,13 @@ describe('academy mode', () => {
     const feedback = page.getByTestId('academy-feedback')
     await feedback.waitFor({ state: 'visible' })
     expect(await feedback.getAttribute('class')).toContain('academy-feedback-fail')
-    // inspect's own sentence, verbatim -- not a bare score.
-    expect(await feedback.textContent()).toContain('vco-1.out is not patched to output-1.in')
+    // Player-facing text -- module display names and port labels, the
+    // words the brief itself used, not `inspect`'s own id-based sentence
+    // and not a bare score.
+    expect(await feedback.textContent()).toContain(
+      `patch the VCO's "Out" jack into the Output's "In" jack`,
+    )
+    expect(await feedback.textContent()).not.toMatch(/vco-1|output-1/)
 
     // The failing module panels are visibly flagged.
     expect(await page.locator('.module-panel-flag-miss').count()).toBeGreaterThan(0)

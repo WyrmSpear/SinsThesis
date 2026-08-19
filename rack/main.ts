@@ -3,7 +3,7 @@ import { registerAllModules } from '../src/engine/modules'
 import { getModule, listModules } from '../src/engine/registry'
 import { ensureWorklets } from '../src/engine/render'
 import { serializePatch, loadPatch, type PatchFile } from '../src/engine/patch'
-import { inspect, type InspectorResult } from '../src/engine/analysis/inspector'
+import { inspect, type InspectorFailure, type InspectorResult } from '../src/engine/analysis/inspector'
 import type { OutputInstance } from '../src/engine/modules/output'
 import { buildPanel } from './panel'
 import { buildGhostPanel } from './ghost-panel'
@@ -18,6 +18,7 @@ import { initThemeSwitcher } from './theme-switcher'
 import { LEVELS, getLevel } from '../academy/levels'
 import { loadProgress, markComplete, type AcademyProgress } from '../academy/progress'
 import { renderAcademyPanel } from './academy-panel'
+import { describeFailures } from '../academy/feedback'
 
 // Same guard as dev/main.ts, same reason: registerAllModules() throws on a
 // second call, and a fresh page load is the only case that should ever run
@@ -159,18 +160,21 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
   }
 
   /** The visible trace of a failed Check (Section 4: "the player must be
-   *  able to see *why*"). `inspect`'s sentences name a module id followed
-   *  by `.port`/`.param` (`"vco-1.out is not patched to vcf-1.in"`) or
-   *  `"<id> has no param ..."` -- both forms always put the id immediately
-   *  before one of those two substrings, so matching against the live
-   *  graph's own module ids (never re-deriving pass/fail -- that stays
-   *  `inspect`'s job entirely) is enough to find which panels a failure is
-   *  actually about, with no new grading logic. */
-  function highlightFailures(failures: readonly string[]): void {
+   *  able to see *why*"). Reads the module ids straight out of `inspect`'s
+   *  own structured `detail` (never re-deriving pass/fail -- that stays
+   *  `inspect`'s job entirely) rather than pattern-matching its English
+   *  sentences, so this keeps working exactly the same regardless of how
+   *  `describeFailures` phrases the feedback panel's text. */
+  function highlightFailures(detail: readonly InspectorFailure[]): void {
     clearHighlights()
-    for (const id of graph.moduleIds) {
-      const mentioned = failures.some((f) => f.includes(`${id}.`) || f.includes(`${id} has no param`))
-      if (mentioned) rackEl.querySelector(`[data-module="${CSS.escape(id)}"]`)?.classList.add('module-panel-flag-miss')
+    const flagged = new Set<string>()
+    for (const f of detail) {
+      if (f.kind === 'missingConnection') { flagged.add(f.from.id); flagged.add(f.to.id) }
+      else if (f.kind === 'missingParam' || f.kind === 'paramMismatch') flagged.add(f.module.id)
+      // 'missingModule' names no existing panel -- there is nothing to flag yet.
+    }
+    for (const id of flagged) {
+      rackEl.querySelector(`[data-module="${CSS.escape(id)}"]`)?.classList.add('module-panel-flag-miss')
     }
   }
 
@@ -182,7 +186,12 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
     renderAcademyPanel(
       academyPanel,
       LEVELS,
-      { currentLevelId, progress, lastCheck },
+      {
+        currentLevelId,
+        progress,
+        lastCheck,
+        feedback: lastCheck && !lastCheck.pass ? describeFailures(lastCheck, graph) : [],
+      },
       { onSelectLevel: enterLevel, onCheck: checkLevel },
     )
   }
@@ -208,7 +217,7 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
   /** The Check button: grades the live graph with the level's own
    *  `InspectorQuery` and nothing else (Section: "Use inspect rather than
    *  writing new grading logic"). A pass persists progress and unlocks the
-   *  next level; a fail highlights the panels its sentences named and
+   *  next level; a fail highlights the panels its failures named and
    *  leaves the graph untouched, so the player can keep working on the
    *  same patch. */
   function checkLevel(): void {
@@ -221,7 +230,7 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
       progress = markComplete(level.id)
       clearHighlights()
     } else {
-      highlightFailures(result.failures)
+      highlightFailures(result.detail)
     }
     renderAcademy()
   }

@@ -14,15 +14,23 @@ import type { InspectorResult } from '../src/engine/analysis/inspector'
  *
  * Section 4 of the task this exists for is blunt about why feedback is a
  * list, not a score: "a grade is never a bare number... show the miss."
- * `inspect`'s own failure sentences (`src/engine/analysis/inspector.ts`)
- * are rendered here verbatim -- this file never rewrites or summarizes
- * them, only lays them out.
+ * The sentences it lays out are player-facing text built by
+ * `academy/feedback.ts` from `inspect`'s structured result -- module
+ * display names, port labels, "the second VCO," a param's own units --
+ * not `inspect`'s own engine-facing sentences (which name modules by id,
+ * for the test suite). This file still never rewrites or summarizes
+ * anything itself; it only lays out whatever `feedback` the caller hands
+ * it.
  */
 
 export interface AcademyPanelState {
   currentLevelId: string | undefined
   progress: AcademyProgress
   lastCheck: InspectorResult | undefined
+  /** Player-facing rephrasing of `lastCheck.failures`, same order and
+   *  length -- see `academy/feedback.ts`'s `describeFailures`. Ignored
+   *  when `lastCheck` is undefined or passing. */
+  feedback: readonly string[]
 }
 
 export interface AcademyPanelOptions {
@@ -120,14 +128,14 @@ export function renderAcademyPanel(
   } else {
     const heading = document.createElement('p')
     heading.className = 'academy-feedback-heading'
-    const n = state.lastCheck.failures.length
+    const n = state.feedback.length
     heading.textContent = `Not yet — ${n} thing${n === 1 ? '' : 's'} to fix:`
 
     const ul = document.createElement('ul')
     ul.className = 'academy-feedback-list'
-    for (const failure of state.lastCheck.failures) {
+    for (const line of state.feedback) {
       const li = document.createElement('li')
-      li.textContent = failure
+      li.textContent = line
       ul.append(li)
     }
     feedback.append(heading, ul)
