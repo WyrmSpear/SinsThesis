@@ -6,6 +6,8 @@ import { serializePatch, loadPatch, type PatchFile } from '../src/engine/patch'
 import { inspect, type InspectorFailure, type InspectorResult } from '../src/engine/analysis/inspector'
 import { compareSounds } from '../src/engine/analysis/compare'
 import type { OutputInstance } from '../src/engine/modules/output'
+import { LiveRecorder, type RecordingResult } from '../src/engine/recorder'
+import { encodeWav, type WavFormat } from '../src/engine/wav'
 import { buildPanel } from './panel'
 import { buildGhostPanel } from './ghost-panel'
 import { buildPalette } from './palette'
@@ -14,7 +16,8 @@ import { buildKeyboardPanel } from './keyboard-panel'
 import { buildSequencerPanel } from './sequencer-panel'
 import { buildScopePanel } from './scope-panel'
 import { enableReorder } from './reorder'
-import { downloadPatch, readPatchFile, saveAutosave, loadAutosave, debounce } from './patch-io'
+import { downloadPatch, downloadWav, readPatchFile, saveAutosave, loadAutosave, debounce } from './patch-io'
+import { renderStudioPanel, type StudioPanelState } from './studio-panel'
 import { initThemeSwitcher } from './theme-switcher'
 import { LEVELS, getLevel, type Level } from '../academy/levels'
 import { loadProgress, markComplete, type AcademyProgress } from '../academy/progress'
@@ -91,6 +94,7 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
   const rackEl = $('rack-modules')
   const paletteDrawer = $('palette-drawer')
   const academyPanel = $('academy-panel')
+  const studioPanelEl = $('studio-panel')
   const statusBanner = $('status-banner')
   const patchNameInput = $<HTMLInputElement>('patch-name')
   const paletteToggle = $<HTMLButtonElement>('palette-toggle')
@@ -137,6 +141,23 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
   const targetBufferCache = new Map<string, Float32Array>()
   let checking = false
   let lastMatch: MatchCheckState | undefined
+
+  // ---- studio layer state (Phase 3's first slice): a `LiveRecorder` tap
+  // for keeping a real performance, and an offline `renderPatch` bounce for
+  // a fixed-length render of the patch as it stands. Only one capture is
+  // ever "the current export" -- see rack/studio-panel.ts's own header
+  // comment for why that mirrors a DAW's single last-bounce slot. ----
+  const recorder = new LiveRecorder(ctx, { onAutoStop: handleRecordingResult })
+  let recording = false
+  let elapsedTimerHandle: ReturnType<typeof setInterval> | undefined
+  let bounceBusy = false
+  let bounceLengthSeconds = 4
+  let lastCapture:
+    | { samples: Float32Array; sampleRate: number; source: 'recording' | 'bounce'; seconds: number; truncated: boolean }
+    | undefined
+  let wavFormat: WavFormat = 'float32'
+  let saveSinpAlongside = true
+  let studioStatus: string | undefined
 
   function showBanner(kind: 'warn' | 'error', message: string): void {
     statusBanner.hidden = false
@@ -217,6 +238,121 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
       },
       { onSelectLevel: enterLevel, onCheck: checkLevel, onPlayTarget: playTarget },
     )
+  }
+
+  function renderStudio(): void {
+    const state: StudioPanelState = {
+      recording,
+      elapsedSeconds: recording ? recorder.elapsedSeconds : 0,
+      maxSeconds: recorder.maxSeconds,
+      bounceBusy,
+      bounceLengthSeconds,
+      hasCapture: lastCapture !== undefined,
+      captureSource: lastCapture?.source,
+      captureSeconds: lastCapture?.seconds ?? 0,
+      truncated: lastCapture?.truncated ?? false,
+      wavFormat,
+      saveSinpAlongside,
+      statusMessage: studioStatus,
+    }
+    renderStudioPanel(studioPanelEl, state, {
+      onRecordToggle: toggleRecord,
+      onBounceLengthChange: (seconds) => {
+        bounceLengthSeconds = seconds
+        renderStudio()
+      },
+      onBounce: () => void doBounce(),
+      onFormatChange: (format) => {
+        wavFormat = format
+        renderStudio()
+      },
+      onSaveSinpToggle: (checked) => {
+        saveSinpAlongside = checked
+        renderStudio()
+      },
+      onExport: doExport,
+    })
+  }
+
+  /** Record button: taps whatever the rack's first Output module currently
+   *  emits (see rack/studio-panel.ts's header comment on why this is the
+   *  live-performance mechanism, not the offline one) and starts a real
+   *  wall-clock capture. A second click -- or `LiveRecorder`'s own length
+   *  cap, via `handleRecordingResult` below -- stops it. */
+  function toggleRecord(): void {
+    if (recording) {
+      handleRecordingResult(recorder.stop())
+      return
+    }
+    const outputId = graph.moduleIds.find((id) => graph.getType(id) === 'output')
+    const source = outputId ? graph.getInstance(outputId)?.outputs.get('out') : undefined
+    if (!source) {
+      showBanner('error', 'Add an Output module before recording.')
+      return
+    }
+    studioStatus = undefined
+    recorder.start(source)
+    recording = true
+    elapsedTimerHandle = setInterval(renderStudio, 200)
+    renderStudio()
+  }
+
+  /** Shared by an explicit Stop click and `LiveRecorder`'s own auto-stop
+   *  (the length cap firing from inside a worklet message handler) -- both
+   *  end up with the same `RecordingResult` shape, so both are finished the
+   *  same way, and the operator sees the same "capped" wording either way. */
+  function handleRecordingResult(result: RecordingResult): void {
+    recording = false
+    if (elapsedTimerHandle !== undefined) {
+      clearInterval(elapsedTimerHandle)
+      elapsedTimerHandle = undefined
+    }
+    if (result.samples.length === 0) {
+      renderStudio()
+      return
+    }
+    lastCapture = { samples: result.samples, sampleRate: result.sampleRate, source: 'recording', seconds: result.seconds, truncated: result.truncated }
+    studioStatus = result.truncated
+      ? `Recording stopped automatically at the ${Math.round(recorder.maxSeconds)}s limit. Export it, or start a new one.`
+      : `Recorded ${result.seconds.toFixed(1)}s. Ready to export.`
+    renderStudio()
+  }
+
+  /** Bounce: renders the *current* patch offline through the same
+   *  `renderPatch` procedure match-this-sound already uses for the
+   *  academy (see this file's `getTargetBuffer`) -- serialize-then-render,
+   *  reusing the exact round trip `.sinp` save/load already exercises,
+   *  rather than trying to clone the live graph. Faster than real time, no
+   *  dropout risk, because nothing here runs against a real-time deadline. */
+  async function doBounce(): Promise<void> {
+    if (bounceBusy || recording) return
+    bounceBusy = true
+    studioStatus = undefined
+    renderStudio()
+    try {
+      const patch = serializePatch(graph, { name: currentPatchName })
+      const samples = await renderPatch(patch, bounceLengthSeconds, { sampleRate: MATCH_SAMPLE_RATE })
+      lastCapture = { samples, sampleRate: MATCH_SAMPLE_RATE, source: 'bounce', seconds: bounceLengthSeconds, truncated: false }
+      studioStatus = `Bounced ${bounceLengthSeconds.toFixed(1)}s. Ready to export.`
+    } catch (err) {
+      showBanner('error', `Bounce failed: ${(err as Error).message}`)
+    } finally {
+      bounceBusy = false
+      renderStudio()
+    }
+  }
+
+  /** Export: hand-written WAV (src/engine/wav.ts), named from the patch --
+   *  see rack/patch-io.ts's `downloadWav` doc comment for why -- and,
+   *  when `saveSinpAlongside` is checked, the `.sinp` that made the sound,
+   *  so a recording and the patch that produced it never drift apart. */
+  function doExport(): void {
+    if (!lastCapture) return
+    const wavBuffer = encodeWav([lastCapture.samples], lastCapture.sampleRate, wavFormat)
+    downloadWav(currentPatchName, wavBuffer)
+    if (saveSinpAlongside) downloadPatch(serializePatch(graph, { name: currentPatchName }))
+    studioStatus = `Exported "${currentPatchName}.wav"${saveSinpAlongside ? ' and .sinp' : ''}.`
+    renderStudio()
   }
 
   /** Loads a level's starting patch into the live rack and filters the
@@ -535,9 +671,20 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
     paletteDrawer.hidden = !paletteDrawer.hidden
   })
 
+  // A patch swap mid-recording would tear down the very module instance
+  // `recorder` is tapped onto (`mountGraph` disposes the old graph), so the
+  // three ways the mounted patch can change while the transport is running
+  // are guarded here rather than inside `mountGraph` itself -- recording
+  // stays tied to a stable graph for its whole duration.
   modeFreeplayBtn.classList.add('mode-toggle-btn-active')
-  modeFreeplayBtn.addEventListener('click', showFreePlay)
-  modeAcademyBtn.addEventListener('click', showAcademy)
+  modeFreeplayBtn.addEventListener('click', () => {
+    if (recording) { showBanner('warn', 'Stop recording before switching modes.'); return }
+    showFreePlay()
+  })
+  modeAcademyBtn.addEventListener('click', () => {
+    if (recording) { showBanner('warn', 'Stop recording before switching modes.'); return }
+    showAcademy()
+  })
 
   saveBtn.addEventListener('click', () => {
     currentPatchName = patchNameInput.value.trim() || 'Untitled'
@@ -545,7 +692,10 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
     downloadPatch(serializePatch(graph, { name: currentPatchName }))
   })
 
-  loadBtn.addEventListener('click', () => loadFileInput.click())
+  loadBtn.addEventListener('click', () => {
+    if (recording) { showBanner('warn', 'Stop recording before loading a different patch.'); return }
+    loadFileInput.click()
+  })
   loadFileInput.addEventListener('change', () => {
     const file = loadFileInput.files?.[0]
     loadFileInput.value = '' // so re-choosing the same filename still fires 'change'
@@ -589,6 +739,7 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
     mountGraph(buildDefaultPatch())
   }
   patchNameInput.value = currentPatchName
+  renderStudio()
 
   // ---- reveal ----
   $('power-section').hidden = true

@@ -11,18 +11,45 @@ import type { PatchFile } from '../src/engine/patch'
 
 const AUTOSAVE_KEY = 'sinsthesis:autosave:v1'
 
-/** Triggers a browser download of `file` as a `.sinp` (JSON) document. */
-export function downloadPatch(file: PatchFile): void {
-  const blob = new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' })
+/** A patch/export name turned into a filesystem-safe stem -- shared by
+ *  every download this file offers, so a `.sinp` and a `.wav` exported
+ *  from the same patch land on matching filenames (`Lead Pluck.sinp`,
+ *  `Lead Pluck.wav`) and a folder of exports stays navigable. */
+function safeFileStem(name: string): string {
+  return (name || 'patch').trim().replace(/[^a-z0-9_-]+/gi, '_') || 'patch'
+}
+
+/** Triggers a browser download of `blob` under `filename`. The one seam
+ *  every download in this file goes through, so a test can intercept a
+ *  download by overriding `URL.createObjectURL` once and catch every kind
+ *  of export (see rack-page.test.ts's save/load round trip for the
+ *  pattern). */
+function triggerDownload(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  const safeName = (file.meta.name || 'patch').trim().replace(/[^a-z0-9_-]+/gi, '_') || 'patch'
-  a.download = `${safeName}.sinp`
+  a.download = filename
   document.body.append(a)
   a.click()
   a.remove()
   URL.revokeObjectURL(url)
+}
+
+/** Triggers a browser download of `file` as a `.sinp` (JSON) document. */
+export function downloadPatch(file: PatchFile): void {
+  const blob = new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' })
+  triggerDownload(blob, `${safeFileStem(file.meta.name)}.sinp`)
+}
+
+/** Triggers a browser download of a WAV file, named from the patch that
+ *  made it -- the studio layer's "keep the sound you made" (see
+ *  docs/CONTINUATION.md's Phase 3 note): a recording or a bounce and the
+ *  patch that produced it share a filename stem so a folder of exports
+ *  stays navigable and a `.sinp` saved alongside (see rack/main.ts's
+ *  export handling) is unambiguous about which recording it belongs to. */
+export function downloadWav(patchName: string, wavBuffer: ArrayBuffer): void {
+  const blob = new Blob([wavBuffer], { type: 'audio/wav' })
+  triggerDownload(blob, `${safeFileStem(patchName)}.wav`)
 }
 
 /**

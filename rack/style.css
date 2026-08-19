@@ -287,6 +287,115 @@ body {
   gap: 0.1rem 0.5rem;
 }
 
+/* ---- studio panel: the live-record / offline-bounce transport (Phase 3's
+   first slice). Same token-only rule as the rest of this file: every color
+   here is one of the nine themes' existing tokens -- --lamp-warn already
+   carries a warm/red accent in all nine (see docs/CONTINUATION.md's
+   Brimstone account for why no new token was needed there either), reused
+   here for the recording indicator instead of adding a tenth. ---- */
+.studio-panel {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.9rem;
+  padding: 0.6rem 0.8rem;
+  background: var(--surface-panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  font-size: var(--text-xs);
+}
+
+.studio-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.studio-record-btn-active {
+  border-color: var(--lamp-warn);
+  color: var(--lamp-warn);
+}
+
+.studio-rec-dot {
+  display: inline-block;
+  width: 0.55em;
+  height: 0.55em;
+  border-radius: 50%;
+  background: var(--text-dim);
+  margin-right: 0.35em;
+  vertical-align: middle;
+}
+
+.studio-rec-dot-active {
+  background: var(--lamp-warn);
+  box-shadow: 0 0 6px 1px var(--lamp-warn-glow);
+  animation: studio-rec-pulse 1s ease-in-out infinite;
+}
+
+@keyframes studio-rec-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+.studio-elapsed {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+}
+
+.studio-elapsed-live {
+  color: var(--lamp-warn);
+}
+
+.studio-bounce-label {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--text-dim);
+}
+
+.studio-bounce-length {
+  font-family: inherit;
+  font-size: var(--text-xs);
+  width: 6ch;
+  padding: 0.25rem 0.3rem;
+  background: var(--surface-recess);
+  color: var(--text-primary);
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+}
+
+.studio-export-group {
+  padding-left: 0.8rem;
+  border-left: 1px solid var(--panel-border);
+}
+
+.studio-capture-summary {
+  color: var(--text-accent);
+}
+
+.studio-format-select {
+  font-family: inherit;
+  font-size: var(--text-xs);
+  padding: 0.25rem 0.4rem;
+  background: var(--surface-recess);
+  color: var(--text-primary);
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+}
+
+.studio-sinp-label {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--text-dim);
+}
+
+.studio-status {
+  color: var(--text-accent);
+  font-size: var(--text-2xs);
+}
+
 .ghost-params dt { color: var(--text-dim); }
 .ghost-params dd { margin: 0; color: var(--text-primary); text-align: right; }
 
