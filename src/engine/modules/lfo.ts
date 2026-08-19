@@ -4,11 +4,16 @@ import { scheduleParam } from '../param-smoothing'
 export const lfoDescriptor: ModuleDescriptor = {
   type: 'lfo',
   name: 'LFO',
-  hp: 26,
+  // 8 HP, the plain Eurorack LFO figure. `shape` (a switch, not a knob) now
+  // shares its row with `rate` and sits above `depth` rather than beside
+  // it -- the previous single-row layout put the SHAPE switch's widest
+  // readout text ("TRIANGLE") directly against DEPTH's column, which is
+  // exactly the collision reported live; stacking removes the adjacency.
+  hp: 8,
   group: 'modulation',
   ports: [
     { id: 'sync', dir: 'in', signal: 'gate', label: 'Sync', pos: [0, 3] },
-    { id: 'out', dir: 'out', signal: 'cv', label: 'Out', pos: [3, 3] },
+    { id: 'out', dir: 'out', signal: 'cv', label: 'Out', pos: [1, 3] },
   ],
   params: [
     { id: 'rate', label: 'Rate', min: 0.01, max: 200, default: 2, curve: 'exp', unit: 'Hz' },
@@ -27,9 +32,9 @@ export const lfoDescriptor: ModuleDescriptor = {
   layout: [
     { kind: 'knob', ref: 'rate', x: 0, y: 0 },
     { kind: 'knob', ref: 'shape', x: 1, y: 0 },
-    { kind: 'knob', ref: 'depth', x: 2, y: 0 },
+    { kind: 'knob', ref: 'depth', x: 0, y: 1 },
     { kind: 'jack', ref: 'sync', x: 0, y: 3 },
-    { kind: 'jack', ref: 'out', x: 3, y: 3 },
+    { kind: 'jack', ref: 'out', x: 1, y: 3 },
   ],
   create(ctx): ModuleInstance {
     const node = new AudioWorkletNode(ctx, 'lfo', {

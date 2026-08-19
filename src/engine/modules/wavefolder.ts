@@ -4,12 +4,13 @@ import { scheduleParam } from '../param-smoothing'
 export const wavefolderDescriptor: ModuleDescriptor = {
   type: 'wavefolder',
   name: 'Wavefolder',
-  hp: 26,
+  // 8 HP, in line with the other 3-knob shaping modules.
+  hp: 8,
   group: 'shaping',
   ports: [
     { id: 'in', dir: 'in', signal: 'audio', label: 'In', pos: [0, 3] },
     { id: 'foldCv', dir: 'in', signal: 'cv', label: 'Fold CV', pos: [1, 3] },
-    { id: 'out', dir: 'out', signal: 'audio', label: 'Out', pos: [3, 3] },
+    { id: 'out', dir: 'out', signal: 'audio', label: 'Out', pos: [0, 4] },
   ],
   params: [
     { id: 'drive', label: 'Drive', min: 0.1, max: 20, default: 1, curve: 'exp', unit: '' },
@@ -22,7 +23,7 @@ export const wavefolderDescriptor: ModuleDescriptor = {
     { kind: 'knob', ref: 'foldCvAmount', x: 0, y: 1 },
     { kind: 'jack', ref: 'in', x: 0, y: 3 },
     { kind: 'jack', ref: 'foldCv', x: 1, y: 3 },
-    { kind: 'jack', ref: 'out', x: 3, y: 3 },
+    { kind: 'jack', ref: 'out', x: 0, y: 4 },
   ],
   create(ctx): ModuleInstance {
     const node = new AudioWorkletNode(ctx, 'wavefolder', {

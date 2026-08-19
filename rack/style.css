@@ -711,19 +711,17 @@ body {
 }
 
 /* ---- keyboard module's custom content ----
- * `width: 420px`, not `width: 100%; min-width: 420px`: this box's own
- * panel (rack/panel.ts) is sized with `min-width`, not a hard `width`,
- * specifically so this content can grow past its nominal hp -- but a
- * *percentage* width here does not give the ancestor panel's shrink-to-fit
- * computation a fixed number to work with, so `.kb-hint`'s own unwrapped
- * text (its real length, in whatever the active theme's font happens to
- * be) bubbled straight up into the panel's rendered width instead of
- * wrapping inside it -- caught by tests/browser/theme-geometry.test.ts,
- * where Phosphor Lab's wider Courier New measurably widened this one
- * module and nothing else. A definite `420px` here is itself a stable
- * number regardless of font, so it settles what the panel picks up
- * *before* `.kb-hint`'s own wrapping is ever in question. */
-.keyboard-panel-content { width: 420px; }
+ * `width: 100%`, not a fixed px: the ancestor panel (rack/panel.ts) now
+ * sets a hard `width` from `descriptor.hp * HP_PX` -- a fixed, non-themed
+ * number -- rather than the old `min-width` shrink-to-fit. That is what
+ * makes a percentage here safe: 100% of a fixed px box is itself a fixed
+ * px number, identical across every theme, which is the same geometry
+ * guarantee the old literal `420px` existed to buy back when the ancestor
+ * still shrank to fit its content. `dev/piano.ts` was already built to
+ * this contract -- every key's width is a `%` of its own container, not a
+ * px constant -- so nothing downstream needed to change to make the piano
+ * itself narrower or wider along with its panel's own `hp`. */
+.keyboard-panel-content { width: 100%; }
 
 .kb-hint {
   margin: 0 0 0.25rem;

@@ -4,11 +4,15 @@ import { scheduleParam } from '../param-smoothing'
 export const adsrDescriptor: ModuleDescriptor = {
   type: 'adsr',
   name: 'ADSR',
-  hp: 26,
+  // 8 HP -- matches the Doepfer A-140 ADSR. Four knobs stack 2x2 rather
+  // than spreading across one row (see rack/panel.ts and
+  // .superpowers/sdd/hp-layout-report.md): a physical ADSR is tall and
+  // narrow, not a single wide strip of pots.
+  hp: 8,
   group: 'modulation',
   ports: [
     { id: 'gate', dir: 'in', signal: 'gate', label: 'Gate', pos: [0, 3] },
-    { id: 'out', dir: 'out', signal: 'cv', label: 'Out', pos: [3, 3] },
+    { id: 'out', dir: 'out', signal: 'cv', label: 'Out', pos: [1, 3] },
   ],
   params: [
     { id: 'attack', label: 'Attack', min: 0.001, max: 10, default: 0.01, curve: 'exp', unit: 's' },
@@ -19,10 +23,10 @@ export const adsrDescriptor: ModuleDescriptor = {
   layout: [
     { kind: 'knob', ref: 'attack', x: 0, y: 0 },
     { kind: 'knob', ref: 'decay', x: 1, y: 0 },
-    { kind: 'knob', ref: 'sustain', x: 2, y: 0 },
-    { kind: 'knob', ref: 'release', x: 3, y: 0 },
+    { kind: 'knob', ref: 'sustain', x: 0, y: 1 },
+    { kind: 'knob', ref: 'release', x: 1, y: 1 },
     { kind: 'jack', ref: 'gate', x: 0, y: 3 },
-    { kind: 'jack', ref: 'out', x: 3, y: 3 },
+    { kind: 'jack', ref: 'out', x: 1, y: 3 },
   ],
   create(ctx): ModuleInstance {
     const node = new AudioWorkletNode(ctx, 'adsr', {

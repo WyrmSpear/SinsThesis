@@ -27,13 +27,21 @@ export interface KeyboardMidiInstance extends ModuleInstance {
 export const keyboardMidiDescriptor: ModuleDescriptor = {
   type: 'keyboard',
   name: 'Keyboard/MIDI',
-  hp: 30,
+  // 16 HP -- within the 10-16 Eurorack range this module's own knobs/jacks
+  // would need, sized instead by the on-screen piano its `customPanel`
+  // appends below them. The piano itself (`dev/piano.ts`) lays out every
+  // key as a percentage of its own container's width, so it has no fixed
+  // px floor of its own -- see `rack/style.css`'s `.keyboard-panel-content`
+  // for the width:100% that replaced its old hard-coded 420px (the panel
+  // it sits in is now hp-pinned and theme-independent, so a percentage of
+  // it is exactly as geometry-stable as the fixed px used to be).
+  hp: 16,
   group: 'control',
   customPanel: 'keyboard',
   ports: [
     { id: 'pitch', dir: 'out', signal: 'cv', label: 'Pitch', pos: [0, 3] },
     { id: 'gate', dir: 'out', signal: 'gate', label: 'Gate', pos: [1, 3] },
-    { id: 'velocity', dir: 'out', signal: 'cv', label: 'Velocity', pos: [2, 3] },
+    { id: 'velocity', dir: 'out', signal: 'cv', label: 'Velocity', pos: [0, 4] },
   ],
   params: [
     { id: 'octave', label: 'Octave', min: 0, max: 8, default: 4, curve: 'lin', unit: '' },
@@ -44,7 +52,7 @@ export const keyboardMidiDescriptor: ModuleDescriptor = {
     { kind: 'knob', ref: 'glide', x: 1, y: 0 },
     { kind: 'jack', ref: 'pitch', x: 0, y: 3 },
     { kind: 'jack', ref: 'gate', x: 1, y: 3 },
-    { kind: 'jack', ref: 'velocity', x: 2, y: 3 },
+    { kind: 'jack', ref: 'velocity', x: 0, y: 4 },
   ],
   create(ctx): KeyboardMidiInstance {
     const pitch = new ConstantSourceNode(ctx, { offset: 0 })

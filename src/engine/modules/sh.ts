@@ -3,18 +3,20 @@ import type { ModuleDescriptor, ModuleInstance } from '../types'
 export const shDescriptor: ModuleDescriptor = {
   type: 'sh',
   name: 'S&H',
-  hp: 20,
+  // 6 HP -- no knobs at all, just three jacks; a single stacked column
+  // rather than spread across a wide strip.
+  hp: 6,
   group: 'modulation',
   ports: [
-    { id: 'in', dir: 'in', signal: 'cv', label: 'In', pos: [0, 3] },
-    { id: 'trigger', dir: 'in', signal: 'gate', label: 'Trig', pos: [1, 3] },
-    { id: 'out', dir: 'out', signal: 'cv', label: 'Out', pos: [3, 3] },
+    { id: 'in', dir: 'in', signal: 'cv', label: 'In', pos: [0, 0] },
+    { id: 'trigger', dir: 'in', signal: 'gate', label: 'Trig', pos: [0, 1] },
+    { id: 'out', dir: 'out', signal: 'cv', label: 'Out', pos: [0, 2] },
   ],
   params: [],
   layout: [
-    { kind: 'jack', ref: 'in', x: 0, y: 3 },
-    { kind: 'jack', ref: 'trigger', x: 1, y: 3 },
-    { kind: 'jack', ref: 'out', x: 3, y: 3 },
+    { kind: 'jack', ref: 'in', x: 0, y: 0 },
+    { kind: 'jack', ref: 'trigger', x: 0, y: 1 },
+    { kind: 'jack', ref: 'out', x: 0, y: 2 },
   ],
   create(ctx): ModuleInstance {
     const node = new AudioWorkletNode(ctx, 'sample-hold', {

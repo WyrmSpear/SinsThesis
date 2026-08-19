@@ -94,7 +94,10 @@ function offlineDurationSeconds(ctx: BaseAudioContext): number | undefined {
 export const clockDescriptor: ModuleDescriptor = {
   type: 'clock',
   name: 'Clock',
-  hp: 18,
+  // 8 HP, in the Eurorack clock range (6-8). Two knobs on top, the third
+  // (a fine trim, `pulseWidth`) alone below it -- a real clock's width knob
+  // usually sits apart from tempo/division exactly like this.
+  hp: 8,
   group: 'control',
   ports: [
     { id: 'gate', dir: 'out', signal: 'gate', label: 'Gate', pos: [0, 3] },
@@ -108,7 +111,7 @@ export const clockDescriptor: ModuleDescriptor = {
   layout: [
     { kind: 'knob', ref: 'bpm', x: 0, y: 0 },
     { kind: 'knob', ref: 'division', x: 1, y: 0 },
-    { kind: 'knob', ref: 'pulseWidth', x: 2, y: 0 },
+    { kind: 'knob', ref: 'pulseWidth', x: 0, y: 1 },
     { kind: 'jack', ref: 'gate', x: 0, y: 3 },
     { kind: 'jack', ref: 'reset', x: 1, y: 3 },
   ],

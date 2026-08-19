@@ -16,17 +16,19 @@ export interface OutputInstance extends ModuleInstance {
 export const outputDescriptor: ModuleDescriptor = {
   type: 'output',
   name: 'Output',
-  hp: 18,
+  // 6 HP -- one knob and two jacks, stacked in a single narrow column
+  // rather than spread across a wide one.
+  hp: 6,
   group: 'utility',
   ports: [
     { id: 'in', dir: 'in', signal: 'audio', label: 'In', pos: [0, 3] },
-    { id: 'out', dir: 'out', signal: 'audio', label: 'Out', pos: [2, 3] },
+    { id: 'out', dir: 'out', signal: 'audio', label: 'Out', pos: [0, 4] },
   ],
   params: [{ id: 'level', label: 'Level', min: 0, max: 1, default: 1, curve: 'lin', unit: '' }],
   layout: [
     { kind: 'knob', ref: 'level', x: 0, y: 0 },
     { kind: 'jack', ref: 'in', x: 0, y: 3 },
-    { kind: 'jack', ref: 'out', x: 2, y: 3 },
+    { kind: 'jack', ref: 'out', x: 0, y: 4 },
   ],
   create(ctx): OutputInstance {
     const level = ctx.createGain()

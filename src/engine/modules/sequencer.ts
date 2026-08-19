@@ -21,14 +21,24 @@ const STEP_PARAMS = Array.from({ length: 16 }, (_, i) => ({
 export const sequencerDescriptor: ModuleDescriptor = {
   type: 'seq',
   name: 'Sequencer',
-  hp: 24,
+  // 8 HP. NOT the 20-24 a hardware 16-step sequencer's per-step CVs would
+  // actually want -- `customPanel: 'sequencer'` names a builder that
+  // rack/main.ts's `customPanels` map never registers, so today this panel
+  // only ever renders the generic grid below (2 knobs, 4 jacks) plus a
+  // "custom panel not implemented" badge; the sixteen `STEP_PARAMS` have no
+  // `layout` entries and are not drawn at all. Sizing for a per-step
+  // display that isn't there yet would recreate exactly the dead-space bug
+  // this pass exists to close. See .superpowers/sdd/hp-layout-report.md --
+  // this is flagged there as a real gap (implement the custom panel, then
+  // widen this to fit it), not a decision to re-litigate silently.
+  hp: 8,
   group: 'control',
   customPanel: 'sequencer',
   ports: [
     { id: 'clock', dir: 'in', signal: 'gate', label: 'Clock', pos: [0, 3] },
     { id: 'reset', dir: 'in', signal: 'gate', label: 'Reset', pos: [1, 3] },
-    { id: 'cv', dir: 'out', signal: 'cv', label: 'CV', pos: [2, 3] },
-    { id: 'gate', dir: 'out', signal: 'gate', label: 'Gate', pos: [3, 3] },
+    { id: 'cv', dir: 'out', signal: 'cv', label: 'CV', pos: [0, 4] },
+    { id: 'gate', dir: 'out', signal: 'gate', label: 'Gate', pos: [1, 4] },
   ],
   params: [
     // Discrete and snapped (see setParam below), but deliberately without
@@ -49,8 +59,8 @@ export const sequencerDescriptor: ModuleDescriptor = {
     { kind: 'knob', ref: 'glide', x: 1, y: 0 },
     { kind: 'jack', ref: 'clock', x: 0, y: 3 },
     { kind: 'jack', ref: 'reset', x: 1, y: 3 },
-    { kind: 'jack', ref: 'cv', x: 2, y: 3 },
-    { kind: 'jack', ref: 'gate', x: 3, y: 3 },
+    { kind: 'jack', ref: 'cv', x: 0, y: 4 },
+    { kind: 'jack', ref: 'gate', x: 1, y: 4 },
   ],
   create(ctx): ModuleInstance {
     const node = new AudioWorkletNode(ctx, 'sequencer', {

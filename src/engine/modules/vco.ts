@@ -9,13 +9,16 @@ import { scheduleParam } from '../param-smoothing'
 export const vcoDescriptor: ModuleDescriptor = {
   type: 'vco',
   name: 'VCO',
-  hp: 26,
+  // 10 HP -- Eurorack VCOs run 10-12; five knobs stack across three rows of
+  // two (the fifth, fmAmount, alone in its own row) rather than spreading
+  // across one row of five.
+  hp: 10,
   group: 'source',
   ports: [
     { id: 'pitch', dir: 'in', signal: 'cv', label: '1V/Oct', pos: [0, 3] },
     { id: 'fm', dir: 'in', signal: 'cv', label: 'FM', pos: [1, 3] },
-    { id: 'sync', dir: 'in', signal: 'gate', label: 'Sync', pos: [2, 3] },
-    { id: 'out', dir: 'out', signal: 'audio', label: 'Out', pos: [3, 3] },
+    { id: 'sync', dir: 'in', signal: 'gate', label: 'Sync', pos: [0, 4] },
+    { id: 'out', dir: 'out', signal: 'audio', label: 'Out', pos: [1, 4] },
   ],
   params: [
     { id: 'tune', label: 'Tune', min: -24, max: 24, default: 0, curve: 'lin', unit: 'st' },
@@ -36,13 +39,13 @@ export const vcoDescriptor: ModuleDescriptor = {
   layout: [
     { kind: 'knob', ref: 'tune', x: 0, y: 0 },
     { kind: 'knob', ref: 'octave', x: 1, y: 0 },
-    { kind: 'knob', ref: 'shape', x: 2, y: 0 },
-    { kind: 'knob', ref: 'pulseWidth', x: 0, y: 1 },
-    { kind: 'knob', ref: 'fmAmount', x: 1, y: 1 },
+    { kind: 'knob', ref: 'shape', x: 0, y: 1 },
+    { kind: 'knob', ref: 'pulseWidth', x: 1, y: 1 },
+    { kind: 'knob', ref: 'fmAmount', x: 0, y: 2 },
     { kind: 'jack', ref: 'pitch', x: 0, y: 3 },
     { kind: 'jack', ref: 'fm', x: 1, y: 3 },
-    { kind: 'jack', ref: 'sync', x: 2, y: 3 },
-    { kind: 'jack', ref: 'out', x: 3, y: 3 },
+    { kind: 'jack', ref: 'sync', x: 0, y: 4 },
+    { kind: 'jack', ref: 'out', x: 1, y: 4 },
   ],
   create(ctx): ModuleInstance {
     const node = new AudioWorkletNode(ctx, 'vco', {

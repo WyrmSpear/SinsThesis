@@ -4,12 +4,13 @@ import { scheduleParam } from '../param-smoothing'
 export const vcaDescriptor: ModuleDescriptor = {
   type: 'vca',
   name: 'VCA',
-  hp: 18,
+  // 8 HP -- matches the Doepfer A-131 VCA.
+  hp: 8,
   group: 'shaping',
   ports: [
     { id: 'in', dir: 'in', signal: 'audio', label: 'In', pos: [0, 3] },
     { id: 'cv', dir: 'in', signal: 'cv', label: 'CV', pos: [1, 3] },
-    { id: 'out', dir: 'out', signal: 'audio', label: 'Out', pos: [2, 3] },
+    { id: 'out', dir: 'out', signal: 'audio', label: 'Out', pos: [0, 4] },
   ],
   params: [
     { id: 'level', label: 'Level', min: 0, max: 1, default: 1, curve: 'lin', unit: '' },
@@ -20,7 +21,7 @@ export const vcaDescriptor: ModuleDescriptor = {
     { kind: 'knob', ref: 'cvAmount', x: 1, y: 0 },
     { kind: 'jack', ref: 'in', x: 0, y: 3 },
     { kind: 'jack', ref: 'cv', x: 1, y: 3 },
-    { kind: 'jack', ref: 'out', x: 2, y: 3 },
+    { kind: 'jack', ref: 'out', x: 0, y: 4 },
   ],
   create(ctx): ModuleInstance {
     const vca = ctx.createGain()

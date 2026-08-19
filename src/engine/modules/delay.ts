@@ -6,12 +6,15 @@ const MAX_DELAY_SECONDS = 2
 export const delayDescriptor: ModuleDescriptor = {
   type: 'delay',
   name: 'Delay',
-  hp: 26,
+  // 10 HP -- upper end of the 8-10 Eurorack delay range, the extra 2 HP
+  // over the plain-3-knob modules giving "Feedback"/"Time CV" a little more
+  // column room than the tightest fit needs.
+  hp: 10,
   group: 'shaping',
   ports: [
     { id: 'in', dir: 'in', signal: 'audio', label: 'In', pos: [0, 3] },
     { id: 'timeCv', dir: 'in', signal: 'cv', label: 'Time CV', pos: [1, 3] },
-    { id: 'out', dir: 'out', signal: 'audio', label: 'Out', pos: [3, 3] },
+    { id: 'out', dir: 'out', signal: 'audio', label: 'Out', pos: [0, 4] },
   ],
   params: [
     { id: 'time', label: 'Time', min: 0.001, max: MAX_DELAY_SECONDS, default: 0.3, curve: 'exp', unit: 's' },
@@ -21,10 +24,10 @@ export const delayDescriptor: ModuleDescriptor = {
   layout: [
     { kind: 'knob', ref: 'time', x: 0, y: 0 },
     { kind: 'knob', ref: 'feedback', x: 1, y: 0 },
-    { kind: 'knob', ref: 'mix', x: 2, y: 0 },
+    { kind: 'knob', ref: 'mix', x: 0, y: 1 },
     { kind: 'jack', ref: 'in', x: 0, y: 3 },
     { kind: 'jack', ref: 'timeCv', x: 1, y: 3 },
-    { kind: 'jack', ref: 'out', x: 3, y: 3 },
+    { kind: 'jack', ref: 'out', x: 0, y: 4 },
   ],
   create(ctx): ModuleInstance {
     const input = ctx.createGain()

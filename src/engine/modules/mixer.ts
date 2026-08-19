@@ -6,14 +6,17 @@ const CHANNELS = [1, 2, 3, 4] as const
 export const mixerDescriptor: ModuleDescriptor = {
   type: 'mixer',
   name: 'Mixer',
-  hp: 26,
+  // 8 HP -- matches small Eurorack mixers (e.g. Doepfer A-138). The 2x2
+  // knob grid was already right; only the jack rows needed to stop
+  // spreading across four columns of an 8 HP-wide panel.
+  hp: 8,
   group: 'utility',
   ports: [
     { id: 'in1', dir: 'in', signal: 'audio', label: 'In 1', pos: [0, 3] },
     { id: 'in2', dir: 'in', signal: 'audio', label: 'In 2', pos: [1, 3] },
-    { id: 'in3', dir: 'in', signal: 'audio', label: 'In 3', pos: [2, 3] },
-    { id: 'in4', dir: 'in', signal: 'audio', label: 'In 4', pos: [3, 3] },
-    { id: 'out', dir: 'out', signal: 'audio', label: 'Out', pos: [3, 4] },
+    { id: 'in3', dir: 'in', signal: 'audio', label: 'In 3', pos: [0, 4] },
+    { id: 'in4', dir: 'in', signal: 'audio', label: 'In 4', pos: [1, 4] },
+    { id: 'out', dir: 'out', signal: 'audio', label: 'Out', pos: [0, 5] },
   ],
   params: CHANNELS.map((n) => ({
     id: `level${n}`,
@@ -33,9 +36,9 @@ export const mixerDescriptor: ModuleDescriptor = {
     { kind: 'knob', ref: 'level4', x: 1, y: 1 },
     { kind: 'jack', ref: 'in1', x: 0, y: 3 },
     { kind: 'jack', ref: 'in2', x: 1, y: 3 },
-    { kind: 'jack', ref: 'in3', x: 2, y: 3 },
-    { kind: 'jack', ref: 'in4', x: 3, y: 3 },
-    { kind: 'jack', ref: 'out', x: 3, y: 4 },
+    { kind: 'jack', ref: 'in3', x: 0, y: 4 },
+    { kind: 'jack', ref: 'in4', x: 1, y: 4 },
+    { kind: 'jack', ref: 'out', x: 0, y: 5 },
   ],
   create(ctx): ModuleInstance {
     const sum = ctx.createGain()
