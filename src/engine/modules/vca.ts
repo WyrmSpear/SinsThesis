@@ -23,7 +23,16 @@ export const vcaDescriptor: ModuleDescriptor = {
   ],
   create(ctx): ModuleInstance {
     const vca = ctx.createGain()
-    vca.gain.value = 1
+    // Closed by construction: a freshly built VCA with nothing patched into
+    // its CV should pass no signal, matching real hardware. `addModule`
+    // (graph.ts) immediately applies this descriptor's default (1, open --
+    // a VCA used as a plain unity gain stage, no envelope involved, is a
+    // legitimate and common patch) as its very next step, snapped rather
+    // than ramped (B4; see graph.ts), so this 0 is never audible on its
+    // own. It matters for whatever constructs a `ModuleInstance` without
+    // immediately reapplying every default, and it is the correct resting
+    // state regardless.
+    vca.gain.value = 0
     // CV rides on top of the level knob: the depth stage scales incoming CV
     // before it sums into the same gain param.
     const cvDepth = ctx.createGain()

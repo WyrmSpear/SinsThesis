@@ -96,11 +96,25 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
   graph.connect([adsr, 'out'], [vca, 'cv'])
   // The ADSR gates the VCA entirely through CV: base level 0, CV amount 1,
   // so the envelope (0..1) *is* the gain, not an offset added to a fader.
-  graph.setParam(vca, 'level', 0)
-  graph.setParam(vca, 'cvAmount', 1)
+  //
+  // These three calls set up the voice's starting point, not a live knob
+  // turn -- they run once, before the power-on screen is even shown, with
+  // no note ever having played. An explicit `atTime` of "now" makes each
+  // one land exactly here (scheduleParam's setValueAtTime branch,
+  // src/engine/param-smoothing.ts) instead of gliding there over B3's ~8ms
+  // smoothing window. That distinction matters here specifically because
+  // the VCA's descriptor default is 1 (open -- correct for a VCA used as a
+  // plain unity gain stage with no envelope) and this patch immediately
+  // overrides it to 0: without `atTime`, closing it is a ramp, and the
+  // signal path's last cable (VCF -> VCA, a few statements below) lands
+  // while gain is still close to its pre-ramp value, letting the free-
+  // running oscillator through as an audible thump on every boot (see
+  // tests/browser/startup-thump.test.ts).
+  graph.setParam(vca, 'level', 0, ctx.currentTime)
+  graph.setParam(vca, 'cvAmount', 1, ctx.currentTime)
   // A fixed modulation depth for the LFO->cutoff patch cable below; the
   // toggle only adds/removes the cable, same as plugging in a real one.
-  graph.setParam(vcf, 'cutoffCvAmount', 3)
+  graph.setParam(vcf, 'cutoffCvAmount', 3, ctx.currentTime)
 
   const outputInstance = graph.getInstance(output) as OutputInstance
   outputInstance.outputs.get('out')!.connect(ctx.destination)

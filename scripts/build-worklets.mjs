@@ -39,6 +39,7 @@ const WORKLETS = {
   ladder: entry('../src/engine/worklets/ladder.worklet.ts'),
   wavefolder: entry('../src/engine/worklets/wavefolder.worklet.ts'),
   segment: entry('../src/engine/worklets/segment.worklet.ts'),
+  'peak-tap': entry('../src/engine/worklets/peak-tap.worklet.ts'),
 }
 
 const OUT_DIR = fileURLToPath(new URL('../public/worklets', import.meta.url))

@@ -60,9 +60,22 @@ export class PatchGraph {
 
     const instance = descriptor.create(this.ctx)
     const params: Record<string, number> = {}
+    // B4: a freshly built node has no prior audible value to declick away
+    // from, so its defaults are applied with an explicit `atTime` --
+    // `scheduleParam`'s exact-`setValueAtTime` branch (param-smoothing.ts)
+    // -- rather than through the no-`atTime` branch every later, genuinely
+    // live `setParam` call uses. Reusing that existing seam (rather than a
+    // parallel "construction-time setParam" path) is deliberate: it is
+    // already exactly what "land precisely on a given time instead of
+    // gliding there" means, construction is exactly that case, and every
+    // module's `setParam` already knows how to honor it. No module's
+    // classification of which params smooth and which snap outright (the
+    // discrete/switch-like ones, e.g. waveform shape) changes here --
+    // `atTime` is simply ignored by those, same as any other exact-time
+    // caller.
     for (const p of descriptor.params) {
       params[p.id] = p.default
-      instance.setParam(p.id, p.default)
+      instance.setParam(p.id, p.default, this.ctx.currentTime)
     }
 
     this.nodes.set(moduleId, { type, instance, params, slot: [0, 0] })

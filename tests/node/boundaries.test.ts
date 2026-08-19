@@ -27,8 +27,13 @@ describe('engine boundaries', () => {
     // passthrough.worklet.ts is a deliberate DSP-free build probe -- it exists
     // to prove the one-bundle-per-worklet build works at all, not to carry
     // any signal processing, so it has nothing to import from dsp/.
+    // peak-tap.worklet.ts is the same kind of exception for a different
+    // reason: it's test-only instrumentation (tests/browser/startup-thump.test.ts)
+    // that copies its input block back to the main thread verbatim to
+    // measure it there -- there is no signal processing to delegate to dsp/.
+    const DSP_FREE_WORKLETS = ['passthrough.worklet.ts', 'peak-tap.worklet.ts']
     for (const file of files.filter(
-      (f) => f.endsWith('.worklet.ts') && !f.endsWith('passthrough.worklet.ts'),
+      (f) => f.endsWith('.worklet.ts') && !DSP_FREE_WORKLETS.some((name) => f.endsWith(name)),
     )) {
       const source = readFileSync(file, 'utf8')
       expect(source, `${file} must import its math from dsp/`).toMatch(/from\s+['"]\.\.\/dsp\//)
