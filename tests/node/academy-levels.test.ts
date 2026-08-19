@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { PatchGraph } from '../../src/engine/graph'
 import { registerModule, clearRegistry } from '../../src/engine/registry'
 import { loadPatch, type PatchFile } from '../../src/engine/patch'
-import { inspect } from '../../src/engine/analysis/inspector'
+import { inspect, type ModuleRef } from '../../src/engine/analysis/inspector'
 import { LEVELS, getLevel } from '../../academy/levels'
 import { stubContext, stubNode } from '../helpers/stub-instance'
 import { vcoDescriptor } from '../../src/engine/modules/vco'
@@ -103,19 +103,30 @@ describe('academy levels', () => {
         }
       })
 
-      it('every module id the query references resolves to a granted type', () => {
+      it('every module the query references (by id or by type) resolves to a granted type', () => {
+        // A rubric may name a module by its exact id (the original,
+        // still-supported form) or by `{ type }` -- "any module of this
+        // type" (src/engine/analysis/inspector.ts's `ModuleRef`). Either
+        // way, whatever type it names must actually be one the level
+        // grants, or the query can never be satisfied with what the
+        // player's palette even offers.
         const typeOf = new Map(level.solution.modules.map((m) => [m.id, m.type]))
-        const ids = new Set<string>()
-        for (const [fromId, , toId] of level.query.connected ?? []) {
-          ids.add(fromId)
-          ids.add(toId)
+        function refType(ref: ModuleRef): string {
+          if (typeof ref === 'object') return ref.type
+          const type = typeOf.get(ref)
+          expect(type, `query references module id "${ref}", which the solution never defines`).toBeDefined()
+          return type!
         }
-        for (const p of level.query.params ?? []) ids.add(p.module)
 
-        for (const id of ids) {
-          const type = typeOf.get(id)
-          expect(type, `query references module id "${id}", which the solution never defines`).toBeDefined()
-          expect(level.grantedModules, `"${id}" is a "${type}", which is not granted`).toContain(type)
+        const types = new Set<string>()
+        for (const [fromRef, , toRef] of level.query.connected ?? []) {
+          types.add(refType(fromRef))
+          types.add(refType(toRef))
+        }
+        for (const p of level.query.params ?? []) types.add(refType(p.module))
+
+        for (const type of types) {
+          expect(level.grantedModules, `query references type "${type}", which is not granted`).toContain(type)
         }
       })
 

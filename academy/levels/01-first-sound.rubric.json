@@ -5,6 +5,6 @@
   "grantedModules": ["vco", "output"],
   "query": {
     "hasModule": ["vco", "output"],
-    "connected": [["vco-1", "out", "output-1", "in"]]
+    "connected": [[{ "type": "vco" }, "out", { "type": "output" }, "in"]]
   }
 }

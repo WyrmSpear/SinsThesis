@@ -7,8 +7,8 @@
   "query": {
     "hasModule": ["vco", "vcf", "output"],
     "connected": [
-      ["vco-1", "out", "vcf-1", "in"],
-      ["vcf-1", "out", "output-1", "in"]
+      [{ "type": "vco" }, "out", { "type": "vcf" }, "in"],
+      [{ "type": "vcf" }, "out", { "type": "output" }, "in"]
     ]
   }
 }

@@ -7,13 +7,13 @@
   "query": {
     "hasModule": ["vco", "vcf", "adsr", "vca", "keyboard", "lfo", "output"],
     "connected": [
-      ["keyboard-1", "pitch", "vco-1", "pitch"],
-      ["keyboard-1", "gate", "adsr-1", "gate"],
-      ["adsr-1", "out", "vca-1", "cv"],
-      ["vcf-1", "out", "vca-1", "in"],
-      ["vca-1", "out", "output-1", "in"],
-      ["lfo-1", "out", "vcf-1", "cutoffCv"]
+      [{ "type": "keyboard" }, "pitch", { "type": "vco" }, "pitch"],
+      [{ "type": "keyboard" }, "gate", { "type": "adsr" }, "gate"],
+      [{ "type": "adsr" }, "out", { "type": "vca" }, "cv"],
+      [{ "type": "vcf" }, "out", { "type": "vca" }, "in"],
+      [{ "type": "vca" }, "out", { "type": "output" }, "in"],
+      [{ "type": "lfo" }, "out", { "type": "vcf" }, "cutoffCv"]
     ],
-    "params": [{ "module": "vcf-1", "param": "resonance", "value": 0.95, "tolerance": 0.05 }]
+    "params": [{ "module": { "type": "vcf" }, "param": "resonance", "value": 0.95, "tolerance": 0.05 }]
   }
 }
