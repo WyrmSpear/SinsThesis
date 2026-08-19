@@ -346,6 +346,22 @@ body {
   margin-bottom: 0.55rem;
   padding-bottom: 0.4rem;
   border-bottom: 1px solid var(--panel-border);
+  /* Grab affordance for drag-to-reorder (rack/reorder.ts) -- picking a
+   * module up by its header, the same place a real rack module's own
+   * name plate sits. */
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+/* Applied to the panel being dragged (rack/reorder.ts). Opacity plus the
+ * existing knob-indicator glow token -- no new color introduced -- so this
+ * reads correctly in every theme without a token file change. */
+.module-panel.module-dragging {
+  cursor: grabbing;
+  opacity: 0.85;
+  box-shadow: 0 0 0 2px var(--knob-indicator-glow), 0 6px 18px var(--shadow-panel);
+  z-index: 3;
 }
 
 /* Absolutely positioned in the header's own corner so it never pushes the

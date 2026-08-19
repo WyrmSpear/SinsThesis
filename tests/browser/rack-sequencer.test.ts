@@ -2,6 +2,9 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { createServer, type ViteDevServer } from 'vite'
 import { chromium, type Browser, type Page } from 'playwright'
 import { fileURLToPath } from 'node:url'
+import { writeFileSync, unlinkSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { peakHz } from '../../src/engine/analysis/features'
 
 /**
@@ -301,6 +304,90 @@ describe('rack sequencer', () => {
     // now read step 1's programmed pitch: the loop no longer reaches step 2.
     expect(firstWindowHz).toBeCloseTo(expectedHz, -1)
     expect(secondWindowHz).toBeCloseTo(expectedHz, -1)
+
+    expect(consoleErrors, `console errors: ${consoleErrors.join('\n')}`).toEqual([])
+    await page.close()
+  }, 20000)
+
+  it('a reordered rack round-trips through save/load with positions preserved', async () => {
+    const page: Page = await browser.newPage()
+    const consoleErrors: string[] = []
+    page.on('console', (msg) => { if (msg.type() === 'error') consoleErrors.push(msg.text()) })
+    page.on('pageerror', (err) => consoleErrors.push(String(err)))
+
+    await powerOn(page)
+
+    // Drag the VCF module's header to before the Keyboard/MIDI module --
+    // the leftmost slot -- through real pointer events on rack/reorder.ts's
+    // drag surface (the module header, not the panel body).
+    const vcfHeader = page.locator('.module-panel[data-module="vcf"] .module-header')
+    const keyboardPanel = page.locator('.module-panel[data-module="keyboard"]')
+    const vcfBox = await vcfHeader.boundingBox()
+    const kbBox = await keyboardPanel.boundingBox()
+    if (!vcfBox || !kbBox) throw new Error('module has no bounding box')
+
+    await page.mouse.move(vcfBox.x + vcfBox.width / 2, vcfBox.y + vcfBox.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(kbBox.x + 5, kbBox.y + kbBox.height / 2, { steps: 10 })
+    await page.mouse.up()
+    await page.waitForTimeout(150)
+
+    interface SlotSnapshot { moduleIds: string[]; slots: Record<string, [number, number]> }
+    const readSlots = (): Promise<SlotSnapshot> =>
+      page.evaluate(() => {
+        const g = (window as unknown as { __sinsthesis: { graph: { moduleIds: readonly string[]; getSlot(id: string): [number, number] } } }).__sinsthesis.graph
+        const slots: Record<string, [number, number]> = {}
+        for (const id of g.moduleIds) slots[id] = g.getSlot(id)
+        return { moduleIds: [...g.moduleIds].sort(), slots }
+      }) as unknown as Promise<SlotSnapshot>
+
+    const before = await readSlots()
+    // The drag actually moved it: VCF now sits at column 0, ahead of every
+    // module that used to precede it.
+    expect(before.slots['vcf']).toEqual([0, 0])
+    expect(before.slots['keyboard']).toEqual([0, 1])
+
+    const domOrderBefore = await page.evaluate(() =>
+      [...document.querySelectorAll('#rack-modules > .module-panel')].map((p) => (p as HTMLElement).dataset['module']),
+    )
+    expect(domOrderBefore[0]).toBe('vcf')
+
+    const patchText = await page.evaluate(
+      () =>
+        new Promise<string>((resolve) => {
+          const orig = URL.createObjectURL.bind(URL)
+          URL.createObjectURL = (blob: Blob) => {
+            void blob.text().then(resolve)
+            return orig(blob)
+          }
+          ;(document.getElementById('save-patch') as HTMLButtonElement).click()
+        }),
+    )
+
+    const tmpPath = join(tmpdir(), `rack-reorder-${Date.now()}-${Math.random().toString(36).slice(2)}.sinp`)
+    writeFileSync(tmpPath, patchText)
+
+    try {
+      // Mutate the live rack before loading -- removing a module proves the
+      // load actually rebuilds state rather than the state having never
+      // changed, same guard the existing save/load test uses.
+      await page.getByTestId('remove-lfo').click()
+
+      await page.getByTestId('load-patch').click()
+      await page.getByTestId('load-file-input').setInputFiles(tmpPath)
+      await page.waitForTimeout(200)
+
+      const after = await readSlots()
+      expect(after).toEqual(before)
+
+      const domOrderAfter = await page.evaluate(() =>
+        [...document.querySelectorAll('#rack-modules > .module-panel')].map((p) => (p as HTMLElement).dataset['module']),
+      )
+      expect(domOrderAfter[0]).toBe('vcf')
+      expect(domOrderAfter[1]).toBe('keyboard')
+    } finally {
+      unlinkSync(tmpPath)
+    }
 
     expect(consoleErrors, `console errors: ${consoleErrors.join('\n')}`).toEqual([])
     await page.close()

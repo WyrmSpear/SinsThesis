@@ -10,6 +10,7 @@ import { buildPalette } from './palette'
 import { CableLayer } from './cables'
 import { buildKeyboardPanel } from './keyboard-panel'
 import { buildSequencerPanel } from './sequencer-panel'
+import { enableReorder } from './reorder'
 import { downloadPatch, readPatchFile, saveAutosave, loadAutosave, debounce } from './patch-io'
 import { initThemeSwitcher } from './theme-switcher'
 
@@ -110,6 +111,14 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
   const saveDebounced = debounce(() => {
     saveAutosave(serializePatch(graph, { name: currentPatchName }))
   }, 400)
+
+  // Drag-to-reorder, wired once at boot rather than per-mount: it is
+  // delegated (one `pointerdown` listener on `rackEl` itself, matched
+  // against `.module-header` on every event), so it keeps working for
+  // panels added later through the palette with no re-registration, and it
+  // reads `graph`/`cableLayer` through getters so a patch load swapping
+  // both out from under it (`mountGraph`, below) is never stale.
+  enableReorder(rackEl, () => graph, () => cableLayer, scheduleAutosave)
 
   /** Real WebAudio destination hookup, not a rendering concern -- the one
    *  place this file is allowed to know a module `type` string, the same
