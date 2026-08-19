@@ -165,7 +165,16 @@ describe('rack page', () => {
     await page.close()
   })
 
-  it('clicking a cable removes the PatchGraph connection', async () => {
+  it('clicking a cable opens its inspector rather than removing it; the inspector\'s own button does', async () => {
+    // Phase 2 reconciles "clicking a cable" with the new click-to-inspect
+    // signal-visualization feature (rack/cable-inspector.ts): a click now
+    // *selects* the cable and opens a live reading instead of deleting it
+    // outright, and removal moves to a deliberate button inside that
+    // reading. See rack/cable-inspector.ts's doc comment for the full
+    // reasoning; this test is the old "clicking a cable removes the
+    // PatchGraph connection" test, updated for the new two-step gesture
+    // rather than deleted, so "a click on a cable does *something*
+    // sensible to the graph" stays covered here.
     const page: Page = await browser.newPage()
     const consoleErrors: string[] = []
     page.on('console', (msg) => { if (msg.type() === 'error') consoleErrors.push(msg.text()) })
@@ -174,8 +183,8 @@ describe('rack page', () => {
     await powerOn(page)
 
     // The VCO -> VCF audio cable is part of the starter patch, so this
-    // removes an existing connection rather than one just created by a
-    // drag -- proving disconnect independently of connect.
+    // inspects (then removes) an existing connection rather than one just
+    // created by a drag -- proving disconnect independently of connect.
     const before = await cablesOf(page)
     const target = before.find((c) => c.from[0] === 'vco' && c.to[0] === 'vcf')
     if (!target) throw new Error('expected a starter vco -> vcf cable')
@@ -200,10 +209,23 @@ describe('rack page', () => {
     )
 
     await page.mouse.click(mid.x, mid.y)
+    await page.waitForTimeout(150)
+
+    // Selecting it opens the inspector and touches nothing in the graph.
+    const inspector = page.getByTestId('cable-inspector')
+    expect(await inspector.isVisible()).toBe(true)
+    const afterClick = await cablesOf(page)
+    expect(afterClick).toHaveLength(6)
+    expect(afterClick.some((c) => c.id === target.id)).toBe(true)
+
+    // Its own "Remove cable" button is the deliberate second step that
+    // actually disconnects it.
+    await page.getByTestId('cable-inspector-remove').click()
 
     const after = await cablesOf(page)
     expect(after).toHaveLength(5)
     expect(after.some((c) => c.id === target.id)).toBe(false)
+    expect(await page.getByTestId('cable-inspector').count()).toBe(0)
 
     expect(consoleErrors, `console errors: ${consoleErrors.join('\n')}`).toEqual([])
     await page.close()

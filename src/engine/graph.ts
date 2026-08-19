@@ -41,6 +41,16 @@ export class PatchGraph {
 
   constructor(private readonly ctx: BaseAudioContext) {}
 
+  /** Read-only escape hatch for a caller that needs a real context handle
+   *  for something orthogonal to the graph itself -- e.g. the rack's cable
+   *  inspector building an `AnalyserNode` to tap a cable's source node
+   *  without disturbing it (rack/cable-inspector.ts). Nothing here lets a
+   *  caller mutate graph state through the context; it is the same object
+   *  every module's own `create(ctx)` already received. */
+  get audioContext(): BaseAudioContext {
+    return this.ctx
+  }
+
   get moduleIds(): readonly string[] {
     return [...this.nodes.keys()]
   }

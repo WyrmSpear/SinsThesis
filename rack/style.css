@@ -1044,6 +1044,15 @@ body {
   filter: drop-shadow(0 0 6px var(--cable-hover-glow));
 }
 
+/* The one cable currently open in rack/cable-inspector.ts -- a persistent
+ * version of the hover glow above, since a selected cable needs to stay
+ * legible without the pointer sitting on it (rack/cables.ts's
+ * `toggleInspect`/`closeInspector`). */
+.cable.cable-selected .cable-visible {
+  stroke-width: 3.5px;
+  filter: drop-shadow(0 0 7px var(--cable-hover-glow));
+}
+
 .cable-preview {
   fill: none;
   stroke-width: 2.5px;
@@ -1055,3 +1064,57 @@ body {
 .cable-preview.signal-audio { stroke: var(--cable-audio); }
 .cable-preview.signal-cv { stroke: var(--cable-cv); }
 .cable-preview.signal-gate { stroke: var(--cable-gate); }
+
+/* ---- cable inspector: click-a-cable-to-see-what-is-on-it (Phase 2 spec,
+ * rack/cable-inspector.ts). An ordinary themed popover, positioned by JS
+ * (`left`/`top` set inline to the clicked cable's own bounding box) rather
+ * than anchored by CSS -- it has to follow whichever cable was clicked,
+ * anywhere in the rack. `transform` centers it horizontally on that point
+ * and sits it just above, the same "cable label" placement a real patch
+ * bay sticker would use. */
+.cable-inspector {
+  position: absolute;
+  transform: translate(-50%, calc(-100% - 10px));
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.5rem 0.6rem;
+  background: linear-gradient(180deg, var(--surface-panel) 0%, var(--surface-panel-alt) 100%);
+  border: 1px solid var(--panel-border-strong);
+  border-radius: 5px;
+  box-shadow: 0 4px 14px var(--shadow-panel), inset 0 1px 0 var(--highlight-edge);
+}
+
+.cable-inspector-readout {
+  font-size: var(--text-2xs);
+  color: var(--text-accent);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.cable-inspector-wave {
+  display: block;
+  border: 1px solid var(--panel-border);
+  border-radius: 3px;
+  box-shadow: inset 0 1px 3px var(--shadow-inset);
+}
+
+.cable-inspector-remove {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--text-warn);
+  background: var(--surface-recess);
+  border: 1px solid var(--panel-border-strong);
+  border-radius: 3px;
+  padding: 0.2rem 0.5rem;
+  cursor: pointer;
+  width: 100%;
+}
+
+.cable-inspector-remove:hover {
+  border-color: var(--text-warn);
+}
