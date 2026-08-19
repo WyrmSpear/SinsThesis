@@ -11,6 +11,8 @@ What makes this project unusual is that its audio quality is *measured*, not
 asserted. Every oscillator, filter and wavefolder ships with a number an
 independent audit reproduced — see below.
 
+![The rack in Reaktor Dark](docs/images/rack-reaktor-dark.png)
+
 ## Running it
 
 Requires Node ≥22.
@@ -135,6 +137,24 @@ Beyond that:
   architectures, measured against each other, and why wavetables won.
 - `.claude/agents/audio-engineer-critic.md` — the audio critic used
   throughout this project's history to keep the numbers above honest.
+
+## What it looks like
+
+Nine themes ship as token files — no component knows which one is active, and
+panel widths, knob sizes and jack positions are pixel-identical across all of
+them.
+
+![Brimstone theme](docs/images/rack-brimstone.png)
+
+*Brimstone — oxblood and ember, with a heretic's-fork motif tiled behind the
+rack. The project is called SinsThesis; eight hardware homages felt like a
+missed joke.*
+
+The academy grades the patch you actually build, and phrases a failure in the
+same words the brief used rather than in engine identifiers.
+
+![An academy level, checked and failed](docs/images/academy.png)
+
 
 ## License
 
