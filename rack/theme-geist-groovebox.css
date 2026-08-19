@@ -1,0 +1,89 @@
+/**
+ * Geist Groovebox -- brushed metal, orange arcs plus cyan (spec Section 8's
+ * list). Same rule as every theme file: nothing but CSS custom properties,
+ * `rack/style.css` and every rack/*.ts component untouched, geometry
+ * unaffected (rack/panel.ts, rack/knob.ts own that instead).
+ *
+ * The brushed-metal finish is the same zero-component trick as Circuit/PCB's
+ * trace grid: `body`'s `background` (`--surface-rack`) is a bare token read
+ * with no gradient wrapped around it in rack/style.css, so the token itself
+ * can be a tight-pitch (2px) diagonal `repeating-linear-gradient` of
+ * alternating light/dark hairlines over a mid-gray base -- close enough at
+ * screen density to read as a brushed aluminum grain, at zero new CSS
+ * mechanics. "Orange arcs plus cyan" maps directly onto the two things a
+ * knob actually draws: `--knob-indicator` (the arc/pointer every dial
+ * already renders) is orange, `--text-accent` (module names, jack-hover
+ * rings) is cyan -- one warm, one cool, the two-LED-color look of a real
+ * hardware groovebox's pads, without inventing a third accent to blur it.
+ */
+:root[data-theme='geist-groovebox'] {
+  /* ---- surfaces: brushed aluminum ---- */
+  --surface-rack:
+    repeating-linear-gradient(97deg, rgba(255, 255, 255, 0.035) 0px, rgba(255, 255, 255, 0.035) 1px, transparent 1px, transparent 2px),
+    repeating-linear-gradient(97deg, rgba(0, 0, 0, 0.05) 0px, rgba(0, 0, 0, 0.05) 1px, transparent 1px, transparent 3px),
+    #333437;
+  --surface-panel: #3c3d40;
+  --surface-panel-alt: #46474b;
+  --surface-recess: #2a2b2d;
+
+  /* ---- engraving: milled edges ---- */
+  --panel-border: #232427;
+  --panel-border-strong: #5a5b60;
+  --shadow-panel: rgba(0, 0, 0, 0.5);
+  --shadow-ambient: rgba(0, 0, 0, 0.35);
+  --shadow-inset: rgba(0, 0, 0, 0.55);
+  --highlight-edge: rgba(255, 255, 255, 0.09);
+
+  /* ---- type: condensed industrial grotesque ---- */
+  --font-mono: 'Oswald', 'Arial Narrow', 'Helvetica Neue', sans-serif;
+  --text-primary: #eceef0;
+  --text-dim: #9a9ca1;
+  --text-faint: #6a6c70;
+  --text-accent: #4dd9e8;
+  --text-warn: #ff8c3c;
+  --text-2xs: 0.6rem;
+  --text-xs: 0.68rem;
+  --text-sm: 0.78rem;
+  --text-md: 0.92rem;
+  --text-lg: 1.16rem;
+  --tracking-label: 0.06em;
+  --tracking-title: 0.1em;
+
+  /* ---- knob material: brushed metal body, orange arc ---- */
+  --knob-body: #2c2d30;
+  --knob-body-hi: #3f4044;
+  --knob-ring: #5c5d61;
+  --knob-indicator: #ff8c3c;
+  --knob-indicator-glow: rgba(255, 140, 60, 0.55);
+  --knob-readout: #ff8c3c;
+  --knob-readout-drag: #ffb578;
+
+  /* ---- jacks: chrome ring, cyan on hover ---- */
+  --jack-socket: #101012;
+  --jack-ring: #7a7b80;
+  --jack-ring-hover: #4dd9e8;
+
+  /* ---- cables: orange for audio (matches the arcs), cyan for CV, a third pop for gate ---- */
+  --cable-audio: #ff8c3c;
+  --cable-cv: #4dd9e8;
+  --cable-gate: #ff5fa8;
+  --cable-preview: #9a9ca1;
+  --cable-delayed-glow: rgba(255, 140, 60, 0.85);
+  --cable-hover-glow: rgba(77, 217, 232, 0.6);
+  --cable-inactive: #6a6c70;
+
+  /* ---- lamps: orange power, red-orange warn ---- */
+  --lamp-on: #ff8c3c;
+  --lamp-on-glow: rgba(255, 140, 60, 0.6);
+  --lamp-off: #303134;
+  --lamp-off-border: #5a5b60;
+  --lamp-warn: #ff5252;
+  --lamp-warn-glow: rgba(255, 82, 82, 0.6);
+
+  /* ---- rack surfaces: rail, screws ---- */
+  --rail-surface:
+    repeating-linear-gradient(97deg, rgba(255, 255, 255, 0.03) 0px, rgba(255, 255, 255, 0.03) 1px, transparent 1px, transparent 2px),
+    repeating-linear-gradient(97deg, rgba(0, 0, 0, 0.06) 0px, rgba(0, 0, 0, 0.06) 1px, transparent 1px, transparent 3px),
+    #222325;
+  --screw: #8a8b9066;
+}

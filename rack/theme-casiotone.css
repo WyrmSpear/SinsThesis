@@ -1,0 +1,92 @@
+/**
+ * Casiotone -- beige plastic, primary colour coding; the only unserious one,
+ * and that is its value (spec Section 8's list). Same rule as every theme
+ * file: nothing but CSS custom properties, `rack/style.css` and every
+ * rack/*.ts component untouched, geometry unaffected (rack/panel.ts,
+ * rack/knob.ts own that instead).
+ *
+ * The one thing every other theme so far shares and this one breaks on
+ * purpose: it is a *light* theme, cream and tan instead of any shade of
+ * near-black. Nothing in `rack/style.css` assumes a dark surface --
+ * `--text-primary`, every shadow token, and `--highlight-edge` are all
+ * themeable precisely so a light theme doesn't need a single component
+ * change, and this is the proof: `--shadow-*` tokens drop their alpha
+ * instead of raising it (a heavy black shadow reads as depth on a light
+ * surface at a fraction of a dark theme's opacity), and `--highlight-edge`
+ * flips from a faint white sheen to a much more visible one, since a
+ * glossy plastic highlight is *supposed* to be the brightest thing in the
+ * panel, not a whisper the way it is against near-black. "Primary colour
+ * coding" is literal, not a figure of speech: the three cable colors
+ * (Section 5's signal types) are exactly red, blue and yellow, the toy
+ * synth's own three-crayon palette, not three shades of one hue the way
+ * Phosphor Lab or Circuit/PCB pick a family and stay in it.
+ */
+:root[data-theme='casiotone'] {
+  /* ---- surfaces: beige injection-molded plastic ---- */
+  --surface-rack:
+    radial-gradient(ellipse at 50% -10%, rgba(255, 255, 255, 0.5), transparent 55%),
+    #ded2ac;
+  --surface-panel: #f2ead0;
+  --surface-panel-alt: #e6d9b3;
+  --surface-recess: #cabd94;
+
+  /* ---- engraving: molded seams ---- */
+  --panel-border: #a89469;
+  --panel-border-strong: #8a7550;
+  --shadow-panel: rgba(74, 63, 44, 0.22);
+  --shadow-ambient: rgba(74, 63, 44, 0.15);
+  --shadow-inset: rgba(74, 63, 44, 0.18);
+  --highlight-edge: rgba(255, 255, 255, 0.75);
+
+  /* ---- type: the one unserious choice, deliberately ---- */
+  --font-mono: 'Comic Sans MS', 'Chalkboard SE', 'Trebuchet MS', sans-serif;
+  --text-primary: #3a3226;
+  --text-dim: #8c7d5f;
+  --text-faint: #b7aa88;
+  --text-accent: #d1332b;
+  --text-warn: #c07f0e;
+  --text-2xs: 0.62rem;
+  --text-xs: 0.72rem;
+  --text-sm: 0.82rem;
+  --text-md: 0.98rem;
+  --text-lg: 1.22rem;
+  --tracking-label: 0.02em;
+  --tracking-title: 0.04em;
+
+  /* ---- knob material: white plastic cap, primary-blue pointer ---- */
+  --knob-body: #faf5e6;
+  --knob-body-hi: #ffffff;
+  --knob-ring: #a89469;
+  --knob-indicator: #2f6fed;
+  --knob-indicator-glow: rgba(47, 111, 237, 0.45);
+  --knob-readout: #2b57b0;
+  --knob-readout-drag: #2f6fed;
+
+  /* ---- jacks: dark molded socket, tan ring ---- */
+  --jack-socket: #4a3f2c;
+  --jack-ring: #a89469;
+  --jack-ring-hover: #d1332b;
+
+  /* ---- cables: the toy's own red/blue/yellow crayon box ---- */
+  --cable-audio: #d1332b;
+  --cable-cv: #2f6fed;
+  --cable-gate: #e8a723;
+  --cable-preview: #a89469;
+  --cable-delayed-glow: rgba(209, 51, 43, 0.6);
+  --cable-hover-glow: rgba(58, 50, 38, 0.3);
+  --cable-inactive: #c9bd9c;
+
+  /* ---- lamps: a cheerful toy green, warm-yellow warn ---- */
+  --lamp-on: #3aa655;
+  --lamp-on-glow: rgba(58, 166, 85, 0.5);
+  --lamp-off: #d8cca8;
+  --lamp-off-border: #a89469;
+  --lamp-warn: #e8a723;
+  --lamp-warn-glow: rgba(232, 167, 35, 0.5);
+
+  /* ---- rack surfaces: rail, screws ---- */
+  --rail-surface:
+    radial-gradient(ellipse at 50% -10%, rgba(255, 255, 255, 0.35), transparent 60%),
+    #cfc29c;
+  --screw: #6b5d4266;
+}

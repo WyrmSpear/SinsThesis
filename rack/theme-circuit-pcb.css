@@ -1,0 +1,96 @@
+/**
+ * Circuit / PCB -- solder-mask green, gold traces, monospace silkscreen; the
+ * panel *is* the schematic (spec Section 8's list). Same rule as every theme
+ * file: nothing but CSS custom properties, `rack/style.css` and every
+ * rack/*.ts component untouched, geometry unaffected (rack/panel.ts,
+ * rack/knob.ts own that instead).
+ *
+ * The trace grid on `body` and the rack rail is the same zero-component
+ * trick Phosphor Lab's scanlines and Moog Wood's wood grain already proved:
+ * `body`'s `background` and `.rack-surface`'s `background` in
+ * rack/style.css are each a bare `var(--surface-rack)` / `var(--rail-surface)`
+ * with no gradient wrapped around them, so the token can hand back two
+ * overlaid `repeating-linear-gradient`s (one horizontal, one vertical, both
+ * a hairline of dim gold) and it renders as a PCB trace grid with zero
+ * component changes. The "panel *is* the schematic" half of the brief is
+ * the border/text-accent split, not a new mechanic: every hairline
+ * `rack/style.css` already draws with `--panel-border` (a real drawn line,
+ * not a texture) reads as silkscreen outline here -- a dim, cool sage-green
+ * rather than either theme's usual near-black or near-white -- while
+ * everything that reads as a *component* on the schematic (knob rings,
+ * jack rings, the accent text color, the audio cable) shares one gold, the
+ * PCB's exposed-copper color. Two hues carrying the whole theme, not a
+ * dozen, is deliberate: a real schematic silkscreen is drawn in one ink.
+ */
+:root[data-theme='circuit-pcb'] {
+  /* ---- surfaces: solder-mask green with a faint trace grid ---- */
+  --surface-rack:
+    repeating-linear-gradient(90deg, rgba(184, 146, 63, 0.05) 0px, rgba(184, 146, 63, 0.05) 1px, transparent 1px, transparent 48px),
+    repeating-linear-gradient(0deg, rgba(184, 146, 63, 0.05) 0px, rgba(184, 146, 63, 0.05) 1px, transparent 1px, transparent 48px),
+    radial-gradient(ellipse at 50% 0%, rgba(74, 222, 128, 0.05), transparent 65%),
+    #08160f;
+  --surface-panel: #0e2317;
+  --surface-panel-alt: #142e1e;
+  --surface-recess: #06130c;
+
+  /* ---- engraving: silkscreen hairlines ---- */
+  --panel-border: #3e6b52;
+  --panel-border-strong: #5c9271;
+  --shadow-panel: rgba(0, 12, 6, 0.65);
+  --shadow-ambient: rgba(0, 10, 5, 0.45);
+  --shadow-inset: rgba(0, 8, 4, 0.7);
+  --highlight-edge: rgba(224, 178, 76, 0.08);
+
+  /* ---- type: monospace silkscreen, copper accent ---- */
+  --font-mono: 'Space Mono', 'Courier New', ui-monospace, 'IBM Plex Mono', monospace;
+  --text-primary: #d7e8da;
+  --text-dim: #63927a;
+  --text-faint: #345a44;
+  --text-accent: #e0b24c;
+  --text-warn: #e2853f;
+  --text-2xs: 0.6rem;
+  --text-xs: 0.68rem;
+  --text-sm: 0.78rem;
+  --text-md: 0.93rem;
+  --text-lg: 1.18rem;
+  --tracking-label: 0.09em;
+  --tracking-title: 0.15em;
+
+  /* ---- knob material: dark component body, copper pointer ---- */
+  --knob-body: #0f2a1c;
+  --knob-body-hi: #1d4530;
+  --knob-ring: #b8923f;
+  --knob-indicator: #e0b24c;
+  --knob-indicator-glow: rgba(224, 178, 76, 0.55);
+  --knob-readout: #e0b24c;
+  --knob-readout-drag: #f5d998;
+
+  /* ---- jacks: through-hole pads ---- */
+  --jack-socket: #050f09;
+  --jack-ring: #b8923f;
+  --jack-ring-hover: #f0cf7a;
+
+  /* ---- cables: gold for the primary signal, a cool jumper-wire pair for the rest ---- */
+  --cable-audio: #e0b24c;
+  --cable-cv: #4fd1c5;
+  --cable-gate: #d874e0;
+  --cable-preview: #63927a;
+  --cable-delayed-glow: rgba(224, 178, 76, 0.85);
+  --cable-hover-glow: rgba(255, 255, 255, 0.35);
+  --cable-inactive: #345a44;
+
+  /* ---- lamps: a genuine power-LED green against the muted board ---- */
+  --lamp-on: #4ade80;
+  --lamp-on-glow: rgba(74, 222, 128, 0.6);
+  --lamp-off: #142e1e;
+  --lamp-off-border: #3e6b52;
+  --lamp-warn: #e2853f;
+  --lamp-warn-glow: rgba(226, 133, 63, 0.6);
+
+  /* ---- rack surfaces: rail, screws ---- */
+  --rail-surface:
+    repeating-linear-gradient(90deg, rgba(184, 146, 63, 0.06) 0px, rgba(184, 146, 63, 0.06) 1px, transparent 1px, transparent 32px),
+    repeating-linear-gradient(0deg, rgba(184, 146, 63, 0.06) 0px, rgba(184, 146, 63, 0.06) 1px, transparent 1px, transparent 32px),
+    #06130c;
+  --screw: #b8923f88;
+}

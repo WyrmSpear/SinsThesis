@@ -57,9 +57,16 @@ afterAll(async () => {
 
 // All eight themes Section 8 names. Reaktor Dark is the default and serves
 // as the reference every other theme is compared against.
-// TODO(themes): circuit-pcb, geist-groovebox, casiotone, korg-ms20 land in
-// the follow-up commit that builds them; this list grows to all eight then.
-const THEMES = ['reaktor-dark', 'moog-wood', 'phosphor-lab', 'ableton-live'] as const
+const THEMES = [
+  'reaktor-dark',
+  'moog-wood',
+  'phosphor-lab',
+  'ableton-live',
+  'circuit-pcb',
+  'geist-groovebox',
+  'casiotone',
+  'korg-ms20',
+] as const
 
 interface Size {
   width: number

@@ -26,14 +26,17 @@ export interface ThemeOption {
   label: string
 }
 
-/** The eight themes Section 8 names; four built so far (spec's own
- *  one-line description follows each id below in file order). Adding a
- *  fifth is: drop a `rack/theme-<id>.css` file, add one line here. */
+/** The eight themes Section 8 names, all built. Adding a ninth would be:
+ *  drop a `rack/theme-<id>.css` file, add one line here. */
 export const THEMES: readonly ThemeOption[] = [
   { id: 'reaktor-dark', label: 'Reaktor Dark' },
   { id: 'moog-wood', label: 'Moog Wood' },
   { id: 'phosphor-lab', label: 'Phosphor Lab' },
   { id: 'ableton-live', label: 'Ableton Live' },
+  { id: 'circuit-pcb', label: 'Circuit/PCB' },
+  { id: 'geist-groovebox', label: 'Geist Groovebox' },
+  { id: 'casiotone', label: 'Casiotone' },
+  { id: 'korg-ms20', label: 'Korg MS-20' },
 ]
 
 function readStored(): string | null {
