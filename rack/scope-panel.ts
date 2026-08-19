@@ -1,6 +1,7 @@
 import type { PatchGraph } from '../src/engine/graph'
 import type { ScopeInstance } from '../src/engine/modules/scope'
-import { peakHz, rms } from '../src/engine/analysis/features'
+import { rms } from '../src/engine/analysis/features'
+import { singlePitchHz } from '../src/engine/analysis/pitch-track'
 
 /**
  * The scope module's bespoke panel content -- the escape hatch
@@ -221,7 +222,14 @@ export function buildScopePanel(moduleId: string, graph: PatchGraph): HTMLElemen
     if (level < 1e-6) {
       readout.textContent = '— · RMS 0.000'
     } else {
-      readout.textContent = `${peakHz(timeData, sampleRate).toFixed(1)} Hz · RMS ${level.toFixed(3)}`
+      // YIN (singlePitchHz), not a plain FFT peak -- audit round two, finding
+      // 2: this readout used to be peakHz, the exact trap YIN exists to
+      // avoid (rack/pitch-display.ts's doc comment), and a bright saw with
+      // a louder second harmonic read a confident octave high. undefined
+      // (no periodic content found) draws '—', matching the RMS-gated
+      // branch above rather than inventing a number.
+      const hz = singlePitchHz(timeData, sampleRate)
+      readout.textContent = hz === undefined ? `— · RMS ${level.toFixed(3)}` : `${hz.toFixed(1)} Hz · RMS ${level.toFixed(3)}`
     }
 
     requestAnimationFrame(tick)

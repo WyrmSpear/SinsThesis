@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { trackPitch, dominantPitchHz } from '../../../src/engine/analysis/pitch-track'
+import { trackPitch, dominantPitchHz, singlePitchHz } from '../../../src/engine/analysis/pitch-track'
 import { peakHz } from '../../../src/engine/analysis/features'
 
 const SR = 48000
@@ -220,5 +220,53 @@ describe('trackPitch: a caller-supplied maxHz below the default also declines ho
     const voiced = frames.filter((f) => f.hz !== undefined)
     const confidentFold = voiced.filter((f) => f.confidence > 0.8 && Math.abs(f.hz! - f0 / 2) < 20)
     expect(confidentFold).toHaveLength(0)
+  })
+})
+
+// Audit round two, finding 2: rack/scope-panel.ts's and rack/cable-inspector.ts's
+// live readouts used peakHz -- a plain FFT-peak picker, the exact trap YIN
+// exists to avoid -- and a 329 Hz saw with a louder 2nd harmonic read
+// 656.3 Hz on that readout. Both panels now poll `singlePitchHz` instead;
+// these tests exercise the same function directly, at the buffer sizes and
+// call pattern those panels actually use (a single `AnalyserNode` snapshot,
+// not a finished recording).
+describe('singlePitchHz: a single live-buffer reading, as the scope and cable-inspector panels use it', () => {
+  it('a saw with a louder second harmonic reads the fundamental, not the octave-high peakHz would report', () => {
+    const F0 = 329 // the audit's own repro frequency
+    const n = 8192 // rack/scope-panel.ts's analyser fftSize
+    const samples = gen(n, (i) => {
+      const t = (2 * Math.PI * i) / SR
+      return 0.3 * Math.sin(F0 * t) + 1.0 * Math.sin(2 * F0 * t) + 0.2 * Math.sin(3 * F0 * t) + 0.1 * Math.sin(4 * F0 * t)
+    })
+    // Confirms the trap this test guards against actually exists on this
+    // exact buffer, the way pitch-track's other "confirms the trap" test
+    // does -- if a future FFT change happens to dodge it, that's fine.
+    expect(peakHz(samples, SR)).toBeCloseTo(2 * F0, -1)
+
+    const hz = singlePitchHz(samples, SR)
+    expect(hz).toBeDefined()
+    expect(hz!).toBeCloseTo(F0, 0)
+  })
+
+  it('a clean tone at a rack/cable-inspector.ts-sized buffer (4096) still reports correctly', () => {
+    const F0 = 441
+    const n = 4096
+    const samples = gen(n, (i) => Math.sin((2 * Math.PI * F0 * i) / SR))
+    const hz = singlePitchHz(samples, SR)
+    expect(hz).toBeDefined()
+    expect(hz!).toBeCloseTo(F0, 0)
+  })
+
+  it('declines rather than guessing when the buffer is too short for even one YIN frame', () => {
+    // frameSize (2048) + sampleRate/minHz (800 at the defaults) = 2848 --
+    // a 2048-sample buffer (the old cable-inspector fftSize) has no room
+    // for a single frame, so trackPitch produces zero frames.
+    const samples = gen(2048, (i) => Math.sin((2 * Math.PI * 441 * i) / SR))
+    expect(singlePitchHz(samples, SR)).toBeUndefined()
+  })
+
+  it('declines on silence rather than reporting a spurious pitch', () => {
+    const samples = new Float32Array(8192)
+    expect(singlePitchHz(samples, SR)).toBeUndefined()
   })
 })

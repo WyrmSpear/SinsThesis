@@ -1,4 +1,5 @@
-import { peakHz, rms } from '../src/engine/analysis/features'
+import { rms } from '../src/engine/analysis/features'
+import { singlePitchHz } from '../src/engine/analysis/pitch-track'
 
 /**
  * Click-a-cable-to-see-what-is-on-it: the pedagogy Phase 2's spec actually
@@ -31,7 +32,13 @@ export interface CableInspectorHandle {
   close(): void
 }
 
-const ANALYSER_FFT_SIZE = 2048
+// 4096, not 2048: singlePitchHz (audit round two, finding 2) needs at least
+// frameSize + sampleRate/minHz samples for one YIN frame to exist at all --
+// 2848 at the pitch-tracker's own defaults and 48 kHz -- and 2048 fell
+// short of that, which would have made every reading decline as "no pitch"
+// regardless of what was on the cable. 4096 clears it with headroom at any
+// sample rate this project runs at.
+const ANALYSER_FFT_SIZE = 4096
 const CANVAS_WIDTH = 220
 const CANVAS_HEIGHT = 64
 
@@ -141,8 +148,15 @@ export function showCableInspector(
     }
 
     const level = rms(timeData)
-    readout.textContent =
-      level < 1e-6 ? '— · RMS 0.000' : `${peakHz(timeData, ctx.sampleRate).toFixed(1)} Hz · RMS ${level.toFixed(3)}`
+    if (level < 1e-6) {
+      readout.textContent = '— · RMS 0.000'
+    } else {
+      // YIN (singlePitchHz), not peakHz -- see rack/scope-panel.ts's own
+      // comment on this same audit finding. A cable carrying a bright saw
+      // used to read its second harmonic, not its fundamental.
+      const hz = singlePitchHz(timeData, ctx.sampleRate)
+      readout.textContent = hz === undefined ? `— · RMS ${level.toFixed(3)}` : `${hz.toFixed(1)} Hz · RMS ${level.toFixed(3)}`
+    }
 
     raf = requestAnimationFrame(tick)
   }

@@ -210,6 +210,34 @@ export function trackPitch(
 }
 
 /**
+ * A single "what pitch is this buffer right now" reading -- one YIN frame
+ * spanning the whole buffer, rather than `trackPitch`'s frame-wise contour.
+ * For a live view polling a rolling `AnalyserNode` snapshot once an
+ * animation frame (the scope panel's readout, the cable inspector), there
+ * is no "over time" to trace, only "right now" -- and re-running the
+ * frame-wise search at its default 75%-overlap hop across an 8192-sample
+ * buffer just to keep one of eleven results would be wasted work.
+ *
+ * Forces `hopSize` to the buffer length so `trackPitch` produces at most
+ * one frame; the buffer must be at least `frameSize + sampleRate/minHz`
+ * samples for that frame to exist at all (2848 at the defaults and 48 kHz)
+ * -- a caller with a smaller `AnalyserNode` buffer must size it up or pass
+ * a smaller `frameSize`/higher `minHz`, the same tradeoff `trackPitch`
+ * itself makes. Undefined exactly when `trackPitch` would report that one
+ * frame unvoiced -- never a `peakHz`-style guess when nothing periodic is
+ * there to find, which was this function's reason for existing: the scope
+ * panel's old plain FFT-peak readout reported a bright saw's loud second
+ * harmonic as the pitch, the exact trap YIN exists to avoid (see the
+ * module doc comment above).
+ */
+export function singlePitchHz(
+  samples: Float32Array, sampleRate: number, opts: PitchTrackOptions = {},
+): number | undefined {
+  const frames = trackPitch(samples, sampleRate, { ...opts, hopSize: samples.length })
+  return frames[0]?.hz
+}
+
+/**
  * A single "dominant pitch" summary from a pitch track -- the reading a
  * readout shows ("329.6 Hz · E4 −2¢"). Averages in log-frequency (MIDI)
  * space, weighted by each frame's own confidence, so an octave-consistent
