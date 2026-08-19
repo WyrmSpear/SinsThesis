@@ -3,16 +3,17 @@
 **Updated:** 2026-08-19. Engine, rack, analysis, the academy's first mode and a
 ninth theme all shipped.
 **Branch:** `master` — 75 commits.
-**State:** 322 tests pass (257 node + 65 browser), `typecheck` clean, tree clean.
+**State:** 359 tests pass (286 node + 73 browser), `typecheck` clean, tree clean.
 
 **Run it:** `npm run dev`, open the URL, POWER ON.
 
 - **Free play** — a modular rack. Sixteen modules in a palette, drag-to-patch
   cables, drag-to-reorder, nine themes, `.sinp` save/load with autosave, a
   programmable 16-step sequencer, and a Scope module.
-- **Academy** — five build-this-patch levels that teach subtractive synthesis,
-  graded on the actual patch graph, with failures phrased in the player's own
-  words.
+- **Academy** — eight levels. Five *build-this-patch*, graded on the actual
+  patch graph; three *match-this-sound*, graded on perceptual distance between
+  your patch rendered offline and a target `.sinp`. Failures are phrased in the
+  player's own words and name which dimension is off.
 - **Dev harness** at `/harness.html` — scope and spectrum for engine work.
 
 Read this file first. Then `docs/audio/PHASE1A-LEDGER.md` for every decision made
@@ -252,6 +253,44 @@ Two things this exposed and closed:
 Still to build: match-this-sound and constrained-challenge grading modes. Both
 need feature extraction over a rendered buffer, which `engine/analysis` already
 provides.
+
+## The academy's second mode
+
+*Match-this-sound* grades sound rather than topology. A level is a `.sinp` that
+IS the target; the player's rack is rendered offline with `renderGraph` and
+compared.
+
+The metric lives in `src/engine/analysis/compare.ts`: a mel-scaled,
+level-invariant, mean-subtracted spectral distance (weight 0.65) plus a
+peak-normalised envelope RMS distance (0.35). Deliberately not raw FFT
+bin-by-bin L2, which punishes an inaudible phase or pitch difference as harshly
+as a wrong filter — that is the "a near-miss can score badly in ways that feel
+unfair" failure the mode was warned about when it was chosen.
+
+Thresholds were set by measurement, not intuition — correct patch versus a
+deliberately-close-but-wrong one:
+
+| level | correct | close-but-wrong | threshold |
+|---|---|---|---|
+| Bright Pluck | 0.0000 | 0.4930 | 0.35 |
+| Hollow Pulse | 0.0000 | 0.5353 | 0.35 |
+| Resonant Sweep | 0.0000 | 0.1133 | 0.08 |
+
+Resonant Sweep needed the tighter bar: at 0.35 a zero-resonance patch passed.
+
+Two bugs surfaced only by measuring against real DSP and playing the levels by
+hand, not by the synthetic tests: an absolute dB floor that broke
+level-invariance and scored inaudible tweaks worse than a wrong waveform, and a
+whole-buffer resonance measurement that smeared a swept peak into backwards
+"add more resonance" advice.
+
+`engine/analysis` was extended deliberately — `compare.ts` is the third and last
+predicted consumer, and `features.ts` gained `spectralPeakinessDb`. The spec's
+bet that one measurement layer would serve tests, displays and graders has now
+been tested by all three.
+
+Still unbuilt: the third mode, *constrained challenge* ("make a kick with three
+modules"), which needs a per-level feature rubric rather than a target sound.
 
 ## Smaller things, recorded but not urgent
 
