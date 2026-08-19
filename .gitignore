@@ -4,3 +4,4 @@ dist/
 coverage/
 public/worklets/
 tests/browser/__screenshots__/
+.gstack/
