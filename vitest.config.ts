@@ -26,6 +26,7 @@ export default defineConfig({
             'tests/browser/startup-thump.test.ts',
             'tests/browser/rack-page.test.ts',
             'tests/browser/theme-geometry.test.ts',
+            'tests/browser/rack-sequencer.test.ts',
           ],
           browser: {
             enabled: true,
@@ -44,6 +45,7 @@ export default defineConfig({
             'tests/browser/startup-thump.test.ts',
             'tests/browser/rack-page.test.ts',
             'tests/browser/theme-geometry.test.ts',
+            'tests/browser/rack-sequencer.test.ts',
           ],
           // Boots a Vite dev server and a Chromium instance; slower than
           // the unit-style browser tests above.

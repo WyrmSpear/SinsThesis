@@ -22,8 +22,14 @@ export interface JackRegistry {
  *  live graph, return bespoke content to append below the generic grid.
  *  The renderer never inspects what a custom panel key *means* -- it only
  *  looks one up and appends whatever comes back, or nothing if the caller
- *  did not register that key. */
-export type CustomPanelBuilder = (moduleId: string, graph: PatchGraph) => HTMLElement
+ *  did not register that key. The optional third argument is the same
+ *  change-notification hook `buildParamControl` already threads through
+ *  every generic knob/switch below -- a custom panel that mutates a param
+ *  itself (the sequencer's step sliders) needs it too, so autosave hears
+ *  about the change the same way a knob drag would. Optional because not
+ *  every custom panel sets a param this way (the keyboard's piano drives
+ *  the instance directly, never `graph.setParam`). */
+export type CustomPanelBuilder = (moduleId: string, graph: PatchGraph, onChange?: () => void) => HTMLElement
 
 export interface BuildPanelOptions {
   jacks: JackRegistry
@@ -286,7 +292,7 @@ export function buildPanel(
   if (descriptor.customPanel) {
     const builder = opts.customPanels?.[descriptor.customPanel]
     if (builder) {
-      const custom = builder(moduleId, graph)
+      const custom = builder(moduleId, graph, opts.onChange)
       custom.className = `${custom.className} custom-panel-content`.trim()
       panel.append(custom)
     } else {

@@ -18,20 +18,30 @@ const STEP_PARAMS = Array.from({ length: 16 }, (_, i) => ({
  * collapse them onto the same signal, mirroring the input-fronting
  * convention every other worklet module already uses.
  */
+export interface SequencerInstance extends ModuleInstance {
+  /**
+   * Subscribe to the playhead: the processor (`segment.worklet.ts`) posts
+   * `{ step: number }` on its message port whenever the step it just wrote
+   * to `cv`/`gate` changes, and this fans that out to every listener a
+   * panel registers. Returns an unsubscribe function, the same handle
+   * shape `addEventListener`/`removeEventListener` would give a caller,
+   * without exposing the raw `AudioWorkletNode` or its port.
+   */
+  onStep(cb: (step: number) => void): () => void
+}
+
 export const sequencerDescriptor: ModuleDescriptor = {
   type: 'seq',
   name: 'Sequencer',
-  // 8 HP. NOT the 20-24 a hardware 16-step sequencer's per-step CVs would
-  // actually want -- `customPanel: 'sequencer'` names a builder that
-  // rack/main.ts's `customPanels` map never registers, so today this panel
-  // only ever renders the generic grid below (2 knobs, 4 jacks) plus a
-  // "custom panel not implemented" badge; the sixteen `STEP_PARAMS` have no
-  // `layout` entries and are not drawn at all. Sizing for a per-step
-  // display that isn't there yet would recreate exactly the dead-space bug
-  // this pass exists to close. See .superpowers/sdd/hp-layout-report.md --
-  // this is flagged there as a real gap (implement the custom panel, then
-  // widen this to fit it), not a decision to re-litigate silently.
-  hp: 8,
+  // 32 HP: sixteen vertical sliders read far better than sixteen knobs for
+  // per-step CV (see rack/sequencer-panel.ts), and that is genuinely wide --
+  // real hardware 16-step sequencers run 20-40 HP for the same reason. The
+  // `steps` knob and all four jacks now live inside the custom panel
+  // (`customPanel: 'sequencer'`, registered in rack/main.ts) rather than
+  // the generic grid below, which is why `layout` only carries the jacks:
+  // see .superpowers/sdd/sequencer-reorder-report.md for the row-by-row
+  // 3U height budget this width and layout split were measured against.
+  hp: 38,
   group: 'control',
   customPanel: 'sequencer',
   ports: [
@@ -51,22 +61,27 @@ export const sequencerDescriptor: ModuleDescriptor = {
     // step count already reads correctly as a plain integer; a `labels`
     // array would just be ['1', '2', ..., '16'], sixteen strings that
     // restate the value the knob already shows. Stays a continuous-looking
-    // (but internally snapped) knob rather than a 16-position switch.
+    // (but internally snapped) knob rather than a 16-position switch. Drawn
+    // by the custom panel, not a generic `layout` knob entry -- see that
+    // file for why (it needs to react live to its own value to grey out
+    // steps past the count, which the generic grid has no hook for).
     { id: 'steps', label: 'Steps', min: 1, max: 16, default: 8, curve: 'lin', unit: '' },
-    // Reserved for a future portamento pass between step CVs; the worklet
-    // does not yet read it, so it is a no-op today (see task-16-report.md).
-    { id: 'glide', label: 'Glide', min: 0, max: 1, default: 0, curve: 'lin', unit: '' },
     ...STEP_PARAMS,
   ],
   layout: [
-    { kind: 'knob', ref: 'steps', x: 0, y: 0 },
-    { kind: 'knob', ref: 'glide', x: 1, y: 0 },
+    // All four jacks share one row (`y: 3` on every entry) rather than the
+    // 2x2 the 8 HP version used -- deliberate, not left over: at 32 HP
+    // there is ample width for one row, and collapsing to one row instead
+    // of two is most of the vertical budget the sixteen sliders below
+    // needed to fit inside the fixed 3U panel height. See
+    // .superpowers/sdd/sequencer-reorder-report.md for the measured
+    // row-height accounting.
     { kind: 'jack', ref: 'clock', x: 0, y: 3 },
     { kind: 'jack', ref: 'reset', x: 1, y: 3 },
-    { kind: 'jack', ref: 'cv', x: 0, y: 4 },
-    { kind: 'jack', ref: 'gate', x: 1, y: 4 },
+    { kind: 'jack', ref: 'cv', x: 2, y: 3 },
+    { kind: 'jack', ref: 'gate', x: 3, y: 3 },
   ],
-  create(ctx): ModuleInstance {
+  create(ctx): SequencerInstance {
     const node = new AudioWorkletNode(ctx, 'sequencer', {
       numberOfInputs: 2,
       numberOfOutputs: 2,
@@ -83,6 +98,11 @@ export const sequencerDescriptor: ModuleDescriptor = {
       return gain
     })
 
+    const stepListeners = new Set<(step: number) => void>()
+    node.port.onmessage = (e: MessageEvent<{ step: number }>) => {
+      for (const cb of stepListeners) cb(e.data.step)
+    }
+
     return {
       inputs: new Map<string, AudioNode | AudioParam>([
         ['clock', fronts[0]!],
@@ -96,9 +116,7 @@ export const sequencerDescriptor: ModuleDescriptor = {
       // knob) and smooths. `steps` is a step count -- the task's own
       // example of a param that must stay instant, since a fractional
       // step count mid-ramp is meaningless to the loop-around logic in
-      // dsp/segment.ts. `glide` isn't a real AudioParam on this worklet
-      // (see the module doc comment above), so it already no-ops here
-      // regardless. B3.
+      // dsp/segment.ts. B3.
       setParam(id, value, atTime) {
         const param = node.parameters.get(id)
         if (!param) return
@@ -110,6 +128,11 @@ export const sequencerDescriptor: ModuleDescriptor = {
         cvOut.disconnect()
         gateOut.disconnect()
         for (const gain of fronts) gain.disconnect()
+        stepListeners.clear()
+      },
+      onStep(cb) {
+        stepListeners.add(cb)
+        return () => stepListeners.delete(cb)
       },
     }
   },

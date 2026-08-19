@@ -100,6 +100,13 @@ const STEP_PARAM_NAMES = Array.from({ length: 16 }, (_, i) => `step${i + 1}`)
 
 class SequencerProcessor extends AudioWorkletProcessor {
   private readonly state = createSequencerState()
+  // Last step index posted to the main thread. -1 (the state's own
+  // "never clocked" sentinel) so the very first process() block, which
+  // reports the clamped display index of 0, is recognized as a change and
+  // gets its one initial message -- a UI listening from module creation
+  // should see step 0 highlighted immediately, not only after the first
+  // clock edge.
+  private lastReportedIndex = -1
 
   static get parameterDescriptors(): AudioParamDescriptor[] {
     return [
@@ -130,6 +137,16 @@ class SequencerProcessor extends AudioWorkletProcessor {
       )
       cvOut[i] = cv
       gateOut[i] = gate
+    }
+
+    // Playhead reporting: pure instrumentation, not DSP -- `this.state.index`
+    // is read after `sequencerStep` (dsp/segment.ts) has already advanced it,
+    // never computed here. Posted only on change, at most once per render
+    // quantum, so an idle sequencer costs nothing extra on the message port.
+    const displayIndex = this.state.index < 0 ? 0 : this.state.index
+    if (displayIndex !== this.lastReportedIndex) {
+      this.lastReportedIndex = displayIndex
+      this.port.postMessage({ step: displayIndex })
     }
     return true
   }

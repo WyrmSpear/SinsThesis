@@ -710,6 +710,171 @@ body {
   padding: 0.3rem;
 }
 
+/* ---- sequencer module's custom content ----
+ * One flex row holding the `steps` knob and all sixteen step sliders,
+ * bottoms aligned (`align-items: flex-end`) so the knob's shorter
+ * label/dial/readout stack and each slider's taller label/playhead/track/
+ * readout stack read as one front face -- see rack/sequencer-panel.ts's
+ * doc comment for why this is one row rather than a knob row stacked above
+ * a slider row (it is most of the vertical budget the sliders needed to
+ * fit inside the fixed 3U panel height).
+ */
+.sequencer-panel-content { width: 100%; }
+
+.sequencer-row {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: nowrap;
+  gap: 0.5rem;
+}
+
+/* Without a fixed width the `steps` knob-wrap, the row's only flexible
+ * child (every `.slider-wrap` below is `flex: none`), gets crushed down
+ * toward zero to make room for the sixteen fixed-width sliders instead of
+ * keeping its own natural size -- found live, not guessed: it rendered at
+ * 6px wide with its label and readout clipped to nothing. A fixed width
+ * matching an ordinary knob-wrap's natural content size fixes it the same
+ * way `.slider-wrap`'s own fixed width does. */
+.sequencer-steps-knob {
+  width: 44px;
+  flex: none;
+}
+
+.slider-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  width: 24px;
+  flex: none;
+}
+
+.slider-label {
+  font-size: var(--text-2xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--text-dim);
+  text-align: center;
+  width: 100%;
+  /* Fixed px, nowrap+ellipsis -- see `.knob-label`'s comment in the knob
+   * section above; the same cross-theme row-height risk applies here. */
+  line-height: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The playhead LED -- lit only on the step the processor last reported as
+ * sounding (rack/sequencer-panel.ts's `instance.onStep`). Fixed px, not
+ * text, so it never perturbs row height across themes. */
+.slider-playhead {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--surface-recess);
+  border: 1px solid var(--panel-border);
+  flex: none;
+}
+
+.step-active .slider-playhead {
+  background: var(--knob-indicator);
+  border-color: var(--knob-indicator);
+  box-shadow: 0 0 5px var(--knob-indicator-glow);
+}
+
+.slider-track {
+  position: relative;
+  width: 18px;
+  /* Must match `TRACK_HEIGHT_PX` in rack/slider.ts -- that constant drives
+   * the drag-distance-to-value mapping, this sets the box the thumb
+   * actually travels in. See .superpowers/sdd/sequencer-reorder-report.md
+   * for the 3U height budget this number was measured against. */
+  height: 200px;
+  border-radius: 3px;
+  background: var(--surface-recess);
+  border: 1px solid var(--knob-ring);
+  box-shadow: inset 0 1px 2px var(--shadow-inset);
+  cursor: ns-resize;
+  touch-action: none;
+  outline: none;
+  flex: none;
+}
+
+.slider-track:focus-visible {
+  border-color: var(--knob-indicator);
+  box-shadow: 0 0 0 2px var(--knob-indicator-glow);
+}
+
+/* A visible ring, not just the LED above -- the playhead has to read at a
+ * glance while the sequencer is running, so the currently-sounding step's
+ * whole track is highlighted too, not only its small dot. */
+.step-active .slider-track {
+  border-color: var(--knob-indicator);
+  box-shadow: 0 0 0 2px var(--knob-indicator-glow);
+}
+
+/* Steps beyond the `steps` knob's current count -- dimmed, not disabled:
+ * a step past the loop's end can still be programmed ahead of lengthening
+ * it back out. */
+.step-inactive .slider-track,
+.step-inactive .slider-label,
+.step-inactive .slider-readout {
+  opacity: 0.35;
+}
+
+.slider-zero {
+  position: absolute;
+  left: 1px;
+  right: 1px;
+  height: 1px;
+  background: var(--panel-border-strong);
+}
+
+.slider-fill {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  background: var(--knob-indicator);
+  opacity: 0.55;
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+.slider-thumb {
+  position: absolute;
+  left: -1px;
+  right: -1px;
+  height: 3px;
+  background: var(--knob-indicator);
+  border-radius: 1px;
+  box-shadow: 0 0 4px var(--knob-indicator-glow);
+  pointer-events: none;
+}
+
+.slider-wrap.dragging .slider-thumb {
+  height: 4px;
+  box-shadow: 0 0 6px var(--knob-indicator-glow);
+}
+
+.slider-readout {
+  font-size: var(--text-2xs);
+  color: var(--knob-readout);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  width: 100%;
+  /* Fixed px -- see `.knob-readout`'s comment; this is the exact bug that
+   * comment describes, on a different widget. */
+  line-height: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.slider-wrap.dragging .slider-readout {
+  color: var(--knob-readout-drag);
+  font-weight: 600;
+}
+
 /* ---- keyboard module's custom content ----
  * `width: 100%`, not a fixed px: the ancestor panel (rack/panel.ts) now
  * sets a hard `width` from `descriptor.hp * HP_PX` -- a fixed, non-themed
