@@ -1,6 +1,7 @@
-import type { ModuleDescriptor, PortSpec } from '../src/engine/types'
+import type { LayoutItem, ModuleDescriptor, ParamSpec, PortSpec } from '../src/engine/types'
 import type { PatchGraph } from '../src/engine/graph'
 import { buildKnob } from './knob'
+import { buildSwitch } from './switch'
 
 /**
  * The generic panel renderer -- the thing this whole slice exists to prove
@@ -29,14 +30,50 @@ export interface BuildPanelOptions {
   customPanels?: Record<string, CustomPanelBuilder>
 }
 
-function gridExtent(descriptor: ModuleDescriptor): { cols: number; rows: number } {
+interface RowPlan {
+  cols: number
+  rows: number
+  rowIndex(item: LayoutItem): number
+}
+
+/**
+ * Collapses layout rows nothing occupies. Every descriptor authors knobs on
+ * rows 0-1 and jacks on a fixed row further down (the convention "jacks sit
+ * at a module's bottom edge") purely for readability in the source file --
+ * the row *number* isn't meaningful screen geometry, only relative order is.
+ * Rendering those numbers literally (N grid rows of equal height, forced to
+ * a total of N * a fixed row height) turned every unused row into real,
+ * visible dead space: a panel with two knob rows and one jack row authored
+ * two rows further down rendered two blank rows nobody put anything in --
+ * the "much taller than their content" panels this fixes.
+ *
+ * Jacks and everything else (knobs, switches, the unused fallback kinds)
+ * are compacted independently, each preserving its own original relative
+ * row order, and jack rows always render immediately after the last control
+ * row -- consistent with "jacks sit at the bottom" without literally
+ * reserving the vertical space in between.
+ */
+function planRows(descriptor: ModuleDescriptor): RowPlan {
   let maxX = 0
-  let maxY = 0
+  const controlYs = new Set<number>()
+  const jackYs = new Set<number>()
   for (const item of descriptor.layout) {
     maxX = Math.max(maxX, item.x)
-    maxY = Math.max(maxY, item.y)
+    if (item.kind === 'jack') jackYs.add(item.y)
+    else controlYs.add(item.y)
   }
-  return { cols: maxX + 1, rows: maxY + 1 }
+  const sortedControl = [...controlYs].sort((a, b) => a - b)
+  const sortedJack = [...jackYs].sort((a, b) => a - b)
+  const controlIndex = new Map(sortedControl.map((y, i) => [y, i]))
+  const jackIndex = new Map(sortedJack.map((y, i) => [y, sortedControl.length + i]))
+
+  return {
+    cols: maxX + 1,
+    rows: Math.max(1, sortedControl.length + sortedJack.length),
+    rowIndex(item) {
+      return (item.kind === 'jack' ? jackIndex : controlIndex).get(item.y) ?? 0
+    },
+  }
 }
 
 function buildJack(descriptor: ModuleDescriptor, moduleId: string, port: PortSpec, jacks: JackRegistry): HTMLElement {
@@ -61,14 +98,15 @@ function buildJack(descriptor: ModuleDescriptor, moduleId: string, port: PortSpe
 }
 
 /**
- * `LayoutItem.kind` also declares `'switch'`, `'button'` and `'display'`,
- * but no descriptor in the Phase 1 module set (all fifteen were checked)
- * emits any of the three -- the sequencer's step values are ordinary knobs,
- * and both modules that need something those kinds might have covered
- * (sequencer, keyboard) instead opt out of the grid entirely via
- * `customPanel`. These renderers exist so the generic path does not throw
- * if a future descriptor does use one, but they are unexercised by
- * anything real today; report that rather than pretending it was tested.
+ * `LayoutItem.kind` also declares `'button'` and `'display'`, and a layout
+ * item can still name `'switch'` explicitly for a param with no `labels`
+ * (nothing in the Phase 1 module set does either). Those stay unexercised
+ * placeholders so the generic path does not throw if a future descriptor
+ * uses one; report that rather than pretending it was tested. `'switch'`
+ * itself is no longer purely a placeholder -- see the `labels` branch below,
+ * which draws a real switch for any knob-kind layout item whose param
+ * declares `labels`, without the descriptor needing to say `kind: 'switch'`
+ * at all.
  */
 function buildFallbackControl(kind: 'switch' | 'button' | 'display', ref: string): HTMLElement {
   const el = document.createElement('div')
@@ -85,13 +123,13 @@ function buildFallbackControl(kind: 'switch' | 'button' | 'display', ref: string
  * themes, which is exactly what lets a Playwright screenshot of one theme
  * match another structurally. `HP_PX` is an arbitrary but fixed screen
  * scale for "horizontal pitch" (a real Eurorack HP is 5.08mm, which has no
- * native meaning on a display); `ROW_PX` is the layout grid's fixed row
- * height. Both are geometry constants, deliberately not CSS custom
- * properties.
+ * native meaning on a display). Row height is deliberately *not* a
+ * matching fixed constant -- see `planRows` -- each row is sized to its own
+ * content instead, so a row of jacks and a row of knobs are each exactly as
+ * tall as they need to be.
  */
 const HP_PX = 16
 const MIN_PANEL_PX = 120
-const ROW_PX = 58
 
 export function buildPanel(
   descriptor: ModuleDescriptor,
@@ -122,33 +160,42 @@ export function buildPanel(
   name.textContent = descriptor.name
   header.append(name)
 
-  const { cols, rows } = gridExtent(descriptor)
+  const plan = planRows(descriptor)
   const grid = document.createElement('div')
   grid.className = 'module-grid'
-  grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`
-  grid.style.gridTemplateRows = `repeat(${rows}, 1fr)`
-  grid.style.height = `${rows * ROW_PX}px`
+  grid.style.gridTemplateColumns = `repeat(${plan.cols}, 1fr)`
+  grid.style.gridTemplateRows = `repeat(${plan.rows}, auto)`
 
   const portsById = new Map(descriptor.ports.map((p) => [p.id, p]))
   const paramsById = new Map(descriptor.params.map((p) => [p.id, p]))
+
+  function buildParamControl(spec: ParamSpec): HTMLElement {
+    const initial = graph.getParams(moduleId)[spec.id] ?? spec.default
+    const onChange = (value: number): void => graph.setParam(moduleId, spec.id, value)
+    // A param with `labels` is discrete, not continuous (src/engine/types.ts)
+    // -- draw the switch, not the knob, regardless of which `layout.kind`
+    // the descriptor used to reach it. The decision lives entirely in the
+    // descriptor's own `ParamSpec`, so no module is special-cased here.
+    return spec.labels ? buildSwitch(spec, initial, onChange).el : buildKnob(spec, initial, onChange).el
+  }
 
   for (const item of descriptor.layout) {
     let el: HTMLElement
     if (item.kind === 'knob') {
       const spec = paramsById.get(item.ref)
       if (!spec) throw new Error(`buildPanel: "${descriptor.type}" layout knob refers to unknown param "${item.ref}"`)
-      const initial = graph.getParams(moduleId)[item.ref] ?? spec.default
-      const knob = buildKnob(spec, initial, (value) => graph.setParam(moduleId, item.ref, value))
-      el = knob.el
+      el = buildParamControl(spec)
     } else if (item.kind === 'jack') {
       const port = portsById.get(item.ref)
       if (!port) throw new Error(`buildPanel: "${descriptor.type}" layout jack refers to unknown port "${item.ref}"`)
       el = buildJack(descriptor, moduleId, port, opts.jacks)
+    } else if (item.kind === 'switch' && paramsById.get(item.ref)?.labels) {
+      el = buildParamControl(paramsById.get(item.ref)!)
     } else {
       el = buildFallbackControl(item.kind, item.ref)
     }
     el.style.gridColumn = `${item.x + 1}`
-    el.style.gridRow = `${item.y + 1}`
+    el.style.gridRow = `${plan.rowIndex(item) + 1}`
     grid.append(el)
   }
 

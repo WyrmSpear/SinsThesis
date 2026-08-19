@@ -19,7 +19,16 @@ export const vcoDescriptor: ModuleDescriptor = {
   params: [
     { id: 'tune', label: 'Tune', min: -24, max: 24, default: 0, curve: 'lin', unit: 'st' },
     { id: 'octave', label: 'Octave', min: -4, max: 4, default: 0, curve: 'lin', unit: '' },
-    { id: 'shape', label: 'Shape', min: 0, max: 3, default: 0, curve: 'lin', unit: '' },
+    {
+      id: 'shape',
+      label: 'Shape',
+      min: 0,
+      max: 3,
+      default: 0,
+      curve: 'lin',
+      unit: '',
+      labels: ['Saw', 'Pulse', 'Triangle', 'Sine'],
+    },
     { id: 'pulseWidth', label: 'Width', min: 0.01, max: 0.99, default: 0.5, curve: 'lin', unit: '' },
     { id: 'fmAmount', label: 'FM', min: 0, max: 4, default: 0, curve: 'lin', unit: '' },
   ],

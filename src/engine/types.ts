@@ -23,6 +23,10 @@ export interface ParamSpec {
   /** `exp` for anything the ear hears logarithmically: frequency, time. */
   curve: 'lin' | 'exp'
   unit: string
+  /** Discrete positions rather than a continuous range. The UI should draw a
+   *  switch, and the engine snaps rather than smooths. Length must equal
+   *  (max - min + 1) when present. */
+  labels?: readonly string[]
 }
 
 export interface LayoutItem {

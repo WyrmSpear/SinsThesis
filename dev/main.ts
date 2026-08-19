@@ -318,21 +318,15 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
   let wavefolderToggle!: ToggleHandle
   let lfoToggle!: ToggleHandle
 
-  function slider(
-    containerId: string,
-    type: string,
-    moduleId: string,
-    paramId: string,
-    labels?: readonly string[],
-  ): void {
+  function slider(containerId: string, type: string, moduleId: string, paramId: string): void {
     const spec = paramOf(type, paramId)
     const initial = graph.getParams(moduleId)[paramId] ?? spec.default
-    const handle = buildSlider(spec, initial, (value) => graph.setParam(moduleId, paramId, value), { labels })
+    const handle = buildSlider(spec, initial, (value) => graph.setParam(moduleId, paramId, value))
     sliders[`${moduleId}.${paramId}`] = handle
     $(containerId).append(handle.el)
   }
 
-  slider('vco-controls', 'vco', vco, 'shape', ['Saw', 'Pulse', 'Tri', 'Sine'])
+  slider('vco-controls', 'vco', vco, 'shape')
   slider('vco-controls', 'vco', vco, 'octave')
   slider('vco-controls', 'vco', vco, 'tune')
   slider('vco-controls', 'vco', vco, 'pulseWidth')

@@ -80,7 +80,12 @@ body {
 
 .rack-modules {
   position: relative;
-  z-index: 2;
+  /* Deliberately no `z-index` here (see `.cable-layer` and `.jack` below for
+   * why): an explicit z-index would make this box its own stacking context
+   * and trap every descendant -- including `.jack` -- below whatever
+   * z-index the cable layer gets, no matter what a jack's own z-index says.
+   * Staying context-less lets `.jack` compete directly against the cable
+   * layer instead. */
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
@@ -88,19 +93,34 @@ body {
   padding: 2.2rem 1.8rem;
   /* The flex container's own box spans every row's gaps too, not just the
    * panels inside it. Left at the default `auto`, that transparent box
-   * would still win every hit-test over the cable layer beneath it
-   * (z-index does not care that nothing is painted there) -- so a cable
-   * sagging through a gap between panels would be un-clickable everywhere
-   * except the handful of pixels outside every row's bounding rect. `none`
-   * here, with `auto` restored on `.module-panel` below, makes empty rack
-   * space pass clicks through to the cables underneath while every panel
-   * (and everything on it -- knobs, jacks) stays fully interactive. */
+   * would still win every hit-test over the cable layer -- whether the
+   * layer sits above or below in paint order, z-index does not care that
+   * nothing is painted there -- so a cable sagging through a gap between
+   * panels would be un-clickable everywhere except the handful of pixels
+   * outside every row's bounding rect. `none` here, with `auto` restored on
+   * `.module-panel` below, makes empty rack space pass clicks through to
+   * whichever layer is actually underneath a given point. */
   pointer-events: none;
 }
 
 .cable-layer {
   position: absolute;
   inset: 0;
+  /* Above the panel backgrounds and knobs, not below: a real patch cable
+   * lies on top of the synth it's plugged into, and drawing it underneath
+   * (the original layering here) let a cable's sag pass invisibly behind
+   * whichever panel it happened to cross under -- a rendering bug, not a
+   * real "the cable went behind the module" situation, since patch cables
+   * never do that. `.jack` (below) sits at a still-higher z-index than this
+   * layer, on purpose: a cable visually runs *up to* the jack it's plugged
+   * into and stops there, exactly like a real plug sitting in its socket,
+   * and it keeps every jack a reliable native-pointer-event target even
+   * when a cable happens to cross directly over it -- the alternative,
+   * hit-testing through the cable in JS, only fixes the drop end of a drag,
+   * not the browser's own real pointerdown that has to *start* one. Only
+   * the cable's own thin hit-stroke (`.cable-hit`, `pointer-events:
+   * stroke`) intercepts clicks; the rest of this layer stays `pointer-
+   * events: none` so every knob and jack is still fully reachable. */
   z-index: 1;
   pointer-events: none;
   overflow: visible;
@@ -138,7 +158,12 @@ body {
 
 .module-grid {
   display: grid;
-  gap: 0.3rem 0.2rem;
+  /* Column gap is wider than row gap on purpose: two knob labels sit only
+   * a column-gap apart with nothing else between them (unlike two stacked
+   * rows, which already get the knob body's own height as separation), so
+   * this is what stops adjacent labels like ADSR's SUSTAIN/RELEASE from
+   * reading as one run-together word. */
+  gap: 0.35rem 0.6rem;
 }
 
 /* ---- knob ---- */
@@ -148,6 +173,11 @@ body {
   align-items: center;
   justify-content: center;
   gap: 0.15rem;
+  /* Small horizontal breathing room of its own, additive with the grid's
+   * column-gap -- so the visible gap between two labels is never just the
+   * bare column-gap value, even on the narrowest panels. */
+  padding: 0 0.2rem;
+  min-width: 0;
 }
 
 .knob-label {
@@ -156,7 +186,12 @@ body {
   text-transform: uppercase;
   color: var(--text-dim);
   text-align: center;
-  line-height: 1.1;
+  line-height: 1.2;
+  /* A label that still can't fit its column wraps onto a second line
+   * instead of forcing the column wider (which is what let SUSTAIN and
+   * RELEASE grow to touch in the first place) or silently overflowing into
+   * the next one. */
+  overflow-wrap: break-word;
 }
 
 .knob-dial {
@@ -207,6 +242,74 @@ body {
   box-shadow: 0 0 0 3px var(--knob-indicator-glow), 0 2px 4px var(--shadow-ambient);
 }
 
+/* ---- switch: discrete params (ParamSpec.labels), never a continuous knob ---- */
+.switch-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+  padding: 0 0.2rem;
+  min-width: 0;
+}
+
+.switch-label {
+  font-size: var(--text-2xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--text-dim);
+  text-align: center;
+  line-height: 1.2;
+  overflow-wrap: break-word;
+}
+
+/* Deliberately rectangular and segmented, not round -- next to a knob it
+ * should read at a glance as "this has positions", not "this is a knob with
+ * fewer numbers." */
+.switch-control {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 2px;
+  width: 38px;
+  height: 22px;
+  padding: 3px;
+  border-radius: 4px;
+  background: radial-gradient(circle at 34% 28%, var(--knob-body-hi), var(--knob-body) 72%);
+  border: 1px solid var(--knob-ring);
+  box-shadow: 0 2px 4px var(--shadow-ambient), inset 0 1px 1px var(--highlight-edge);
+  cursor: pointer;
+  outline: none;
+}
+
+.switch-control:focus-visible {
+  border-color: var(--knob-indicator);
+  box-shadow: 0 0 0 2px var(--knob-indicator-glow);
+}
+
+.switch-control:hover { border-color: var(--knob-indicator); }
+
+.switch-tick {
+  flex: 1;
+  border-radius: 1px;
+  background: var(--surface-recess);
+  border: 1px solid var(--panel-border);
+}
+
+.switch-tick.active {
+  background: var(--knob-indicator);
+  border-color: var(--knob-indicator);
+  box-shadow: 0 0 4px var(--knob-indicator-glow);
+}
+
+.switch-readout {
+  font-size: var(--text-2xs);
+  color: var(--knob-readout);
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-label);
+}
+
 /* ---- jacks ---- */
 .jack {
   display: flex;
@@ -215,6 +318,19 @@ body {
   justify-content: flex-end;
   gap: 0.2rem;
   cursor: crosshair;
+  /* The grid no longer reserves empty rows between a module's controls and
+   * its jacks (rack/panel.ts's `planRows`), so this margin is what now
+   * separates the two groups -- a deliberate, modest break rather than the
+   * dead band that used to fall out of unused row tracks. */
+  margin-top: 0.5rem;
+  padding: 0 0.2rem;
+  min-width: 0;
+  /* Above `.cable-layer` (see its comment) -- `position` is required for
+   * `z-index` to do anything, and `.rack-modules` staying context-less is
+   * what lets this actually win against the cable layer instead of being
+   * capped by an ancestor's stacking context. */
+  position: relative;
+  z-index: 2;
 }
 
 .jack-socket {
@@ -238,7 +354,8 @@ body {
   color: var(--text-dim);
   text-transform: uppercase;
   text-align: center;
-  line-height: 1.1;
+  line-height: 1.2;
+  overflow-wrap: break-word;
 }
 
 /* ---- layout kinds no Phase 1 descriptor currently emits (see panel.ts) ---- */
@@ -267,7 +384,7 @@ body {
 .keyboard-panel-content { width: 100%; min-width: 420px; }
 
 .kb-hint {
-  margin: 0 0 0.4rem;
+  margin: 0 0 0.25rem;
   font-size: var(--text-2xs);
   color: var(--text-dim);
 }
@@ -276,15 +393,19 @@ body {
   font-size: var(--text-sm);
   color: var(--text-accent);
   font-variant-numeric: tabular-nums;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.3rem;
 }
 
-/* ---- on-screen piano (dev/piano.ts's DOM, themed here) ---- */
+/* ---- on-screen piano (dev/piano.ts's DOM, themed here) ----
+ * 88px, not the dev harness's fuller-page 110px -- the keyboard module sits
+ * in a rack next to knob-and-jack panels a third its width, and the taller
+ * figure was most of why it dwarfed its neighbors (Part 3). Still tall
+ * enough for a comfortable click/touch target. */
 .piano {
   position: relative;
   display: flex;
   width: 100%;
-  height: 110px;
+  height: 88px;
   background: var(--surface-recess);
   border: 1px solid var(--panel-border);
   border-radius: 3px;

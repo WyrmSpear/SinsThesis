@@ -49,19 +49,7 @@ export interface SliderHandle {
   setValue(value: number): void
 }
 
-export interface SliderOptions {
-  /** Names for a discrete param (e.g. the VCO's waveform index). When given,
-   *  the slider snaps to integer steps between spec.min and spec.max and
-   *  the readout shows the name instead of the raw index. */
-  labels?: readonly string[]
-}
-
-export function buildSlider(
-  spec: ParamSpec,
-  initial: number,
-  onChange: (value: number) => void,
-  options: SliderOptions = {},
-): SliderHandle {
+export function buildSlider(spec: ParamSpec, initial: number, onChange: (value: number) => void): SliderHandle {
   const wrap = document.createElement('div')
   wrap.className = 'ctl'
   wrap.dataset['param'] = spec.id
@@ -81,7 +69,11 @@ export function buildSlider(
   input.className = 'ctl-slider'
   input.dataset['testid'] = `slider-${spec.id}`
 
-  const discrete = options.labels !== undefined
+  // `spec.labels` is the single source of truth for "this param is discrete,
+  // not continuous" (src/engine/types.ts) -- there is no separate ad-hoc
+  // flag here anymore, so a module's descriptor is the only place that
+  // decision gets made.
+  const discrete = spec.labels !== undefined
   if (discrete) {
     input.min = String(spec.min)
     input.max = String(spec.max)
@@ -94,7 +86,7 @@ export function buildSlider(
 
   function render(value: number): void {
     readout.textContent = discrete
-      ? (options.labels![Math.round(value) - spec.min] ?? String(Math.round(value)))
+      ? (spec.labels![Math.round(value) - spec.min] ?? String(Math.round(value)))
       : defaultFormat(value, spec)
   }
 

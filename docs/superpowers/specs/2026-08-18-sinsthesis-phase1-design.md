@@ -64,7 +64,7 @@ panels.
 interface ModuleDescriptor {
   type: string; name: string; hp: number;
   ports:  PortSpec[];    // {id, dir, signal: 'audio'|'cv'|'gate', label, pos}
-  params: ParamSpec[];   // {id, min, max, default, curve, unit}
+  params: ParamSpec[];   // {id, min, max, default, curve, unit, labels?}
   layout: LayoutItem[];  // {kind, ref, x, y}
   create(ctx: AudioContext): ModuleInstance;
 }
@@ -76,6 +76,13 @@ interface ModuleInstance {
   dispose(): void;
 }
 ```
+
+A `ParamSpec` with `labels` (one string per integer position, `min` through
+`max`) is discrete rather than continuous — a waveform switch, not a cutoff
+knob. The renderer draws it as a switch showing the current label instead of
+a 270° knob, and the engine snaps it rather than smoothing it. The registry
+rejects a `labels` array whose length does not equal `max - min + 1` at
+registration time, the same way it already rejects an out-of-range default.
 
 Modules that genuinely need bespoke UI — the sequencer and, in Phase 2, the
 scope — declare a custom panel component instead of a layout grid.

@@ -33,6 +33,15 @@ function validate(d: ModuleDescriptor): void {
           `falls outside [${p.min}, ${p.max}]`,
       )
     }
+    if (p.labels !== undefined) {
+      const expected = p.max - p.min + 1
+      if (p.labels.length !== expected) {
+        throw new Error(
+          `registerModule: "${d.type}" param "${p.id}" has ${p.labels.length} labels ` +
+            `but range [${p.min}, ${p.max}] needs ${expected}`,
+        )
+      }
+    }
   }
 
   for (const item of d.layout) {

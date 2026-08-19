@@ -30,6 +30,13 @@ export const sequencerDescriptor: ModuleDescriptor = {
     { id: 'gate', dir: 'out', signal: 'gate', label: 'Gate', pos: [3, 3] },
   ],
   params: [
+    // Discrete and snapped (see setParam below), but deliberately without
+    // `labels`: `labels` earns its keep when the *name* carries information
+    // a bare index doesn't -- 'Saw' means something '1' does not. Here the
+    // step count already reads correctly as a plain integer; a `labels`
+    // array would just be ['1', '2', ..., '16'], sixteen strings that
+    // restate the value the knob already shows. Stays a continuous-looking
+    // (but internally snapped) knob rather than a 16-position switch.
     { id: 'steps', label: 'Steps', min: 1, max: 16, default: 8, curve: 'lin', unit: '' },
     // Reserved for a future portamento pass between step CVs; the worklet
     // does not yet read it, so it is a no-op today (see task-16-report.md).

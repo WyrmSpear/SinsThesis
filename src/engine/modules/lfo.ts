@@ -11,7 +11,16 @@ export const lfoDescriptor: ModuleDescriptor = {
   ],
   params: [
     { id: 'rate', label: 'Rate', min: 0.01, max: 200, default: 2, curve: 'exp', unit: 'Hz' },
-    { id: 'shape', label: 'Shape', min: 0, max: 3, default: 2, curve: 'lin', unit: '' },
+    {
+      id: 'shape',
+      label: 'Shape',
+      min: 0,
+      max: 3,
+      default: 2,
+      curve: 'lin',
+      unit: '',
+      labels: ['Saw', 'Pulse', 'Triangle', 'Sine'],
+    },
     { id: 'depth', label: 'Depth', min: 0, max: 1, default: 1, curve: 'lin', unit: '' },
   ],
   layout: [

@@ -48,4 +48,29 @@ describe('registry', () => {
     d.layout = [{ kind: 'knob', ref: 'nonexistent', x: 0, y: 0 }]
     expect(() => registerModule(d)).toThrow(/unknown reference/)
   })
+
+  it('rejects a param whose labels length does not match its range', () => {
+    const d = stubDescriptor('bad')
+    d.params = [
+      { id: 'shape', label: 'Shape', min: 0, max: 3, default: 0, curve: 'lin', unit: '', labels: ['Saw', 'Pulse'] },
+    ]
+    expect(() => registerModule(d)).toThrow(/labels/)
+  })
+
+  it('accepts a param whose labels length matches its range', () => {
+    const d = stubDescriptor('ok')
+    d.params = [
+      {
+        id: 'shape',
+        label: 'Shape',
+        min: 0,
+        max: 3,
+        default: 0,
+        curve: 'lin',
+        unit: '',
+        labels: ['Saw', 'Pulse', 'Triangle', 'Sine'],
+      },
+    ]
+    expect(() => registerModule(d)).not.toThrow()
+  })
 })
