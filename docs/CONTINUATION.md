@@ -333,7 +333,7 @@ If the agent type is not registered in a fresh session, dispatch a
 general-purpose agent whose prompt begins:
 
 > **Adopt the role defined in this file and follow it exactly:**
-> `/home/an4n51/Desktop/SinsThesis/.claude/agents/audio-engineer-critic.md`
+> `.claude/agents/audio-engineer-critic.md`
 
 That is how it was used throughout this run and it works.
 
