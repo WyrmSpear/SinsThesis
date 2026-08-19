@@ -1,10 +1,13 @@
 # SinsThesis — continuation
 
-**Updated:** 2026-08-18, after both fix waves closed.
-**Branch:** `feat/phase1a-engine` — 47 commits, HEAD `30d466b`.
-**State:** 247 tests pass (209 node + 38 browser), `typecheck` clean, working tree clean.
-**Not merged.** Both fix waves are done and the audio critic's blockers are cleared.
-Next real work is Phase 1B, the UI.
+**Updated:** 2026-08-19. Phase 1A merged; a playable dev harness now exists.
+**Branch:** `master` — 56 commits.
+**State:** 251 tests pass (209 node + 42 browser), `typecheck` clean, tree clean.
+
+**You can hear it.** `npm run dev`, open the URL, click POWER ON. The ASDF row
+plays, or click the on-screen piano. HOLD drones a note so you can sweep the
+filter while it sounds. This is a dev harness — test-equipment styling, no
+themes, no patch cables — not the Phase 1B rack.
 
 Read this file first. Then `docs/audio/PHASE1A-LEDGER.md` for every decision made
 and why.
@@ -31,7 +34,8 @@ adding.
 
 ## What exists
 
-A headless audio engine. No UI — that is Phase 1B and deliberately absent.
+The audio engine, plus a dev harness page that plays it. The themed modular
+rack is still Phase 1B and deliberately absent.
 
 ```
 src/engine/
@@ -40,6 +44,8 @@ src/engine/
   worklets/   vco, ladder, wavefolder, segment, passthrough + audioworklet-globals.d.ts
   modules/    fifteen descriptors + index.ts
   graph.ts  patch.ts  cycle.ts  render.ts  clock.ts  midi.ts  types.ts  registry.ts
+dev/          main.ts, piano.ts, controls.ts, presets.ts, scope.ts, style.css
+index.html    the dev harness — npm run dev
 scripts/build-worklets.mjs    one Rollup bundle per worklet
 docs/superpowers/specs/2026-08-18-sinsthesis-phase1-design.md    the binding spec
 docs/superpowers/plans/2026-08-18-phase1a-engine.md              the 18-task plan
