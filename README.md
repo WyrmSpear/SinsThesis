@@ -37,6 +37,35 @@ npm run typecheck     # tsc --noEmit
 There is no single command that runs both test suites — `npm test` covers
 `tests/node/`, and `npm run test:browser` covers `tests/browser/`.
 
+## Building for deployment
+
+```bash
+npm run build     # builds the worklets, then the app, into dist/
+npm run preview   # serve dist/ locally to sanity-check it before deploying
+```
+
+`dist/` is a self-contained static directory — `index.html`, `harness.html`,
+their bundled JS/CSS, and `dist/worklets/` (the same worklet bundles
+`build:worklets` produces, carried through unchanged). Upload it to any
+static host.
+
+**It can be dropped at the domain root or in a subdirectory — e.g.
+`https://example.com/portfolio/sinsthesis/` — with no rebuild and no
+configuration.** Every reference the build emits (script/link tags, and the
+worklet URLs `src/engine/worklets/registry.ts` hands to
+`audioWorklet.addModule()`) is relative to wherever the HTML page that loaded
+it actually sits, not to the domain root. `vite.config.ts` sets `base: './'`
+for this reason — a generic, deployment-agnostic value, never a specific
+subpath — and `registry.ts` reads `import.meta.env.BASE_URL` rather than
+hardcoding a leading `/`. Move `dist/`'s contents anywhere and it works; there
+is nothing to reconfigure per deployment.
+
+If you build without `npm run build` (which runs `build:worklets` first), the
+worklets are missing from `dist/` and every module goes silent with no
+visible error, only a console 404 for each `dist/worklets/*.js` — the exact
+failure mode this build was designed to make impossible from the standard
+entry point.
+
 ## What's built
 
 - **The rack** (`index.html`, `npm run dev`) — the product's front door. A

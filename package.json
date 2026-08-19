@@ -5,6 +5,8 @@
   "engines": { "node": ">=22" },
   "scripts": {
     "dev": "npm run build:worklets && vite",
+    "build": "npm run build:worklets && vite build",
+    "preview": "vite preview",
     "test": "vitest run --project node",
     "test:watch": "vitest --project node",
     "build:worklets": "node scripts/build-worklets.mjs",
