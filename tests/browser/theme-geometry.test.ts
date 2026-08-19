@@ -4,53 +4,29 @@ import { chromium, type Browser, type Page } from 'playwright'
 import { fileURLToPath } from 'node:url'
 
 /**
- * Section 8's claim under test: "switching a theme rewrites tokens and
- * nothing else. Geometry -- panel widths, knob sizes, jack positions --
- * stays identical across all eight [themes]." Four themes exist now
- * (rack/theme-reaktor-dark.css, -moog-wood.css, -phosphor-lab.css,
- * -ableton-live.css); this drives the real rack page, switches between all
- * four via the on-screen switcher (rack/theme-switcher.ts), and measures.
+ * Section 8's claim under test, verbatim: "switching a theme rewrites
+ * tokens and nothing else. Geometry -- panel widths, knob sizes, jack
+ * positions -- stays identical across all eight [themes] ... a Playwright
+ * test asserts exactly that." This drives the real rack page, adds every
+ * module type through the palette (not just the starter patch's seven), and
+ * measures every panel's width, every knob/switch/jack's size, and every
+ * jack's position relative to its own panel, across every theme.
  *
- * The honest result, found by actually measuring rather than assuming: the
- * claim holds exactly for control *diameters* (a knob is 38x38px, a jack
- * socket 16x16px, in every theme, asserted below to exact equality) and for
- * the one module whose custom content got a definite pixel width instead of
- * a percentage (the keyboard's on-screen piano -- see rack/style.css's
- * `.keyboard-panel-content`). It does **not** hold exactly for an ordinary
- * module's overall panel *width*: rack/panel.ts sizes those with
- * `min-width` (shrink-to-fit), on the documented theory that "nothing
- * inside it is wider" than its hp-derived floor -- a theory that was only
- * ever true for Reaktor Dark's own IBM Plex Mono. Section 8 itself makes
- * font-family, letter-spacing and font-size theme tokens
- * (--font-mono/--tracking-label/--text-* in rack/theme-*.css), and a wider
- * font measurably grows a shrink-to-fit panel -- confirmed here: the VCO
- * panel (hp 12) ranges from 238px (Ableton Live's tighter Inter) to 264px
- * (Phosphor Lab's wider Courier New) across the four themes, an ~11%
- * spread.
- *
- * A stricter fix was attempted and reverted -- see rack/panel.ts's own
- * comment on `panel.style.minWidth` for the full account. Forcing a
- * definite `width` on every ordinary panel *did* pin cross-theme width
- * exactly, but ADSR (hp 8, four knobs in one row) turned out to depend on
- * `min-width`'s shrink-to-fit growth to avoid its own knobs overlapping --
- * the hard `width` was narrower than a single 38px knob dial needs times
- * four, and every theme, including Reaktor Dark itself, rendered visibly
- * broken. A few px of honest, reported cross-theme width drift is a better
- * outcome than a worse bug introduced while chasing exact pixel parity, so
- * this test asserts width with a generous, documented tolerance instead of
- * exact equality for ordinary panels, while still holding true geometric
- * constants (diameters) and the one module fixed to a definite width
- * (keyboard) to exact equality -- see .superpowers/sdd/themes-report.md
- * for the full writeup of this finding.
- *
- * A jack/knob's *y* offset from its panel's top is not asserted at all,
- * for an unrelated and pre-existing reason: rack/panel.ts's own `planRows`
- * doc comment already establishes that row height is "deliberately *not* a
- * matching fixed constant... each row is sized to its own content instead"
- * -- true before any theme work existed, since a five-knob module and a
- * two-knob module were never going to share a row height. A taller header
- * at a larger type-scale token pushes every row below it down by a few px,
- * which is tokens doing their job, not a regression.
+ * This used to hold only approximately: `rack/panel.ts` sized panels with
+ * `min-width` (shrink-to-fit), so a theme's font tokens (font-family,
+ * letter-spacing, font-size all vary per theme) measurably changed panel
+ * width -- up to ~11% on the VCO panel. The fix has two halves, both
+ * required: `rack/panel.ts` now sets a definite `width` from
+ * `descriptor.hp * HP_PX` (a fixed, non-themed constant) instead of
+ * `min-width`, AND every module descriptor's `hp` was re-audited against
+ * what its own layout actually needs at that width -- several were too
+ * small (ADSR's hp=8 was the one that surfaced this; see
+ * .superpowers/sdd/themes-complete-report.md for the full per-module
+ * table). Pinning `width` alone, without the `hp` audit, breaks the
+ * undersized descriptors' layouts instead of fixing geometry -- that's
+ * exactly what happened the first time this was attempted and reverted.
+ * With both halves done, every measurement below holds to exact pixel
+ * equality, with no tolerance.
  *
  * Same real-Chromium-tab pattern as rack-page.test.ts and dev-page.test.ts,
  * for the same reason: a real Vite dev server plus Playwright's
@@ -79,129 +55,201 @@ afterAll(async () => {
   await server?.close()
 })
 
+// All eight themes Section 8 names. Reaktor Dark is the default and serves
+// as the reference every other theme is compared against.
+// TODO(themes): circuit-pcb, geist-groovebox, casiotone, korg-ms20 land in
+// the follow-up commit that builds them; this list grows to all eight then.
 const THEMES = ['reaktor-dark', 'moog-wood', 'phosphor-lab', 'ableton-live'] as const
-
-// An ordinary panel's shrink-to-fit width may legitimately vary a bit by
-// theme (see file header) -- 30px covers the largest spread measured
-// across all four built themes (~26px on the VCO panel) with headroom,
-// while still catching something actually broken (a panel silently
-// doubling in width, a token that stopped applying, etc).
-const ORDINARY_PANEL_WIDTH_TOLERANCE_PX = 30
 
 interface Size {
   width: number
   height: number
 }
 
-interface Geometry {
-  vcoPanelWidth: number
-  keyboardPanelWidth: number
-  cutoffKnobSize: Size
-  vcoOutSocketSize: Size
-  knobIndicatorToken: string
+interface ControlGeometry {
+  kind: string
+  size: Size
+  // Position relative to the panel's own top-left, not the viewport --
+  // the rack reflows per theme (taller headers at a larger type scale push
+  // rows down), so an absolute-position comparison would be comparing the
+  // wrong thing. Relative-to-panel is what "jack positions stay identical"
+  // actually means.
+  x: number
+  y: number
 }
 
-async function readGeometry(page: Page): Promise<Geometry> {
-  const result = await page.evaluate(() => {
-    function rect(testId: string): DOMRect {
-      const el = document.querySelector(`[data-testid="${testId}"]`)
-      if (!el) throw new Error(`no element for testid ${testId}`)
-      return el.getBoundingClientRect()
-    }
-    const vcoPanel = rect('module-vco')
-    const keyboardPanel = rect('module-keyboard')
-    const knob = rect('knob-cutoff')
-    const socket = document
-      .querySelector('[data-testid="jack-vco-out"] .jack-socket')!
-      .getBoundingClientRect()
-    return {
-      vcoPanelWidth: vcoPanel.width,
-      keyboardPanelWidth: keyboardPanel.width,
-      cutoffKnobSize: { width: knob.width, height: knob.height },
-      vcoOutSocketSize: { width: socket.width, height: socket.height },
-      knobIndicatorToken: getComputedStyle(document.documentElement).getPropertyValue('--knob-indicator').trim(),
-    }
+interface PanelGeometry {
+  type: string
+  width: number
+  height: number
+  controls: ControlGeometry[]
+}
+
+async function readAllPanelGeometry(page: Page): Promise<PanelGeometry[]> {
+  const raw = await page.evaluate(() => {
+    const panels = [...document.querySelectorAll<HTMLElement>('.module-panel')]
+    return panels.map((panel) => {
+      const prect = panel.getBoundingClientRect()
+      const controls = [
+        ...panel.querySelectorAll<HTMLElement>('.knob-dial, .switch-control, .jack-socket'),
+      ].map((el) => {
+        const r = el.getBoundingClientRect()
+        return {
+          kind: el.className,
+          size: { width: r.width, height: r.height },
+          x: r.left - prect.left,
+          y: r.top - prect.top,
+        }
+      })
+      return {
+        type: panel.dataset['type'] ?? '',
+        width: prect.width,
+        height: prect.height,
+        controls,
+      }
+    })
   })
-  const round = (n: number): number => Math.round(n * 10) / 10
-  return {
-    vcoPanelWidth: round(result.vcoPanelWidth),
-    keyboardPanelWidth: round(result.keyboardPanelWidth),
-    cutoffKnobSize: { width: round(result.cutoffKnobSize.width), height: round(result.cutoffKnobSize.height) },
-    vcoOutSocketSize: { width: round(result.vcoOutSocketSize.width), height: round(result.vcoOutSocketSize.height) },
-    knobIndicatorToken: result.knobIndicatorToken,
+  const round = (n: number): number => Math.round(n * 100) / 100
+  return raw.map((p) => ({
+    type: p.type,
+    width: round(p.width),
+    height: round(p.height),
+    controls: p.controls.map((c) => ({
+      kind: c.kind,
+      size: { width: round(c.size.width), height: round(c.size.height) },
+      x: round(c.x),
+      y: round(c.y),
+    })),
+  }))
+}
+
+/** Every module panel's own bounding box must fully contain every one of
+ *  its controls -- a control poking outside its panel (ADSR's original
+ *  bug: knobs overlapping because the panel was narrower than four knob
+ *  dials need) is exactly the failure this geometry claim exists to catch,
+ *  and it would not show up in a width-only or size-only comparison. */
+function assertNoOverflowOrOverlap(panels: PanelGeometry[]): void {
+  for (const panel of panels) {
+    for (const c of panel.controls) {
+      expect(c.x, `${panel.type}: control ${c.kind} left edge inside panel`).toBeGreaterThanOrEqual(0)
+      expect(c.y, `${panel.type}: control ${c.kind} top edge inside panel`).toBeGreaterThanOrEqual(0)
+      expect(c.x + c.size.width, `${panel.type}: control ${c.kind} right edge inside panel`).toBeLessThanOrEqual(
+        panel.width + 0.5,
+      )
+    }
+    for (let i = 0; i < panel.controls.length; i++) {
+      for (let j = i + 1; j < panel.controls.length; j++) {
+        const a = panel.controls[i]!
+        const b = panel.controls[j]!
+        const ix = Math.min(a.x + a.size.width, b.x + b.size.width) - Math.max(a.x, b.x)
+        const iy = Math.min(a.y + a.size.height, b.y + b.size.height) - Math.max(a.y, b.y)
+        expect(
+          ix > 1 && iy > 1,
+          `${panel.type}: controls ${a.kind} and ${b.kind} overlap (${ix.toFixed(1)}x${iy.toFixed(1)}px)`,
+        ).toBe(false)
+      }
+    }
   }
 }
 
 describe('theme geometry (Section 8)', () => {
-  it('switching every theme changes tokens, holds control diameters exact, and keeps panel width within a documented tolerance', async () => {
-    const page: Page = await browser.newPage()
-    const consoleErrors: string[] = []
-    page.on('console', (msg) => {
-      if (msg.type() === 'error') consoleErrors.push(msg.text())
-    })
-    page.on('pageerror', (err) => consoleErrors.push(String(err)))
+  it(
+    'switching every theme changes tokens and holds panel width, control size and jack position pixel-identical across all eight',
+    async () => {
+      const page: Page = await browser.newPage()
+      const consoleErrors: string[] = []
+      page.on('console', (msg) => {
+        if (msg.type() === 'error') consoleErrors.push(msg.text())
+      })
+      page.on('pageerror', (err) => consoleErrors.push(String(err)))
 
-    await page.setViewportSize({ width: 1600, height: 1150 })
-    await page.goto(baseUrl + '/', { waitUntil: 'load' })
-    const powerBtn = page.getByTestId('power')
-    await powerBtn.waitFor({ state: 'visible' })
-    await powerBtn.click()
-    await page.waitForFunction(() => Boolean((window as unknown as { __sinsthesis?: unknown }).__sinsthesis))
-    const app = page.getByTestId('app')
-    await app.waitFor({ state: 'visible' })
-    await page.waitForTimeout(250)
+      await page.setViewportSize({ width: 2400, height: 3200 })
+      await page.goto(baseUrl + '/', { waitUntil: 'load' })
+      const powerBtn = page.getByTestId('power')
+      await powerBtn.waitFor({ state: 'visible' })
+      await powerBtn.click()
+      await page.waitForFunction(() => Boolean((window as unknown as { __sinsthesis?: unknown }).__sinsthesis))
+      const app = page.getByTestId('app')
+      await app.waitFor({ state: 'visible' })
+      await page.waitForTimeout(250)
 
-    // Reaktor Dark is the default -- verify the switcher already shows it
-    // active before touching anything, so a later mismatch can't be
-    // blamed on this test's own setup.
-    expect(await page.evaluate(() => document.documentElement.dataset['theme'])).toBe('reaktor-dark')
+      // Reaktor Dark is the default -- verify the switcher already shows it
+      // active before touching anything, so a later mismatch can't be
+      // blamed on this test's own setup.
+      expect(await page.evaluate(() => document.documentElement.dataset['theme'])).toBe('reaktor-dark')
 
-    const geometries: Record<string, Geometry> = {}
-    for (const theme of THEMES) {
-      await page.getByTestId(`theme-${theme}`).click()
-      expect(await page.evaluate(() => document.documentElement.dataset['theme'])).toBe(theme)
-      geometries[theme] = await readGeometry(page)
-    }
+      // Add every module type through the palette so the assertions below
+      // cover all fifteen descriptors, not just the starter patch's seven.
+      const paletteTypes = await page.evaluate(() =>
+        [...document.querySelectorAll('[data-testid^="palette-add-"]')].map((e) =>
+          e.getAttribute('data-testid')!.replace('palette-add-', ''),
+        ),
+      )
+      expect(paletteTypes.length).toBeGreaterThan(0)
+      for (const type of paletteTypes) {
+        await page.getByTestId('palette-toggle').click()
+        await page.getByTestId(`palette-add-${type}`).click()
+      }
 
-    // The tokens really did change per theme -- otherwise a bug that made
-    // every theme file a no-op would still pass the geometry assertions
-    // below vacuously.
-    const indicatorTokens = new Set(THEMES.map((t) => geometries[t]!.knobIndicatorToken))
-    expect(indicatorTokens.size).toBe(THEMES.length)
+      const geometries: Record<string, PanelGeometry[]> = {}
+      const indicatorTokens = new Set<string>()
+      for (const theme of THEMES) {
+        await page.getByTestId(`theme-${theme}`).click()
+        expect(await page.evaluate(() => document.documentElement.dataset['theme'])).toBe(theme)
+        await page.waitForTimeout(30)
+        geometries[theme] = await readAllPanelGeometry(page)
+        indicatorTokens.add(
+          await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--knob-indicator').trim()),
+        )
+        // Fails closed within each theme first: a theme with its own
+        // internal overlap/overflow bug should not need cross-theme
+        // comparison to be caught.
+        assertNoOverflowOrOverlap(geometries[theme]!)
+      }
 
-    const reference = geometries['reaktor-dark']!
-    for (const theme of THEMES.slice(1)) {
-      const g = geometries[theme]!
+      // The tokens really did change per theme -- otherwise a bug that made
+      // every theme file a no-op would still pass the geometry assertions
+      // below vacuously.
+      expect(indicatorTokens.size).toBe(THEMES.length)
 
-      // Exact: control diameters are plain fixed px in rack/style.css,
-      // read by no token, and the keyboard's custom content got a
-      // definite width specifically so it would not vary (see file
-      // header). Pinning the literal values, not just cross-theme
-      // equality, also catches a theme file that shrank every theme
-      // uniformly, which a cross-theme-only comparison could never see.
-      expect(g.cutoffKnobSize, `${theme} cutoff knob size`).toEqual({ width: 38, height: 38 })
-      expect(g.vcoOutSocketSize, `${theme} vco-out jack socket size`).toEqual({ width: 16, height: 16 })
-      expect(g.keyboardPanelWidth, `${theme} keyboard panel width`).toBe(reference.keyboardPanelWidth)
+      const reference = geometries['reaktor-dark']!
+      expect(reference.length).toBeGreaterThanOrEqual(paletteTypes.length)
 
-      // Tolerant: an ordinary panel's shrink-to-fit width tracks its
-      // theme's font metrics -- see file header for why forcing exact
-      // equality here broke real content instead.
-      expect(
-        Math.abs(g.vcoPanelWidth - reference.vcoPanelWidth),
-        `${theme} vco panel width drifted ${Math.abs(g.vcoPanelWidth - reference.vcoPanelWidth).toFixed(1)}px from Reaktor Dark's ${reference.vcoPanelWidth}px (got ${g.vcoPanelWidth}px), past the ${ORDINARY_PANEL_WIDTH_TOLERANCE_PX}px tolerance`,
-      ).toBeLessThanOrEqual(ORDINARY_PANEL_WIDTH_TOLERANCE_PX)
-    }
+      for (const theme of THEMES.slice(1)) {
+        const g = geometries[theme]!
+        expect(g.length, `${theme}: panel count`).toBe(reference.length)
+        for (let i = 0; i < reference.length; i++) {
+          const refPanel = reference[i]!
+          const themePanel = g[i]!
+          expect(themePanel.type, `${theme}: panel ${i} type`).toBe(refPanel.type)
+          expect(themePanel.width, `${theme}: ${refPanel.type} panel width`).toBe(refPanel.width)
+          expect(themePanel.controls.length, `${theme}: ${refPanel.type} control count`).toBe(
+            refPanel.controls.length,
+          )
+          for (let c = 0; c < refPanel.controls.length; c++) {
+            const refControl = refPanel.controls[c]!
+            const themeControl = themePanel.controls[c]!
+            expect(themeControl.size, `${theme}: ${refPanel.type} control ${c} size`).toEqual(refControl.size)
+            expect(themeControl.x, `${theme}: ${refPanel.type} control ${c} x`).toBe(refControl.x)
+            expect(themeControl.y, `${theme}: ${refPanel.type} control ${c} y`).toBe(refControl.y)
+          }
+        }
+      }
 
-    // Reload with the last theme (Ableton Live) already in localStorage and
-    // confirm it persists across a full page load, per the task's
-    // "persists across reloads" requirement -- and via the *inline*
-    // bootstrap in index.html specifically, not this module's own JS: the
-    // attribute must already be right by the time `--knob-indicator`
-    // resolves, well before rack/theme-switcher.ts (an ES module) runs.
-    await page.reload({ waitUntil: 'load' })
-    expect(await page.evaluate(() => document.documentElement.dataset['theme'])).toBe('ableton-live')
+      // Reload with the last theme (Korg MS-20) already in localStorage and
+      // confirm it persists across a full page load, per the task's
+      // "persists across reloads" requirement -- and via the *inline*
+      // bootstrap in index.html specifically, not this module's own JS: the
+      // attribute must already be right by the time `--knob-indicator`
+      // resolves, well before rack/theme-switcher.ts (an ES module) runs.
+      await page.reload({ waitUntil: 'load' })
+      expect(await page.evaluate(() => document.documentElement.dataset['theme'])).toBe(
+        THEMES[THEMES.length - 1],
+      )
 
-    expect(consoleErrors, `console errors: ${consoleErrors.join('\n')}`).toEqual([])
-    await page.close()
-  })
+      expect(consoleErrors, `console errors: ${consoleErrors.join('\n')}`).toEqual([])
+      await page.close()
+    },
+    30000,
+  )
 })

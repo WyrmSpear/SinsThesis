@@ -72,7 +72,19 @@ async function powerOn(page: Page): Promise<void> {
   // selection highlight instead of a cable preview, i.e. the mousedown
   // landed on nothing draggable. A tall viewport sidesteps it rather than
   // scrolling mid-drag, which two different jacks could each need.
-  await page.setViewportSize({ width: 1600, height: 1150 })
+  //
+  // Width bumped 1600 -> 2000 by the Section 8 geometry fix: every
+  // starter-patch module's `hp` grew (rack/panel.ts now pins panel width
+  // instead of shrink-to-fit, and several descriptors' `hp` were too small
+  // for their own layout -- see .superpowers/sdd/themes-complete-report.md),
+  // so the same seven modules wrap into rows at different points than
+  // before. At 1600px this pushed LFO's remove button directly under the
+  // ADSR-to-VCA cable's curve, which silently ate the round-trip test's
+  // `remove-lfo` click (Playwright correctly refused to click a target
+  // another element visually covers). Wider, not a click workaround: the
+  // click was never wrong, the layout had just drifted an unrelated cable
+  // on top of it.
+  await page.setViewportSize({ width: 2000, height: 1150 })
   await page.goto(baseUrl + '/', { waitUntil: 'load' })
   const powerBtn = page.getByTestId('power')
   await powerBtn.waitFor({ state: 'visible' })

@@ -383,6 +383,28 @@ body {
   color: var(--text-accent);
   font-weight: 600;
   text-align: center;
+  /* Bounds the box `text-overflow: ellipsis` (below) clips against -- a
+   * flex child's default main-axis size is shrink-to-fit content, which
+   * would let this grow right past `overflow: hidden` instead of ever
+   * actually clipping. */
+  width: 100%;
+  /* Fixed px, not the font's own metrics: `--text-xs` is a theme token
+   * (Section 8 makes type scale themeable on purpose), and letting the
+   * header's height track its line-height would make the *header* itself
+   * -- and therefore every row below it, since rows stack under it in
+   * normal flow -- a few px taller or shorter per theme, which is exactly
+   * the jack-position drift `tests/browser/theme-geometry.test.ts` now
+   * asserts against at pixel equality. Pinning this the same way
+   * `rack/panel.ts` pins panel width from `hp * HP_PX` keeps the header's
+   * box height constant while still letting the token vary the text's own
+   * rendered size inside it. `white-space: nowrap` for the same reason as
+   * `.knob-label`'s comment: a name that *wrapped* to a second line in one
+   * theme's font metrics but not another's would defeat the fixed
+   * line-height the same way a wrapped knob label would. */
+  line-height: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .module-grid {
@@ -415,12 +437,32 @@ body {
   text-transform: uppercase;
   color: var(--text-dim);
   text-align: center;
-  line-height: 1.2;
-  /* A label that still can't fit its column wraps onto a second line
-   * instead of forcing the column wider (which is what let SUSTAIN and
-   * RELEASE grow to touch in the first place) or silently overflowing into
-   * the next one. */
-  overflow-wrap: break-word;
+  /* Bounds the ellipsis clip -- see `.module-name`'s comment. */
+  width: 100%;
+  /* Fixed px, not `1.2` (relative to the themed `--text-2xs` font-size) --
+   * see `.module-name`'s comment for why: a relative line-height makes
+   * this label's own box height, and so the knob row's height, and so
+   * every jack row below it, drift per theme. Every module in the Phase 1
+   * set fits its longest label on one line at this row's width; a longer
+   * future label would need a wider descriptor `hp`, not a taller line. */
+  line-height: 15px;
+  /* `nowrap` + `ellipsis`, not `overflow-wrap: break-word`: a label used
+   * to wrap onto a second line rather than force its column wider or
+   * overflow into the next one, but *whether* it wraps depends on the
+   * active theme's font metrics and letter-spacing token -- caught here by
+   * `tests/browser/theme-geometry.test.ts` measuring the VCF panel's
+   * "Cutoff" label wrapping in Reaktor Dark's own 0.1em `--tracking-label`
+   * but not in Moog Wood's 0.05em, at an identical column width. A label
+   * that sometimes wraps and sometimes doesn't makes the *row's* height --
+   * and everything below it -- theme-dependent again, the exact bug this
+   * whole file's fixed line-heights exist to close. Clipping to one line
+   * with an ellipsis keeps row height constant unconditionally; a
+   * descriptor whose column is genuinely too narrow for its label needs a
+   * wider `hp`, not a second line.
+   */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .knob-dial {
@@ -459,6 +501,29 @@ body {
   color: var(--knob-readout);
   font-variant-numeric: tabular-nums;
   text-align: center;
+  /* Bounds the ellipsis clip -- see `.module-name`'s comment. Load-bearing
+   * here specifically: this is what actually caught the theme-dependent
+   * row-height bug (`tests/browser/theme-geometry.test.ts`, VCF's
+   * cutoffCvAmount knob) -- its formatted value ("+0.0 oct") wrapped onto
+   * a second line in Reaktor Dark but not Moog Wood at the same column
+   * width, doubling this element's height in one theme only and pushing
+   * every knob below it in that row down by half the difference (grid
+   * items stretch to their row's height by default, and `.knob-wrap`
+   * centers its children within whatever height it's given). The label
+   * fix alone did not catch this because a readout is a sibling box, not
+   * the label. */
+  width: 100%;
+  /* Fixed px -- same reasoning as `.knob-label`: this box sits below the
+   * dial inside the same row, so its height is just as load-bearing for
+   * cross-theme row-height equality. The `.dragging` state below bumps
+   * font-size but deliberately leaves this inherited, since a knob's row
+   * growing while it is actively being dragged is a live-interaction
+   * detail, not part of the at-rest cross-theme geometry this line-height
+   * exists to pin. */
+  line-height: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .knob-wrap.dragging .knob-readout {
@@ -488,8 +553,13 @@ body {
   text-transform: uppercase;
   color: var(--text-dim);
   text-align: center;
-  line-height: 1.2;
-  overflow-wrap: break-word;
+  /* Bounds the ellipsis clip -- see `.module-name`'s comment. */
+  width: 100%;
+  /* Fixed px, nowrap+ellipsis -- see `.knob-label`'s comment. */
+  line-height: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Deliberately rectangular and segmented, not round -- next to a knob it
@@ -537,6 +607,13 @@ body {
   text-align: center;
   text-transform: uppercase;
   letter-spacing: var(--tracking-label);
+  /* Bounds the ellipsis clip -- see `.module-name`'s comment. */
+  width: 100%;
+  /* Fixed px, nowrap+ellipsis -- see `.knob-readout`'s comment. */
+  line-height: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ---- jacks ---- */
@@ -583,8 +660,19 @@ body {
   color: var(--text-dim);
   text-transform: uppercase;
   text-align: center;
-  line-height: 1.2;
-  overflow-wrap: break-word;
+  /* Bounds the ellipsis clip -- see `.module-name`'s comment. */
+  width: 100%;
+  /* Fixed px, nowrap+ellipsis -- see `.knob-label`'s comment. A jack row's
+   * own height feeds into a multi-row module's total panel height the same
+   * way a knob row's does, and `.jack`'s own `justify-content: flex-end`
+   * means a wrapped label on *any* jack in the row can shift every other
+   * jack's socket in that same row down too -- worth calling out because
+   * it is the one place here where the wrap risk is not even confined to
+   * the wrapping element's own column. */
+  line-height: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   /* `.jack` already paints above `.cable-layer` (z-index 2 vs 1, see the
    * comment on `.cable-layer` above) -- confirmed live with
    * `elementFromPoint`, the label really is the topmost element at every

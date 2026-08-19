@@ -4,7 +4,7 @@ import { scheduleParam } from '../param-smoothing'
 export const vcfDescriptor: ModuleDescriptor = {
   type: 'vcf',
   name: 'Ladder VCF',
-  hp: 12,
+  hp: 26,
   group: 'shaping',
   ports: [
     { id: 'in', dir: 'in', signal: 'audio', label: 'In', pos: [0, 3] },

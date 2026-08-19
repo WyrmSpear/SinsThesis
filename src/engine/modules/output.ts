@@ -16,7 +16,7 @@ export interface OutputInstance extends ModuleInstance {
 export const outputDescriptor: ModuleDescriptor = {
   type: 'output',
   name: 'Output',
-  hp: 6,
+  hp: 18,
   group: 'utility',
   ports: [
     { id: 'in', dir: 'in', signal: 'audio', label: 'In', pos: [0, 3] },

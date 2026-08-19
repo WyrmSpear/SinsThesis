@@ -9,7 +9,7 @@ import { scheduleParam } from '../param-smoothing'
 export const vcoDescriptor: ModuleDescriptor = {
   type: 'vco',
   name: 'VCO',
-  hp: 12,
+  hp: 26,
   group: 'source',
   ports: [
     { id: 'pitch', dir: 'in', signal: 'cv', label: '1V/Oct', pos: [0, 3] },

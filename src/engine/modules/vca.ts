@@ -4,7 +4,7 @@ import { scheduleParam } from '../param-smoothing'
 export const vcaDescriptor: ModuleDescriptor = {
   type: 'vca',
   name: 'VCA',
-  hp: 6,
+  hp: 18,
   group: 'shaping',
   ports: [
     { id: 'in', dir: 'in', signal: 'audio', label: 'In', pos: [0, 3] },

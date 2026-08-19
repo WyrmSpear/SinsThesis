@@ -27,7 +27,7 @@ export interface KeyboardMidiInstance extends ModuleInstance {
 export const keyboardMidiDescriptor: ModuleDescriptor = {
   type: 'keyboard',
   name: 'Keyboard/MIDI',
-  hp: 10,
+  hp: 30,
   group: 'control',
   customPanel: 'keyboard',
   ports: [

@@ -4,7 +4,7 @@ import { scheduleParam } from '../param-smoothing'
 export const adsrDescriptor: ModuleDescriptor = {
   type: 'adsr',
   name: 'ADSR',
-  hp: 8,
+  hp: 26,
   group: 'modulation',
   ports: [
     { id: 'gate', dir: 'in', signal: 'gate', label: 'Gate', pos: [0, 3] },

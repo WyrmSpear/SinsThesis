@@ -152,33 +152,31 @@ export function buildPanel(
   panel.dataset['module'] = moduleId
   panel.dataset['type'] = descriptor.type
   panel.dataset['testid'] = `module-${moduleId}`
-  // `min-width`, not `width`: an ordinary module renders at exactly its
-  // hp-derived size (nothing inside it is wider), but a module with
-  // `customPanel` content that genuinely needs more room -- the keyboard's
-  // on-screen piano, at 10hp, is narrower than a two-octave keyboard can
-  // legibly be -- is allowed to grow past its nominal hp rather than
-  // clipping or overflowing its neighbors. A first version of this used a
-  // hard `width` here and the piano silently overflowed into the next
-  // panel's column, invisible in the DOM and obvious the moment the page
-  // was actually looked at.
-  //
-  // A *second* version (Section 8 theme work) tried a hard `width` again,
-  // this time for every ordinary module, to stop a theme's font tokens
-  // from nudging shrink-to-fit panel width by a few px between themes
-  // (tests/browser/theme-geometry.test.ts caught it: Moog Wood's serif and
-  // Phosphor Lab's wider Courier New each grew every panel measurably
-  // versus Reaktor Dark's IBM Plex Mono). That version screenshotted
-  // *worse*, not better: ADSR's hp (8, i.e. 128px) divided across its
-  // four-knob row leaves each grid track well under the 38px a knob
-  // dial actually needs, and `min-width`'s shrink-to-fit growth had been
-  // silently bailing that out the whole time -- a hard `width` removed
-  // the bailout and the knobs visibly overlapped. `min-width` stays; the
-  // handful of px of shrink-to-fit width drift a theme's own font tokens
-  // can introduce is documented as a known, cosmetically-minor gap in
-  // Section 8's "geometry stays identical" claim (.superpowers/sdd/
-  // themes-report.md) rather than "fixed" by trading it for a worse,
-  // visibly broken bug.
-  panel.style.minWidth = `${Math.max(MIN_PANEL_PX, descriptor.hp * HP_PX)}px`
+  // `width`, not `min-width`: Section 8 requires panel width to be
+  // theme-independent, and `min-width` cannot deliver that because it lets
+  // the panel shrink-to-fit its widest child -- which, for ordinary
+  // modules, means the widest *label text*, and a label's rendered width
+  // depends on the active theme's font-family/letter-spacing/font-size
+  // tokens (Moog Wood's serif vs. Phosphor Lab's wider Courier New vs.
+  // Reaktor Dark's own IBM Plex Mono measurably disagreed on it). A first
+  // attempt at a hard `width` here broke ADSR -- not because `width` is
+  // wrong, but because ADSR's own `hp` (8, 128px) was too small for its
+  // four knobs in the first place: 128px split four ways leaves each grid
+  // track well under the 38px a knob dial needs, and `min-width`'s
+  // shrink-to-fit growth had been silently bailing that undersized
+  // descriptor out the whole time. The real fix is both halves together:
+  // every descriptor's `hp` is now audited against what its own layout
+  // needs at that width (see each module file's `hp` and
+  // .superpowers/sdd/themes-complete-report.md for the audit table), and
+  // *only* with that audit done does pinning `width` stop being a
+  // regression. `HP_PX` is deliberately not a theme token (Section 8: "if
+  // it varies per theme, geometry is not identical") -- one arbitrary but
+  // fixed px-per-hp scale, shared by every theme because it lives here,
+  // not in a theme file. The keyboard's on-screen piano (`customPanel`)
+  // still needs its own hp large enough to fit its fixed-420px content
+  // (see keyboard-midi.ts) -- there is no longer a shrink-to-fit safety
+  // net for it either.
+  panel.style.width = `${Math.max(MIN_PANEL_PX, descriptor.hp * HP_PX)}px`
 
   const header = document.createElement('div')
   header.className = 'module-header'

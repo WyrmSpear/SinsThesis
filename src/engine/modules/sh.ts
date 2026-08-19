@@ -3,7 +3,7 @@ import type { ModuleDescriptor, ModuleInstance } from '../types'
 export const shDescriptor: ModuleDescriptor = {
   type: 'sh',
   name: 'S&H',
-  hp: 6,
+  hp: 20,
   group: 'modulation',
   ports: [
     { id: 'in', dir: 'in', signal: 'cv', label: 'In', pos: [0, 3] },

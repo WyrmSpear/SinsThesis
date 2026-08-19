@@ -4,7 +4,7 @@ import { scheduleParam } from '../param-smoothing'
 export const lfoDescriptor: ModuleDescriptor = {
   type: 'lfo',
   name: 'LFO',
-  hp: 8,
+  hp: 26,
   group: 'modulation',
   ports: [
     { id: 'sync', dir: 'in', signal: 'gate', label: 'Sync', pos: [0, 3] },

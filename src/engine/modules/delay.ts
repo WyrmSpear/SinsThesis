@@ -6,7 +6,7 @@ const MAX_DELAY_SECONDS = 2
 export const delayDescriptor: ModuleDescriptor = {
   type: 'delay',
   name: 'Delay',
-  hp: 10,
+  hp: 26,
   group: 'shaping',
   ports: [
     { id: 'in', dir: 'in', signal: 'audio', label: 'In', pos: [0, 3] },

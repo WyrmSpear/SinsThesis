@@ -3,7 +3,7 @@ import type { ModuleDescriptor, ModuleInstance } from '../types'
 export const multipleDescriptor: ModuleDescriptor = {
   type: 'multiple',
   name: 'Mult',
-  hp: 4,
+  hp: 20,
   group: 'utility',
   ports: [
     { id: 'in', dir: 'in', signal: 'audio', label: 'In', pos: [0, 3] },
