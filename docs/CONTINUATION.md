@@ -1,24 +1,13 @@
 # SinsThesis — continuation
 
-**Updated:** 2026-08-18. The rack is now the front door; four themes prove
-Section 8's "a theme is a token file" claim.
-**Branch:** `master`.
-**State:** node + browser tests pass, `typecheck` clean, tree clean.
+**Updated:** 2026-08-19. Phase 1A engine merged; Phase 1B rack is playable.
+**Branch:** `master` — 66 commits.
+**State:** 266 tests pass (211 node + 55 browser), `typecheck` clean, tree clean.
 
-**You can hear it.** `npm run dev`, open the URL: **`index.html` is the rack**
-now, not the old slider harness. Click POWER ON, then click a piano key or an
-ASDF-row letter. The theme switcher lives in the rack's header and works even
-before POWER ON, since it only ever writes `document.documentElement.dataset.theme`
-— it never touches the AudioContext. Four themes exist as token files under
-`rack/theme-*.css` (Reaktor Dark is the default; Moog Wood, Phosphor Lab and
-Ableton Live prove a second, third and fourth skin cost nothing but a token
-file — see `.superpowers/sdd/themes-report.md`), and the choice persists in
-`localStorage` across reloads.
-
-The old dev harness — test-equipment styling, a real oscilloscope and
-spectrum analyzer, no themes, no patch cables — now lives at `/harness.html`,
-linked from the rack's header. Reach for it for engine work: it is still the
-one page with a scope and spectrum, which the rack does not have.
+**You can play it.** `npm run dev`, open the URL, POWER ON. A modular rack:
+fifteen modules in a palette, drag-to-patch cables, drag-to-reorder, eight
+themes, `.sinp` save/load with autosave. The dev harness with scope and
+spectrum is still at `/harness.html` for engine work.
 
 Read this file first. Then `docs/audio/PHASE1A-LEDGER.md` for every decision made
 and why.
@@ -157,6 +146,39 @@ Two things Phase 1B will immediately need, both known:
   press power, hear something") has nothing to test against yet.
 
 ---
+
+## Phase 1B — what the rack proved
+
+The spec made two architectural bets. Both were tested by building, and both
+held.
+
+**Panels are declarative.** One renderer in `rack/panel.ts` draws all fifteen
+modules from `ports`/`params`/`layout`/`hp`. No module is special-cased; the
+keyboard and sequencer use the `customPanel` escape hatch the spec provided,
+and even they get generic knobs and jacks.
+
+**A theme is a token file.** Eight themes ship — Reaktor Dark, Moog Wood,
+Phosphor Lab, Ableton Live, Circuit/PCB, Geist Groovebox, Casiotone, Korg
+MS-20 — and adding the last seven forced **zero** new tokens and **zero**
+component edits. Panel widths, knob sizes, jack positions and panel height are
+pixel-identical across all eight, asserted by test.
+
+Two contract gaps the build exposed, both since closed:
+
+- `ParamSpec` could not say a param was **discrete**, so a four-position
+  waveform switch rendered as a continuous knob. Added `labels?: readonly
+  string[]`, which carries the positions and their display text.
+- `ModuleDescriptor` had no **group**, so a palette would have needed its own
+  drifting `type -> group` table. Added `group?: ModuleGroup`.
+
+Both are validated at registration and documented in the spec.
+
+One correction worth remembering: an early fix for theme-dependent panel width
+inflated every module's `hp` (ADSR 8→26, keyboard 10→30) until content fit.
+That solved the symptom and broke the unit — `hp` is real Eurorack horizontal
+pitch, and a 26 HP ADSR is nonsense. The actual bug was that every `layout`
+put its knobs on one row. Layouts now stack, `hp` values are realistic (4–38),
+and panels are a uniform 3U as hardware is.
 
 ## Smaller things, recorded but not urgent
 
