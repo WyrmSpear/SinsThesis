@@ -1,5 +1,5 @@
 import type { ModuleDescriptor, ModuleInstance } from '../types'
-import { NoteStack, noteToPitchCv, keyToNote, type MidiEvent } from '../midi'
+import { NoteStack, noteToPitchCv, keyToNote, inKeyRange, type MidiEvent } from '../midi'
 
 /**
  * The panel that gets sound out of the rack without a MIDI controller
@@ -8,6 +8,33 @@ import { NoteStack, noteToPitchCv, keyToNote, type MidiEvent } from '../midi'
  * access. Three independent `ConstantSourceNode`s carry pitch, gate, and
  * velocity — there is no worklet here, so each output port is its own node
  * rather than a shared multi-output front.
+ *
+ * **Key range.** `rangeLow`/`rangeHigh` (MIDI note numbers, inclusive on
+ * both ends) restrict which notes this instance responds to at all —
+ * computer key, on-screen/touch press, or real MIDI alike, all gated at the
+ * same `inZone` check before anything reaches the shared `NoteStack`. This
+ * is what makes a split keyboard possible: two Keyboard modules with
+ * non-overlapping ranges (say 0-59 and 60-127) each drive their own chain
+ * from the low and high halves of one physical or on-screen keyboard,
+ * exactly like a hardware dual-manual interface. Default is the full
+ * 0-127 range, so an existing single-Keyboard patch is unaffected.
+ *
+ * This is **not** polyphony — deliberately deferred to a later phase (see
+ * docs/CONTINUATION.md). Each zone is its own independent monophonic voice
+ * with its own last-note priority (`NoteStack`); a zone never sounds more
+ * than one note at a time, it just claims a different slice of the
+ * keyboard than its neighbor.
+ *
+ * **Overlapping zones.** If two Keyboard modules' ranges overlap, both
+ * simply respond independently to a note in the overlap — there is no
+ * cross-module arbitration (narrower-wins, first-added-wins, etc.), because
+ * no module knows the others exist. This is also the natural, zero-plumbing
+ * consequence of how input already reaches every Keyboard instance: each
+ * module's own panel (`rack/keyboard-panel.ts`) attaches its own `window`
+ * keydown listener, so a single physical keydown is already delivered to
+ * every Keyboard module's panel today, overlapping ranges or not. "Both
+ * respond" is simply that existing behavior, formalized and documented
+ * rather than left as an accident of the panel wiring.
  */
 export interface KeyboardMidiInstance extends ModuleInstance {
   handleMidiEvent(e: MidiEvent): void
@@ -16,7 +43,8 @@ export interface KeyboardMidiInstance extends ModuleInstance {
    *  NoteStack and last-note priority as `handleKey`. The dev harness's
    *  on-screen piano and touch input use this instead of `handleKey`
    *  because they address notes directly rather than through a computer
-   *  key code and the current octave. */
+   *  key code and the current octave. Silently ignored when `note` falls
+   *  outside this instance's [rangeLow, rangeHigh] zone. */
   pressNote(id: string, note: number): void
   releaseNote(id: string): void
   /** The note currently sounding by last-note priority, across every input
@@ -34,7 +62,12 @@ export const keyboardMidiDescriptor: ModuleDescriptor = {
   // px floor of its own -- see `rack/style.css`'s `.keyboard-panel-content`
   // for the width:100% that replaced its old hard-coded 420px (the panel
   // it sits in is now hp-pinned and theme-independent, so a percentage of
-  // it is exactly as geometry-stable as the fixed px used to be).
+  // it is exactly as geometry-stable as the fixed px used to be). The two
+  // zone knobs (below) join the existing octave/glide row rather than
+  // opening a new one -- a fourth 64px-ish column at this hp comfortably
+  // fits a 38px dial, and adding a whole row would eat into the panel's
+  // fixed 392px/3U budget, which the piano's own hint text already uses
+  // most of (rack/panel.ts's PANEL_HEIGHT_PX comment).
   hp: 16,
   group: 'control',
   customPanel: 'keyboard',
@@ -46,10 +79,20 @@ export const keyboardMidiDescriptor: ModuleDescriptor = {
   params: [
     { id: 'octave', label: 'Octave', min: 0, max: 8, default: 4, curve: 'lin', unit: '' },
     { id: 'glide', label: 'Glide', min: 0, max: 1, default: 0, curve: 'exp', unit: 's' },
+    // Note numbers, not Hz or an octave/semitone pair -- precise and what
+    // `keyToNote`/MIDI already speak. `unit: 'note'` is a display-only
+    // marker `rack/curve.ts`'s `formatValue` special-cases to read "C2"
+    // rather than "36" (src/engine/analysis/note.ts, per this task's
+    // brief) -- the engine and the saved patch value are still plain MIDI
+    // note integers throughout; only the knob readout is musical.
+    { id: 'rangeLow', label: 'Lo', min: 0, max: 127, default: 0, curve: 'lin', unit: 'note' },
+    { id: 'rangeHigh', label: 'Hi', min: 0, max: 127, default: 127, curve: 'lin', unit: 'note' },
   ],
   layout: [
     { kind: 'knob', ref: 'octave', x: 0, y: 0 },
     { kind: 'knob', ref: 'glide', x: 1, y: 0 },
+    { kind: 'knob', ref: 'rangeLow', x: 2, y: 0 },
+    { kind: 'knob', ref: 'rangeHigh', x: 3, y: 0 },
     { kind: 'jack', ref: 'pitch', x: 0, y: 3 },
     { kind: 'jack', ref: 'gate', x: 1, y: 3 },
     { kind: 'jack', ref: 'velocity', x: 0, y: 4 },
@@ -62,21 +105,37 @@ export const keyboardMidiDescriptor: ModuleDescriptor = {
     gate.start()
     velocity.start()
 
-    const settings = { octave: 4, glide: 0 }
+    const settings = { octave: 4, glide: 0, rangeLow: 0, rangeHigh: 127 }
     const notes = new NoteStack()
-    // Every input path -- computer-keyboard keys and whatever calls
-    // `pressNote`/`releaseNote` (the on-screen piano) -- presses into this
-    // same map, keyed by an id namespaced per source (`key:<code>` vs
-    // `ext:<id>`) so the two can't collide. That is what keeps last-note
-    // priority shared across mouse and keyboard: both funnel through the
-    // one `notes` NoteStack via `noteOn`/`noteOff` below, never a second
-    // parallel path.
+    // Every input path -- computer-keyboard keys, whatever calls
+    // `pressNote`/`releaseNote` (the on-screen piano), and real MIDI
+    // (`handleMidiEvent`) -- presses into this same map, keyed by an id
+    // namespaced per source (`key:<code>` vs `ext:<id>` vs `midi:<note>`)
+    // so none of the three can collide with each other. That is what keeps
+    // last-note priority shared across mouse, keyboard and MIDI: all three
+    // funnel through the one `notes` NoteStack via `noteOn`/`noteOff`
+    // below, never a second parallel path. (A genuinely shared edge case
+    // survives this: two *different* sources pressing the exact same note
+    // number still share one entry in `notes`, so releasing it from either
+    // source silences it even if the other source's key is still
+    // physically down. That was already true of key-vs-mouse before this
+    // task and is not attempted here -- it would need per-source reference
+    // counting inside `NoteStack` itself, a bigger change than this task's
+    // scope.)
     const noteIdMap = new Map<string, number>()
 
-    function trigger(id: string, note: number): void {
+    function inZone(note: number): boolean {
+      return inKeyRange(note, settings.rangeLow, settings.rangeHigh)
+    }
+
+    function clampNote(v: number): number {
+      return Math.min(127, Math.max(0, Math.round(v)))
+    }
+
+    function trigger(id: string, note: number, vel = 1): void {
       if (noteIdMap.has(id)) return // repeat guard: id already sounding
       noteIdMap.set(id, note)
-      noteOn(note, 1)
+      noteOn(note, vel)
     }
 
     function untrigger(id: string): void {
@@ -112,9 +171,23 @@ export const keyboardMidiDescriptor: ModuleDescriptor = {
       }
     }
 
+    // Routed through the same trigger/untrigger id-map every other input
+    // source uses (namespaced `midi:<note>`), not a direct noteOn/noteOff
+    // call the way this used to bypass it entirely. Two things that fixes:
+    // a repeated note-on with no note-off between (a real running-status
+    // controller quirk) now dedupes the same way a held computer key does,
+    // instead of re-triggering; and MIDI-held notes are now visible in
+    // `noteIdMap` the same way keyboard/mouse-held ones are, for any future
+    // caller that wants to know what's down and from where. Velocity still
+    // reaches `noteOn` -- `trigger`'s new third argument -- so this is not
+    // a loss of fidelity, just a shared path.
     function handleMidiEvent(e: MidiEvent): void {
-      if (e.kind === 'noteOn') noteOn(e.note, e.velocity)
-      else if (e.kind === 'noteOff') noteOff(e.note)
+      if (e.kind === 'noteOn') {
+        if (!inZone(e.note)) return
+        trigger(`midi:${e.note}`, e.note, e.velocity)
+      } else if (e.kind === 'noteOff') {
+        untrigger(`midi:${e.note}`)
+      }
       // CC messages are not yet routed to a destination; ignored for now.
     }
 
@@ -122,7 +195,7 @@ export const keyboardMidiDescriptor: ModuleDescriptor = {
       const id = `key:${code}`
       if (down) {
         const note = keyToNote(code, settings.octave)
-        if (note === undefined) return
+        if (note === undefined || !inZone(note)) return
         trigger(id, note)
       } else {
         untrigger(id)
@@ -136,6 +209,7 @@ export const keyboardMidiDescriptor: ModuleDescriptor = {
     // computer-keyboard id above, but it presses into the very same
     // `noteIdMap` / `notes` NoteStack.
     function pressNote(id: string, note: number): void {
+      if (!inZone(note)) return
       trigger(`ext:${id}`, note)
     }
 
@@ -153,6 +227,8 @@ export const keyboardMidiDescriptor: ModuleDescriptor = {
       setParam(id, value) {
         if (id === 'octave') settings.octave = value
         else if (id === 'glide') settings.glide = value
+        else if (id === 'rangeLow') settings.rangeLow = clampNote(value)
+        else if (id === 'rangeHigh') settings.rangeHigh = clampNote(value)
       },
       dispose() {
         pitch.stop()

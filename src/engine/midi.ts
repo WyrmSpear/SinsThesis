@@ -66,6 +66,18 @@ export function keyToNote(code: string, octave: number): number | undefined {
 }
 
 /**
+ * Is `note` inside a Keyboard module's key-range zone? Both bounds
+ * inclusive, so `low === high` is a legal one-note zone rather than an
+ * always-false one. Kept as a pure, standalone predicate (rather than a
+ * closure inside `keyboard-midi.ts`) specifically so the zone rule itself
+ * -- boundaries inclusive, nothing fancier -- has a node-level unit test
+ * independent of the Web Audio machinery the module instance needs.
+ */
+export function inKeyRange(note: number, low: number, high: number): boolean {
+  return note >= low && note <= high
+}
+
+/**
  * Request Web MIDI access. Refusal is not an error: many browsers gate this
  * behind a permission prompt or lack the API entirely, and the computer
  * keyboard must keep working either way. Callers get `null` rather than a
