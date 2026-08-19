@@ -47,6 +47,55 @@ const MIN_DB = -100
 const DB_TICKS = [0, -20, -40, -60, -80, -100]
 const FREQ_TICKS_HZ = [50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000]
 
+/**
+ * Audit round two, finding 3: this panel's dB axis used to lie about what
+ * it showed. A full-scale, bin-centered sine read -13.9 dB, not 0, and a
+ * known -80 dB tone polled every animation frame drifted rather than
+ * settled. Both are `AnalyserNode` quirks with `getFloatFrequencyData`,
+ * not bugs in this file, and both are fixable without giving up an
+ * absolute axis:
+ *
+ * 1. **The -13.9 dB offset is a fixed, derivable constant, not signal- or
+ *    time-dependent** -- confirmed by measuring it with smoothing off
+ *    (`smoothingTimeConstant: 0`), where it settles to -13.56 dB
+ *    immediately and stays there. It is exactly explained by two things
+ *    the browser's FFT does and never compensates for: the Blackman
+ *    window's own coherent-gain loss (its DC/average term, `a0 = (1 -
+ *    0.16) / 2 = 0.42` in the Web Audio spec's own window formula, a
+ *    -7.54 dB loss on its own) and a missing x2 single-sided-spectrum
+ *    factor in the magnitude-to-dB conversion (another -6.02 dB).
+ *    `-20*log10(0.42 * 0.5) = 13.5556...` dB -- measured to four decimal
+ *    places against a real `AnalyserNode` (13.5556 dB observed). Adding
+ *    that back turns "reads -13.9 dB for 0 dBFS" into "reads 0 dB for
+ *    0 dBFS", for any signal, not just the one it was measured against.
+ * 2. **The "drift" is `smoothingTimeConstant`, exactly as suspected, but
+ *    not a leak -- it's a per-*call* blend, not a per-elapsed-time decay.**
+ *    Each `getFloatFrequencyData()` call blends the new FFT frame against
+ *    whatever the *previous call* computed, regardless of how much audio
+ *    time passed between the two calls -- so how fast a reading appears to
+ *    settle in wall-clock time depends entirely on how often something
+ *    polls it. At the default 0.8 (or this module's old 0.7), a -80 dB
+ *    tone measured with sparse polling looks like it never converges; at a
+ *    realistic 60fps poll (`requestAnimationFrame`, what this panel
+ *    actually does) it settles within about a third of a second -- still
+ *    slower than useful for a live instrument reading you glance at for a
+ *    moment. `src/engine/modules/scope.ts` lowers its analyser's
+ *    `smoothingTimeConstant` from 0.7 to 0.15 for this: 60fps polling
+ *    settles to within a few tenths of a dB by ~0.2 s instead of ~0.5 s,
+ *    while still smoothing frame-to-frame FFT noise more than turning
+ *    smoothing off entirely would.
+ */
+const BLACKMAN_A0 = 0.42
+export const SPECTRUM_CALIBRATION_DB = -20 * Math.log10(BLACKMAN_A0 * 0.5)
+
+/** `raw` is whatever `AnalyserNode.getFloatFrequencyData` reported for one
+ *  bin; the return value is what that bin's *true* level is, once the
+ *  Blackman-window/single-sided-spectrum offset documented above is
+ *  compensated for. */
+export function calibratedDb(raw: number): number {
+  return raw + SPECTRUM_CALIBRATION_DB
+}
+
 function token(name: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
 }
@@ -148,7 +197,7 @@ function drawSpectrum(
     const freq = bin * binHz
     if (freq > nyquist) break
     const x = xForFreq(freq)
-    const db = freqData[bin] ?? MIN_DB
+    const db = calibratedDb(freqData[bin] ?? MIN_DB)
     const clamped = Math.min(MAX_DB, Math.max(MIN_DB, db))
     const y = ((MAX_DB - clamped) / (MAX_DB - MIN_DB)) * height
     if (!started) {

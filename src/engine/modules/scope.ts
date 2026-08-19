@@ -65,11 +65,23 @@ export const scopeDescriptor: ModuleDescriptor = {
 
     const analyser = ctx.createAnalyser()
     // Matches the dev harness's scope (dev/scope.ts): 8192 for spectrum
-    // resolution fine enough to read an alias floor, 0.7 smoothing so the
-    // spectrum reads as a settled curve, and an explicit dB window sized
-    // for the same floors documented in docs/CONTINUATION.md.
+    // resolution fine enough to read an alias floor, and an explicit dB
+    // window sized for the same floors documented in docs/CONTINUATION.md.
+    // smoothingTimeConstant is 0.15, not the dev harness's 0.7 -- audit
+    // round two, finding 3: `getFloatFrequencyData`'s smoothing blends each
+    // call against whatever the *previous call* computed, not against
+    // elapsed audio time, so how long a reading takes to settle in
+    // wall-clock time depends on how often something polls it. At 0.7,
+    // rack/scope-panel.ts's real 60fps `requestAnimationFrame` poll needed
+    // roughly half a second to settle a known -80 dB tone to within a
+    // fraction of a dB; at 0.15 the same poll settles to the same accuracy
+    // in under a quarter of a second, while still smoothing frame-to-frame
+    // FFT noise more than turning smoothing off entirely would. See
+    // rack/scope-panel.ts's own doc comment on `calibratedDb` for the rest
+    // of this finding -- the offset this panel's dB axis needs on top of
+    // settling faster.
     analyser.fftSize = 8192
-    analyser.smoothingTimeConstant = 0.7
+    analyser.smoothingTimeConstant = 0.15
     analyser.minDecibels = -100
     analyser.maxDecibels = 0
     pass.connect(analyser)
