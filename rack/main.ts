@@ -10,6 +10,7 @@ import { buildPalette } from './palette'
 import { CableLayer } from './cables'
 import { buildKeyboardPanel } from './keyboard-panel'
 import { buildSequencerPanel } from './sequencer-panel'
+import { buildScopePanel } from './scope-panel'
 import { enableReorder } from './reorder'
 import { downloadPatch, readPatchFile, saveAutosave, loadAutosave, debounce } from './patch-io'
 import { initThemeSwitcher } from './theme-switcher'
@@ -169,7 +170,7 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
     const descriptor = getModule(type)!
     return buildPanel(descriptor, id, graph, {
       jacks: cableLayer.jackRegistry,
-      customPanels: { keyboard: buildKeyboardPanel, sequencer: buildSequencerPanel },
+      customPanels: { keyboard: buildKeyboardPanel, sequencer: buildSequencerPanel, scope: buildScopePanel },
       onChange: scheduleAutosave,
       onRemove: removeModuleById,
     })

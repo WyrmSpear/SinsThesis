@@ -891,6 +891,38 @@ body {
   font-weight: 600;
 }
 
+/* ---- scope module's custom content ----
+ * One readout line plus one canvas, stacked -- see rack/scope-panel.ts's
+ * doc comment for the panel-height accounting this was measured against
+ * and for why waveform/spectrum share one canvas instead of two. The
+ * canvas itself paints with `getComputedStyle`-read theme tokens (a
+ * `<canvas>` has no CSS cascade of its own to hand it colors any other
+ * way); everything here is just the two DOM elements around it.
+ */
+.scope-panel-content { width: 100%; }
+
+.scope-readout {
+  font-size: var(--text-2xs);
+  color: var(--text-accent);
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 0.3rem;
+}
+
+.scope-display {
+  display: block;
+  width: 100%;
+  /* Fixed px, not `auto` -- the panel-height budget in
+   * rack/scope-panel.ts's doc comment is measured against this exact
+   * number. `width: 100%` still stretches the canvas to the panel's own
+   * (theme-independent) content width, so this is the same "fixed height,
+   * scaled width" contract `.slider-track` and the keyboard's `.piano`
+   * already use. */
+  height: 168px;
+  border: 1px solid var(--panel-border);
+  border-radius: 3px;
+  box-shadow: inset 0 1px 3px var(--shadow-inset);
+}
+
 /* ---- keyboard module's custom content ----
  * `width: 100%`, not a fixed px: the ancestor panel (rack/panel.ts) now
  * sets a hard `width` from `descriptor.hp * HP_PX` -- a fixed, non-themed

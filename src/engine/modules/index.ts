@@ -14,15 +14,18 @@ import { clockDescriptor } from './clock-module'
 import { sequencerDescriptor } from './sequencer'
 import { keyboardMidiDescriptor } from './keyboard-midi'
 import { outputDescriptor } from './output'
+import { scopeDescriptor } from './scope'
 
-/** The Phase 1 module set. The UI's palette reads this and may filter it,
- *  which is how a Phase 4 level grants four modules and withholds the rest. */
+/** The Phase 1 module set, plus Phase 2's scope. The UI's palette reads
+ *  this and may filter it, which is how a Phase 4 level grants four
+ *  modules and withholds the rest. */
 export const ALL_DESCRIPTORS = [
   vcoDescriptor, noiseDescriptor,
   vcfDescriptor, vcaDescriptor, wavefolderDescriptor,
   adsrDescriptor, lfoDescriptor, shDescriptor,
   mixerDescriptor, multipleDescriptor, delayDescriptor,
   clockDescriptor, sequencerDescriptor, keyboardMidiDescriptor, outputDescriptor,
+  scopeDescriptor,
 ]
 
 export function registerAllModules(): void {

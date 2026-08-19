@@ -1,6 +1,6 @@
 /**
  * Global module registry, validated at registration time rather than at use
- * time. Fifteen modules each define their descriptor once at startup; a typo
+ * time. Sixteen modules each define their descriptor once at startup; a typo
  * in a port id or a default outside its own range should fail loudly right
  * there, not silently corrupt a patch loaded three screens later.
  */

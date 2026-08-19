@@ -194,7 +194,8 @@ describe('theme geometry (Section 8)', () => {
       expect(await page.evaluate(() => document.documentElement.dataset['theme'])).toBe('reaktor-dark')
 
       // Add every module type through the palette so the assertions below
-      // cover all fifteen descriptors, not just the starter patch's seven.
+      // cover every registered descriptor, not just the starter patch's
+      // seven.
       const paletteTypes = await page.evaluate(() =>
         [...document.querySelectorAll('[data-testid^="palette-add-"]')].map((e) =>
           e.getAttribute('data-testid')!.replace('palette-add-', ''),
