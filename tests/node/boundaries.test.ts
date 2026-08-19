@@ -31,7 +31,12 @@ describe('engine boundaries', () => {
     // reason: it's test-only instrumentation (tests/browser/startup-thump.test.ts)
     // that copies its input block back to the main thread verbatim to
     // measure it there -- there is no signal processing to delegate to dsp/.
-    const DSP_FREE_WORKLETS = ['passthrough.worklet.ts', 'peak-tap.worklet.ts']
+    // recorder.worklet.ts is the same shape again, this time for production
+    // use: the studio layer's live recording tap (src/engine/recorder.ts)
+    // also just copies its input back to the main thread verbatim, batched,
+    // for `wav.ts` to encode later -- no signal processing happens on the
+    // audio thread here either.
+    const DSP_FREE_WORKLETS = ['passthrough.worklet.ts', 'peak-tap.worklet.ts', 'recorder.worklet.ts']
     for (const file of files.filter(
       (f) => f.endsWith('.worklet.ts') && !DSP_FREE_WORKLETS.some((name) => f.endsWith(name)),
     )) {

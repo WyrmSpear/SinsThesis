@@ -6,6 +6,7 @@ export const WORKLET_MODULES = [
   'wavefolder',
   'segment',
   'peak-tap',
+  'recorder',
 ] as const
 
 export const workletUrl = (name: string): string => `/worklets/${name}.js`
