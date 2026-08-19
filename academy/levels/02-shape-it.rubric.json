@@ -1,0 +1,14 @@
+{
+  "id": "02-shape-it",
+  "title": "Shape It",
+  "brief": "A filter carves the tone. Add a VCF (voltage-controlled filter) from the palette. Reroute the signal so it runs VCO → VCF → Output instead of straight through: unplug the VCO→Output cable (click it, then \"Remove cable\"), then patch the VCO's \"Out\" into the VCF's \"In\", and the VCF's \"Out\" into the Output's \"In\". Turn the VCF's Cut knob and listen to the tone brighten and darken.",
+  "grantedModules": ["vco", "vcf", "output"],
+  "startingPatchFrom": "01-first-sound",
+  "query": {
+    "hasModule": ["vco", "vcf", "output"],
+    "connected": [
+      ["vco-1", "out", "vcf-1", "in"],
+      ["vcf-1", "out", "output-1", "in"]
+    ]
+  }
+}

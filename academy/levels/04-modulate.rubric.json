@@ -1,0 +1,18 @@
+{
+  "id": "04-modulate",
+  "title": "Modulate the Filter",
+  "brief": "Modulation means using one signal to move another, automatically. Add an LFO (a low-frequency oscillator) from the palette and patch its \"Out\" jack into the VCF's \"CV\" jack — its cutoff-modulation input. Turn the LFO's Rate knob down slow. You should hear the filter's brightness wobble on its own, in time with the LFO, with no hands on the Cut knob.",
+  "grantedModules": ["vco", "vcf", "adsr", "vca", "keyboard", "lfo", "output"],
+  "startingPatchFrom": "03-play-notes",
+  "query": {
+    "hasModule": ["vco", "vcf", "adsr", "vca", "keyboard", "lfo", "output"],
+    "connected": [
+      ["keyboard-1", "pitch", "vco-1", "pitch"],
+      ["keyboard-1", "gate", "adsr-1", "gate"],
+      ["adsr-1", "out", "vca-1", "cv"],
+      ["vcf-1", "out", "vca-1", "in"],
+      ["vca-1", "out", "output-1", "in"],
+      ["lfo-1", "out", "vcf-1", "cutoffCv"]
+    ]
+  }
+}

@@ -3,6 +3,7 @@ import { registerAllModules } from '../src/engine/modules'
 import { getModule, listModules } from '../src/engine/registry'
 import { ensureWorklets } from '../src/engine/render'
 import { serializePatch, loadPatch, type PatchFile } from '../src/engine/patch'
+import { inspect, type InspectorResult } from '../src/engine/analysis/inspector'
 import type { OutputInstance } from '../src/engine/modules/output'
 import { buildPanel } from './panel'
 import { buildGhostPanel } from './ghost-panel'
@@ -14,6 +15,9 @@ import { buildScopePanel } from './scope-panel'
 import { enableReorder } from './reorder'
 import { downloadPatch, readPatchFile, saveAutosave, loadAutosave, debounce } from './patch-io'
 import { initThemeSwitcher } from './theme-switcher'
+import { LEVELS, getLevel } from '../academy/levels'
+import { loadProgress, markComplete, type AcademyProgress } from '../academy/progress'
+import { renderAcademyPanel } from './academy-panel'
 
 // Same guard as dev/main.ts, same reason: registerAllModules() throws on a
 // second call, and a fresh page load is the only case that should ever run
@@ -77,12 +81,15 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
 
   const rackEl = $('rack-modules')
   const paletteDrawer = $('palette-drawer')
+  const academyPanel = $('academy-panel')
   const statusBanner = $('status-banner')
   const patchNameInput = $<HTMLInputElement>('patch-name')
   const paletteToggle = $<HTMLButtonElement>('palette-toggle')
   const saveBtn = $<HTMLButtonElement>('save-patch')
   const loadBtn = $<HTMLButtonElement>('load-patch')
   const loadFileInput = $<HTMLInputElement>('load-file')
+  const modeFreeplayBtn = $<HTMLButtonElement>('mode-freeplay')
+  const modeAcademyBtn = $<HTMLButtonElement>('mode-academy')
 
   // ---- mutable rack state: reassigned wholesale on every patch load, per
   // src/engine/graph.ts's dispose() doc comment -- a live session swapping
@@ -93,6 +100,21 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
   let nextColumn = 0
   let currentPatchName = 'Untitled'
   const connectedOutputs = new Set<string>()
+
+  // ---- academy mode state. `mode` gates two things: which chrome is
+  // visible (`academyPanel` vs. the ordinary palette/toolbar), and whether
+  // `scheduleAutosave` is allowed to touch the free-play autosave slot --
+  // see its own comment below for why academy edits must never overwrite
+  // it. `freePlaySnapshot` is what makes leaving the academy restore
+  // free-play exactly as it was, per the task's "the academy is a mode,
+  // not a replacement": it is captured the moment the player *enters* the
+  // academy (mountGraph having last held the free-play patch) and
+  // reloaded the moment they leave. ----
+  let mode: 'freeplay' | 'academy' = 'freeplay'
+  let currentLevelId: string | undefined
+  let progress: AcademyProgress = loadProgress()
+  let lastCheck: InspectorResult | undefined
+  let freePlaySnapshot: PatchFile | undefined
 
   function showBanner(kind: 'warn' | 'error', message: string): void {
     statusBanner.hidden = false
@@ -106,12 +128,133 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
     statusBanner.textContent = ''
   }
 
+  // Academy edits must never land in the free-play autosave slot: they
+  // patch the *same* PatchGraph/CableLayer plumbing free play uses (no
+  // separate "academy graph" type exists), so every knob turn and cable
+  // drag fires the identical onChange -> scheduleAutosave hook regardless
+  // of mode. Without this guard, working through a single academy level
+  // would silently overwrite whatever the player had built in free play,
+  // and reloading the page afterward would hand them the level instead of
+  // their own patch -- exactly the "replacement, not a mode" failure the
+  // task warns against.
   function scheduleAutosave(): void {
+    if (mode === 'academy') return
     saveDebounced()
   }
   const saveDebounced = debounce(() => {
     saveAutosave(serializePatch(graph, { name: currentPatchName }))
   }, 400)
+
+  /** Rebuilds the palette drawer, optionally restricted to `allowedTypes`
+   *  -- the mechanism Section 12's "a level can grant four modules and
+   *  withhold the rest" describes. Free play calls this with no argument
+   *  (every registered module); entering an academy level calls it with
+   *  that level's `grantedModules`. */
+  function refreshPalette(allowedTypes?: readonly string[]): void {
+    paletteDrawer.innerHTML = ''
+    const descriptors = allowedTypes
+      ? listModules().filter((d) => allowedTypes.includes(d.type))
+      : listModules()
+    paletteDrawer.append(buildPalette(descriptors, { onAdd: addModuleFromPalette }))
+  }
+
+  /** The visible trace of a failed Check (Section 4: "the player must be
+   *  able to see *why*"). `inspect`'s sentences name a module id followed
+   *  by `.port`/`.param` (`"vco-1.out is not patched to vcf-1.in"`) or
+   *  `"<id> has no param ..."` -- both forms always put the id immediately
+   *  before one of those two substrings, so matching against the live
+   *  graph's own module ids (never re-deriving pass/fail -- that stays
+   *  `inspect`'s job entirely) is enough to find which panels a failure is
+   *  actually about, with no new grading logic. */
+  function highlightFailures(failures: readonly string[]): void {
+    clearHighlights()
+    for (const id of graph.moduleIds) {
+      const mentioned = failures.some((f) => f.includes(`${id}.`) || f.includes(`${id} has no param`))
+      if (mentioned) rackEl.querySelector(`[data-module="${CSS.escape(id)}"]`)?.classList.add('module-panel-flag-miss')
+    }
+  }
+
+  function clearHighlights(): void {
+    for (const el of rackEl.querySelectorAll('.module-panel-flag-miss')) el.classList.remove('module-panel-flag-miss')
+  }
+
+  function renderAcademy(): void {
+    renderAcademyPanel(
+      academyPanel,
+      LEVELS,
+      { currentLevelId, progress, lastCheck },
+      { onSelectLevel: enterLevel, onCheck: checkLevel },
+    )
+  }
+
+  /** Loads a level's starting patch into the live rack and filters the
+   *  palette to what it grants -- the two things Section 3 says "entering
+   *  a level" does. Reuses `mountGraph`/`loadPatch` exactly as an explicit
+   *  Load does, so a level's `.sinp` is loaded through the same one path
+   *  every other patch in this app is. */
+  function enterLevel(id: string): void {
+    const level = getLevel(id)
+    if (!level) return
+    currentLevelId = id
+    lastCheck = undefined
+    const { graph: loaded } = loadPatch(ctx, level.startingPatch)
+    mountGraph(loaded)
+    currentPatchName = level.title
+    patchNameInput.value = currentPatchName
+    refreshPalette(level.grantedModules)
+    renderAcademy()
+  }
+
+  /** The Check button: grades the live graph with the level's own
+   *  `InspectorQuery` and nothing else (Section: "Use inspect rather than
+   *  writing new grading logic"). A pass persists progress and unlocks the
+   *  next level; a fail highlights the panels its sentences named and
+   *  leaves the graph untouched, so the player can keep working on the
+   *  same patch. */
+  function checkLevel(): void {
+    if (!currentLevelId) return
+    const level = getLevel(currentLevelId)
+    if (!level) return
+    const result = inspect(graph, level.query)
+    lastCheck = result
+    if (result.pass) {
+      progress = markComplete(level.id)
+      clearHighlights()
+    } else {
+      highlightFailures(result.failures)
+    }
+    renderAcademy()
+  }
+
+  function showAcademy(): void {
+    if (mode !== 'academy') freePlaySnapshot = serializePatch(graph, { name: currentPatchName })
+    mode = 'academy'
+    modeAcademyBtn.classList.add('mode-toggle-btn-active')
+    modeFreeplayBtn.classList.remove('mode-toggle-btn-active')
+    academyPanel.hidden = false
+    paletteDrawer.hidden = true
+    if (currentLevelId === undefined && LEVELS[0]) {
+      enterLevel(LEVELS[0].id) // also refreshes the palette and renders
+    } else {
+      refreshPalette(currentLevelId ? getLevel(currentLevelId)?.grantedModules : undefined)
+      renderAcademy()
+    }
+  }
+
+  function showFreePlay(): void {
+    mode = 'freeplay'
+    modeFreeplayBtn.classList.add('mode-toggle-btn-active')
+    modeAcademyBtn.classList.remove('mode-toggle-btn-active')
+    academyPanel.hidden = true
+    clearHighlights()
+    refreshPalette()
+    if (freePlaySnapshot) {
+      const { graph: restored } = loadPatch(ctx, freePlaySnapshot)
+      mountGraph(restored)
+      currentPatchName = freePlaySnapshot.meta.name
+      patchNameInput.value = currentPatchName
+    }
+  }
 
   // Drag-to-reorder, wired once at boot rather than per-mount: it is
   // delegated (one `pointerdown` listener on `rackEl` itself, matched
@@ -279,11 +422,14 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
   // ---- toolbar wiring: independent of which graph happens to be mounted,
   // since every handler reads the outer `graph`/`cableLayer`/
   // `currentPatchName` bindings fresh on each call. ----
-  const palette = buildPalette(listModules(), { onAdd: addModuleFromPalette })
-  paletteDrawer.append(palette)
+  refreshPalette()
   paletteToggle.addEventListener('click', () => {
     paletteDrawer.hidden = !paletteDrawer.hidden
   })
+
+  modeFreeplayBtn.classList.add('mode-toggle-btn-active')
+  modeFreeplayBtn.addEventListener('click', showFreePlay)
+  modeAcademyBtn.addEventListener('click', showAcademy)
 
   saveBtn.addEventListener('click', () => {
     currentPatchName = patchNameInput.value.trim() || 'Untitled'

@@ -1,0 +1,17 @@
+{
+  "id": "03-play-notes",
+  "title": "Play Notes",
+  "brief": "Right now the tone drones forever — nothing is triggering notes. Add a Keyboard, an ADSR envelope, and a VCA (voltage-controlled amplifier). Patch: Keyboard \"Pitch\" → VCO's \"1V/Oct\" (so keys change pitch), Keyboard \"Gate\" → ADSR's \"Gate\" (so keys trigger the envelope), ADSR \"Out\" → VCA's \"CV\" (so the envelope shapes volume), and route the audio through the VCA: VCF \"Out\" → VCA's \"In\", VCA \"Out\" → Output's \"In\". Press and hold a computer key (A, S, D…) and you should hear a note fade in and out, instead of a constant drone.",
+  "grantedModules": ["vco", "vcf", "adsr", "vca", "keyboard", "output"],
+  "startingPatchFrom": "02-shape-it",
+  "query": {
+    "hasModule": ["vco", "vcf", "adsr", "vca", "keyboard", "output"],
+    "connected": [
+      ["keyboard-1", "pitch", "vco-1", "pitch"],
+      ["keyboard-1", "gate", "adsr-1", "gate"],
+      ["adsr-1", "out", "vca-1", "cv"],
+      ["vcf-1", "out", "vca-1", "in"],
+      ["vca-1", "out", "output-1", "in"]
+    ]
+  }
+}

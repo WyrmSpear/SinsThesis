@@ -146,6 +146,35 @@ body {
   color: var(--knob-indicator);
 }
 
+/* ---- free play / academy mode toggle ---- */
+.mode-toggle {
+  display: flex;
+  border: 1px solid var(--panel-border-strong);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.mode-toggle-btn {
+  font-family: inherit;
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  padding: 0.45rem 0.8rem;
+  background: var(--surface-panel);
+  color: var(--text-dim);
+  border: none;
+  cursor: pointer;
+}
+
+.mode-toggle-btn + .mode-toggle-btn { border-left: 1px solid var(--panel-border-strong); }
+
+.mode-toggle-btn:hover { color: var(--knob-indicator); }
+
+.mode-toggle-btn-active {
+  background: var(--surface-recess);
+  color: var(--knob-indicator);
+}
+
 .patch-name-input {
   font-family: inherit;
   font-size: var(--text-sm);
@@ -1117,4 +1146,158 @@ body {
 
 .cable-inspector-remove:hover {
   border-color: var(--text-warn);
+}
+
+/* ---- academy panel: level list, brief, check button, feedback ----
+ * `rack/academy-panel.ts` is the sole builder of this markup; every color
+ * below is an existing theme token (Section 8: no literal color outside a
+ * theme file), reused rather than growing new academy-only tokens --
+ * `--lamp-on`/`--lamp-on-glow` already mean "good" everywhere else in the
+ * rack (the power lamp, module-active indicators), and `--text-warn`/
+ * `--lamp-warn` already mean "needs attention" (the status banner, ghost
+ * panels), so a pass and a miss read consistently with the rest of the
+ * instrument instead of inventing a parallel vocabulary. */
+.academy-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  margin-bottom: 0.9rem;
+  padding: 0.9rem 1rem;
+  background: var(--surface-panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+}
+
+.academy-level-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.academy-level-entry {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: inherit;
+  font-size: var(--text-xs);
+  padding: 0.35rem 0.6rem;
+  background: var(--surface-recess);
+  color: var(--text-primary);
+  border: 1px solid var(--panel-border);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.academy-level-entry:hover:not(:disabled) {
+  border-color: var(--knob-indicator);
+  color: var(--knob-indicator);
+}
+
+.academy-level-entry:disabled {
+  cursor: default;
+  color: var(--text-faint);
+}
+
+.academy-level-badge {
+  font-size: var(--text-2xs);
+  color: var(--text-dim);
+  min-width: 1.2em;
+  text-align: center;
+}
+
+.academy-level-current {
+  border-color: var(--knob-indicator);
+  color: var(--knob-indicator);
+}
+
+.academy-level-complete .academy-level-badge { color: var(--lamp-on); }
+
+.academy-level-locked { opacity: 0.55; }
+
+.academy-empty-note {
+  font-size: var(--text-sm);
+  color: var(--text-dim);
+  margin: 0;
+}
+
+.academy-brief {
+  padding: 0.7rem 0.9rem;
+  background: var(--surface-recess);
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+}
+
+.academy-brief-title {
+  margin: 0 0 0.35rem;
+  font-size: var(--text-md);
+  letter-spacing: var(--tracking-title);
+  color: var(--text-accent);
+}
+
+.academy-brief-body {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--text-primary);
+  max-width: 70ch;
+}
+
+.academy-check-btn {
+  align-self: flex-start;
+  font-family: inherit;
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  padding: 0.5rem 1rem;
+  background: var(--knob-indicator);
+  color: var(--surface-recess);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.academy-check-btn:hover { filter: brightness(1.1); }
+
+.academy-feedback {
+  padding: 0.7rem 0.9rem;
+  border-radius: 4px;
+  font-size: var(--text-sm);
+  border: 1px solid var(--panel-border);
+}
+
+.academy-feedback-pass {
+  border-color: var(--lamp-on);
+  color: var(--lamp-on);
+  background: var(--surface-recess);
+}
+
+.academy-feedback-fail {
+  border-color: var(--lamp-warn);
+  background: var(--surface-recess);
+}
+
+.academy-feedback-heading {
+  margin: 0 0 0.4rem;
+  color: var(--lamp-warn);
+}
+
+.academy-feedback-list {
+  margin: 0;
+  padding-left: 1.2rem;
+  color: var(--text-primary);
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+/* A module a failed Check's own sentence named -- see
+ * `highlightFailures` in rack/main.ts. Reuses the same warn tokens as the
+ * status banner and ghost panels rather than a new color, and the glow
+ * comes from each theme's own `--lamp-warn-glow`, so the flash reads
+ * correctly against all eight skins the same way the delayed-cable glow
+ * (`.cable-delayed`) already does. */
+.module-panel-flag-miss {
+  border-color: var(--lamp-warn) !important;
+  box-shadow: 0 0 0 2px var(--lamp-warn-glow);
 }

@@ -1,0 +1,10 @@
+{
+  "id": "01-first-sound",
+  "title": "First Sound",
+  "brief": "Every patch starts with a source and a destination. From the palette, add a VCO (the oscillator — it makes the raw tone) and an Output module. Then drag a cable from the VCO's \"Out\" jack to the Output's \"In\" jack. The moment that cable connects, you should hear a steady tone.",
+  "grantedModules": ["vco", "output"],
+  "query": {
+    "hasModule": ["vco", "output"],
+    "connected": [["vco-1", "out", "output-1", "in"]]
+  }
+}

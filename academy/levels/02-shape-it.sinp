@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "meta": { "name": "Level 2 — Shape It (solution)", "created": "2026-08-18T00:00:00.000Z", "author": "academy" },
+  "modules": [
+    { "id": "vco-1", "type": "vco", "slot": [0, 0], "params": {} },
+    { "id": "vcf-1", "type": "vcf", "slot": [0, 1], "params": {} },
+    { "id": "output-1", "type": "output", "slot": [0, 2], "params": {} }
+  ],
+  "cables": [
+    { "from": ["vco-1", "out"], "to": ["vcf-1", "in"] },
+    { "from": ["vcf-1", "out"], "to": ["output-1", "in"] }
+  ]
+}

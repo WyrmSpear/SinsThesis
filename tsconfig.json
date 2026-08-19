@@ -7,7 +7,8 @@
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "noEmit": true,
+    "resolveJsonModule": true,
     "types": ["vitest/globals", "node"]
   },
-  "include": ["src", "tests", "dev", "rack", "vitest.config.ts"]
+  "include": ["src", "tests", "dev", "rack", "academy", "vitest.config.ts"]
 }

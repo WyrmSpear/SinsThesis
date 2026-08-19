@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "meta": { "name": "Level 5 — Resonance (solution)", "created": "2026-08-18T00:00:00.000Z", "author": "academy" },
+  "modules": [
+    { "id": "keyboard-1", "type": "keyboard", "slot": [0, 0], "params": {} },
+    { "id": "vco-1", "type": "vco", "slot": [0, 1], "params": {} },
+    { "id": "vcf-1", "type": "vcf", "slot": [0, 2], "params": { "resonance": 0.95 } },
+    { "id": "adsr-1", "type": "adsr", "slot": [0, 3], "params": {} },
+    { "id": "vca-1", "type": "vca", "slot": [0, 4], "params": { "level": 0, "cvAmount": 1 } },
+    { "id": "lfo-1", "type": "lfo", "slot": [0, 5], "params": { "rate": 3 } },
+    { "id": "output-1", "type": "output", "slot": [0, 6], "params": {} }
+  ],
+  "cables": [
+    { "from": ["keyboard-1", "pitch"], "to": ["vco-1", "pitch"] },
+    { "from": ["keyboard-1", "gate"], "to": ["adsr-1", "gate"] },
+    { "from": ["adsr-1", "out"], "to": ["vca-1", "cv"] },
+    { "from": ["vco-1", "out"], "to": ["vcf-1", "in"] },
+    { "from": ["vcf-1", "out"], "to": ["vca-1", "in"] },
+    { "from": ["vca-1", "out"], "to": ["output-1", "in"] },
+    { "from": ["lfo-1", "out"], "to": ["vcf-1", "cutoffCv"] }
+  ]
+}
