@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "meta": { "name": "Level 8 — Match: Resonant Sweep (target)", "created": "2026-08-19T00:00:00.000Z", "author": "academy" },
+  "modules": [
+    { "id": "vco-1", "type": "vco", "slot": [0, 0], "params": {} },
+    { "id": "vcf-1", "type": "vcf", "slot": [0, 1], "params": { "cutoff": 1500, "resonance": 0.85, "cutoffCvAmount": 4 } },
+    { "id": "lfo-1", "type": "lfo", "slot": [0, 2], "params": { "rate": 0.5, "shape": 3, "depth": 1 } },
+    { "id": "output-1", "type": "output", "slot": [0, 3], "params": {} }
+  ],
+  "cables": [
+    { "from": ["vco-1", "out"], "to": ["vcf-1", "in"] },
+    { "from": ["vcf-1", "out"], "to": ["output-1", "in"] },
+    { "from": ["lfo-1", "out"], "to": ["vcf-1", "cutoffCv"] }
+  ]
+}

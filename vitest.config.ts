@@ -29,6 +29,7 @@ export default defineConfig({
             'tests/browser/rack-sequencer.test.ts',
             'tests/browser/rack-scope.test.ts',
             'tests/browser/rack-academy.test.ts',
+            'tests/browser/rack-match-sound.test.ts',
           ],
           browser: {
             enabled: true,
@@ -50,6 +51,7 @@ export default defineConfig({
             'tests/browser/rack-sequencer.test.ts',
             'tests/browser/rack-scope.test.ts',
             'tests/browser/rack-academy.test.ts',
+            'tests/browser/rack-match-sound.test.ts',
           ],
           // Boots a Vite dev server and a Chromium instance; slower than
           // the unit-style browser tests above.

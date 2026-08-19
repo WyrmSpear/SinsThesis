@@ -53,8 +53,36 @@ export function spectralCentroid(samples: Float32Array, sampleRate: number): num
   return total === 0 ? 0 : weighted / total
 }
 
-const EPS = 1e-12
-const db = (x: number) => 20 * Math.log10(Math.max(x, EPS))
+export const EPS = 1e-12
+export const db = (x: number) => 20 * Math.log10(Math.max(x, EPS))
+
+/** A least-squares fit of dB against log2(Hz) over every bin in `[fromHz,
+ *  toHz]`, shared by `slopeDbPerOctave` (wants just the slope) and
+ *  `spectralPeakinessDb` (wants the residual of each bin above the line). */
+function fitLogLogDb(
+  mags: Float32Array, size: number, sampleRate: number, fromHz: number, toHz: number,
+): { slope: number; intercept: number; points: { hz: number; db: number }[] } {
+  const points: { hz: number; db: number }[] = []
+  for (let i = 1; i < mags.length; i++) {
+    const hz = binToHz(i, sampleRate, size)
+    if (hz < fromHz || hz > toHz) continue
+    points.push({ hz, db: db(mags[i]!) })
+  }
+  if (points.length < 2) throw new Error('fitLogLogDb: band too narrow to fit')
+
+  const n = points.length
+  const meanX = points.reduce((a, p) => a + Math.log2(p.hz), 0) / n
+  const meanY = points.reduce((a, p) => a + p.db, 0) / n
+  let num = 0
+  let den = 0
+  for (const p of points) {
+    const x = Math.log2(p.hz)
+    num += (x - meanX) * (p.db - meanY)
+    den += (x - meanX) ** 2
+  }
+  const slope = num / den
+  return { slope, intercept: meanY - slope * meanX, points }
+}
 
 /**
  * Least-squares slope of the spectrum in dB against log2(Hz), measured between
@@ -70,26 +98,36 @@ export function slopeDbPerOctave(
   samples: Float32Array, sampleRate: number, fromHz: number, toHz: number,
 ): number {
   const { mags, size } = spectrumOf(samples)
-  const xs: number[] = []
-  const ys: number[] = []
-  for (let i = 1; i < mags.length; i++) {
-    const hz = binToHz(i, sampleRate, size)
-    if (hz < fromHz || hz > toHz) continue
-    xs.push(Math.log2(hz))
-    ys.push(db(mags[i]!))
-  }
-  if (xs.length < 2) throw new Error('slopeDbPerOctave: band too narrow to fit')
+  return fitLogLogDb(mags, size, sampleRate, fromHz, toHz).slope
+}
 
-  const n = xs.length
-  const meanX = xs.reduce((a, b) => a + b, 0) / n
-  const meanY = ys.reduce((a, b) => a + b, 0) / n
-  let num = 0
-  let den = 0
-  for (let i = 0; i < n; i++) {
-    num += (xs[i]! - meanX) * (ys[i]! - meanY)
-    den += (xs[i]! - meanX) ** 2
+/**
+ * How far the loudest bin in `[fromHz, toHz]` sticks up above the band's own
+ * least-squares rolloff trend, in dB -- added for the academy's
+ * match-this-sound grading mode (`engine/analysis/compare.ts`), which needs
+ * a "how resonant does this sound" number that works whether the peak sits at
+ * a fixed cutoff or is being swept by an LFO (see the resonant-sweep level).
+ *
+ * A plain lowpass rolloff tracks its own trend line closely -- low
+ * peakiness, close to 0 dB, regardless of how steep the rolloff itself is.
+ * A resonant peak sticks up out of that same trend by however many dB the
+ * resonance boosts it, which is exactly the "zing" a player hears and a raw
+ * magnitude reading (dominated by cutoff frequency and drive, not
+ * resonance) would miss. Blackman-Harris, like `aliasFloorDb`: this is a
+ * floor-relative measurement and Hann's -31.5 dB first sidelobe would put
+ * a floor under it (see fft.ts's `FftWindow` doc comment).
+ */
+export function spectralPeakinessDb(
+  samples: Float32Array, sampleRate: number, fromHz: number, toHz: number,
+): number {
+  const { mags, size } = spectrumOf(samples, 'blackman-harris')
+  const fit = fitLogLogDb(mags, size, sampleRate, fromHz, toHz)
+  let maxResidual = -Infinity
+  for (const p of fit.points) {
+    const predicted = fit.intercept + fit.slope * Math.log2(p.hz)
+    maxResidual = Math.max(maxResidual, p.db - predicted)
   }
-  return num / den
+  return maxResidual
 }
 
 /**

@@ -1,0 +1,12 @@
+{
+  "id": "06-match-pluck",
+  "title": "Match: Bright Pluck",
+  "brief": "Match this sound: a short, bright pluck. Press \"Play target\" to hear it as many times as you like — comparing from memory is a different skill than the one this teaches. Build VCO → VCF → VCA → Output, then patch the ADSR's \"Out\" into the VCA's \"CV\" jack so the envelope gates the sound. A quick Attack and a short Decay make the pluck snap in and fall away; the VCF's Cut knob controls how bright it is. Press Check when you think you're close — the feedback will name whichever is off: brightness, or timing.",
+  "grantedModules": ["vco", "vcf", "adsr", "vca", "output"],
+  "mode": "match",
+  "match": {
+    "seconds": 1.0,
+    "gate": { "onAt": 0, "offAt": 0.45 },
+    "passThreshold": 0.35
+  }
+}

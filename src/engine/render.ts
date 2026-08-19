@@ -1,5 +1,6 @@
 import { PatchGraph } from './graph'
 import { WORKLET_MODULES, workletUrl } from './worklets/registry'
+import { loadPatch, type PatchFile } from './patch'
 
 const loading = new WeakMap<BaseAudioContext, Promise<void>>()
 
@@ -52,6 +53,62 @@ export async function renderGraph(
   if (!instance) throw new Error(`renderGraph: no module "${outputId}"`)
   const out = instance.outputs.get(portId)
   if (!out) throw new Error(`renderGraph: module "${outputId}" has no "${portId}" port`)
+  out.connect(ctx.destination)
+
+  const buffer = await ctx.startRendering()
+  return buffer.getChannelData(0)
+}
+
+/**
+ * Render a full saved patch offline -- the academy's match-this-sound mode
+ * uses this for both sides of a Check: the level's own target `.sinp` and
+ * whatever the player currently has built, through the *identical*
+ * procedure, so a measured difference reflects a real difference in what
+ * was patched rather than one side being triggered a few milliseconds
+ * earlier than the other, held longer, or rendered at a different sample
+ * rate. `renderGraph` above stays the lower-level primitive this is built
+ * on (a caller assembling a graph by hand, as every other module's test
+ * suite does); this is the one two `PatchFile`s -- both untrusted, since a
+ * player's live patch is one of them -- need to render the same way.
+ *
+ * `opts.gate`, if given, connects a synthetic `ConstantSourceNode` directly
+ * into the `gate` input of *every* `adsr` module the patch contains
+ * (existential by type, the same "any module of this type" resolution
+ * `inspector.ts`'s `ModuleRef` uses, so it doesn't care which id the
+ * palette happened to assign). Match-this-sound levels grant no keyboard --
+ * there is nothing else that would ever gate an ADSR in one of them -- so
+ * this is how a "bright pluck" level's envelope actually gets triggered,
+ * identically, on both the target render and every attempt a player makes.
+ */
+export async function renderPatch(
+  patch: PatchFile,
+  seconds: number,
+  opts: { sampleRate?: number; gate?: { onAt: number; offAt?: number } } = {},
+): Promise<Float32Array> {
+  const sampleRate = opts.sampleRate ?? 48000
+  const ctx = new OfflineAudioContext(1, Math.ceil(seconds * sampleRate), sampleRate)
+  await ensureWorklets(ctx)
+
+  const { graph } = loadPatch(ctx, patch)
+
+  if (opts.gate) {
+    const gate = opts.gate
+    for (const id of graph.moduleIds) {
+      if (graph.getType(id) !== 'adsr') continue
+      const input = graph.getInstance(id)?.inputs.get('gate')
+      if (!(input instanceof AudioNode)) continue
+      const source = ctx.createConstantSource()
+      source.offset.setValueAtTime(1, gate.onAt)
+      if (gate.offAt !== undefined) source.offset.setValueAtTime(0, gate.offAt)
+      source.start(0)
+      source.connect(input)
+    }
+  }
+
+  const outputId = graph.moduleIds.find((id) => graph.getType(id) === 'output')
+  if (!outputId) throw new Error('renderPatch: patch has no output module')
+  const out = graph.getInstance(outputId)?.outputs.get('out')
+  if (!out) throw new Error('renderPatch: output module has no "out" port')
   out.connect(ctx.destination)
 
   const buffer = await ctx.startRendering()

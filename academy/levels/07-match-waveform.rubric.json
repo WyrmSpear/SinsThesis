@@ -1,0 +1,11 @@
+{
+  "id": "07-match-waveform",
+  "title": "Match: Hollow Pulse",
+  "brief": "Match this sound: a narrow, buzzy pulse, held steady. Press \"Play target\" to hear it. Build a VCO straight into the Output — no filter this time, so the only thing that can be wrong is the waveform itself. Try the Shape knob's four positions first and find Pulse; then turn the Width knob well away from its centered default, toward one edge — the narrower the pulse gets, the more of its harmonic series drops out, and the more hollow and buzzy it sounds next to a full sawtooth.",
+  "grantedModules": ["vco", "output"],
+  "mode": "match",
+  "match": {
+    "seconds": 1.0,
+    "passThreshold": 0.35
+  }
+}

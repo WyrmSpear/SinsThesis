@@ -1,9 +1,10 @@
 import { PatchGraph } from '../src/engine/graph'
 import { registerAllModules } from '../src/engine/modules'
 import { getModule, listModules } from '../src/engine/registry'
-import { ensureWorklets } from '../src/engine/render'
+import { ensureWorklets, renderPatch } from '../src/engine/render'
 import { serializePatch, loadPatch, type PatchFile } from '../src/engine/patch'
 import { inspect, type InspectorFailure, type InspectorResult } from '../src/engine/analysis/inspector'
+import { compareSounds } from '../src/engine/analysis/compare'
 import type { OutputInstance } from '../src/engine/modules/output'
 import { buildPanel } from './panel'
 import { buildGhostPanel } from './ghost-panel'
@@ -15,10 +16,17 @@ import { buildScopePanel } from './scope-panel'
 import { enableReorder } from './reorder'
 import { downloadPatch, readPatchFile, saveAutosave, loadAutosave, debounce } from './patch-io'
 import { initThemeSwitcher } from './theme-switcher'
-import { LEVELS, getLevel } from '../academy/levels'
+import { LEVELS, getLevel, type Level } from '../academy/levels'
 import { loadProgress, markComplete, type AcademyProgress } from '../academy/progress'
-import { renderAcademyPanel } from './academy-panel'
+import { renderAcademyPanel, type MatchCheckState } from './academy-panel'
 import { describeFailures } from '../academy/feedback'
+import { describeSoundDifference } from '../academy/sound-feedback'
+
+/** Every match-this-sound render, target and player alike, uses this rate
+ *  -- fixed rather than inherited from the live `AudioContext` (which
+ *  varies by OS/device default) so a target rendered once is directly
+ *  comparable to every player render for the rest of the session. */
+const MATCH_SAMPLE_RATE = 48000
 
 // Same guard as dev/main.ts, same reason: registerAllModules() throws on a
 // second call, and a fresh page load is the only case that should ever run
@@ -117,6 +125,19 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
   let lastCheck: InspectorResult | undefined
   let freePlaySnapshot: PatchFile | undefined
 
+  // ---- match-this-sound state: a level's target is rendered offline
+  // (never stored at author time -- see academy/levels.ts's own header
+  // comment for why) the first time it's needed and cached here per level
+  // id for the rest of the session, since this build's DSP cannot change
+  // out from under a single running page. `checking` covers both "Play
+  // target" and "Check my patch", either of which is a real (if short)
+  // OfflineAudioContext render -- unlike build-this-patch's synchronous
+  // inspect(), so the panel disables its buttons and says so rather than
+  // letting a second click race the first. ----
+  const targetBufferCache = new Map<string, Float32Array>()
+  let checking = false
+  let lastMatch: MatchCheckState | undefined
+
   function showBanner(kind: 'warn' | 'error', message: string): void {
     statusBanner.hidden = false
     statusBanner.textContent = message
@@ -191,8 +212,10 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
         progress,
         lastCheck,
         feedback: lastCheck && !lastCheck.pass ? describeFailures(lastCheck, graph) : [],
+        busy: checking,
+        lastMatch,
       },
-      { onSelectLevel: enterLevel, onCheck: checkLevel },
+      { onSelectLevel: enterLevel, onCheck: checkLevel, onPlayTarget: playTarget },
     )
   }
 
@@ -206,6 +229,7 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
     if (!level) return
     currentLevelId = id
     lastCheck = undefined
+    lastMatch = undefined
     const { graph: loaded } = loadPatch(ctx, level.startingPatch)
     mountGraph(loaded)
     currentPatchName = level.title
@@ -214,17 +238,92 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
     renderAcademy()
   }
 
-  /** The Check button: grades the live graph with the level's own
-   *  `InspectorQuery` and nothing else (Section: "Use inspect rather than
-   *  writing new grading logic"). A pass persists progress and unlocks the
-   *  next level; a fail highlights the panels its failures named and
-   *  leaves the graph untouched, so the player can keep working on the
-   *  same patch. */
+  /** Renders a match-this-sound level's target sound once and caches it
+   *  for the rest of the session (see the `targetBufferCache` comment
+   *  above): the `.sinp` under `level.solution` *is* the target here, not
+   *  a model solution to compare wiring against. */
+  async function getTargetBuffer(level: Level): Promise<Float32Array> {
+    const cached = targetBufferCache.get(level.id)
+    if (cached) return cached
+    const buffer = await renderPatch(level.solution, level.match!.seconds, {
+      sampleRate: MATCH_SAMPLE_RATE,
+      gate: level.match!.gate,
+    })
+    targetBufferCache.set(level.id, buffer)
+    return buffer
+  }
+
+  /** "Play target sound": Section 3's "hear the target on demand, as many
+   *  times as you want" -- plays straight through the live `ctx`, no
+   *  grading involved. Only the render (cached after the first call) takes
+   *  real time; scheduling playback is instant. */
+  function playTarget(): void {
+    if (checking || !currentLevelId) return
+    const level = getLevel(currentLevelId)
+    if (!level || level.mode !== 'match') return
+    checking = true
+    renderAcademy()
+    void getTargetBuffer(level)
+      .then((buffer) => {
+        const audioBuffer = ctx.createBuffer(1, buffer.length, MATCH_SAMPLE_RATE)
+        // A fresh, plain-ArrayBuffer-backed copy: `renderPatch`'s Float32Array
+        // is typed against the more general `ArrayBufferLike`, which
+        // `copyToChannel` (correctly) won't accept a `SharedArrayBuffer`-backed
+        // view as -- copying (not just casting) also means the render buffer
+        // in `targetBufferCache` is never handed to WebAudio for it to retain
+        // a reference into.
+        audioBuffer.copyToChannel(new Float32Array(buffer), 0)
+        const source = ctx.createBufferSource()
+        source.buffer = audioBuffer
+        source.connect(ctx.destination)
+        source.start()
+      })
+      .finally(() => {
+        checking = false
+        renderAcademy()
+      })
+  }
+
+  /** The Check button. Build-this-patch levels grade the live graph with
+   *  the level's own `InspectorQuery` (Section: "Use inspect rather than
+   *  writing new grading logic") -- synchronous, unchanged. Match-this-sound
+   *  levels render the player's *current* patch offline through the same
+   *  `renderPatch` procedure as the target (same duration, same gate
+   *  schedule) and grade the pair with `compareSounds`. Either way, a pass
+   *  persists progress; a fail leaves the graph untouched so the player
+   *  keeps working on the same patch. */
   function checkLevel(): void {
-    if (!currentLevelId) return
+    if (checking || !currentLevelId) return
     const level = getLevel(currentLevelId)
     if (!level) return
-    const result = inspect(graph, level.query)
+
+    if (level.mode === 'match') {
+      checking = true
+      renderAcademy()
+      const playerPatch = serializePatch(graph, { name: currentPatchName })
+      void Promise.all([
+        getTargetBuffer(level),
+        renderPatch(playerPatch, level.match!.seconds, { sampleRate: MATCH_SAMPLE_RATE, gate: level.match!.gate }),
+      ])
+        .then(([target, player]) => {
+          const comparison = compareSounds(target, player, MATCH_SAMPLE_RATE, level.match!.passThreshold)
+          lastMatch = {
+            comparison,
+            target,
+            player,
+            sampleRate: MATCH_SAMPLE_RATE,
+            feedback: describeSoundDifference(comparison, { hasFilter: level.grantedModules.includes('vcf') }),
+          }
+          if (comparison.pass) progress = markComplete(level.id)
+        })
+        .finally(() => {
+          checking = false
+          renderAcademy()
+        })
+      return
+    }
+
+    const result = inspect(graph, level.query!)
     lastCheck = result
     if (result.pass) {
       progress = markComplete(level.id)

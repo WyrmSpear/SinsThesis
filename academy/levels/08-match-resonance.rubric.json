@@ -1,0 +1,11 @@
+{
+  "id": "08-match-resonance",
+  "title": "Match: Resonant Sweep",
+  "brief": "Match this sound: a filter sweeping back and forth with a strong resonant edge. Press \"Play target\" to hear it. Build VCO → VCF → Output, patch an LFO into the VCF's \"CV\" jack, and turn the VCF's \"Amt\" knob up — with Amt at zero the LFO reaches the filter but has nothing to move. Then push Resonance up until the sweep starts to sing rather than just brighten and darken.",
+  "grantedModules": ["vco", "vcf", "lfo", "output"],
+  "mode": "match",
+  "match": {
+    "seconds": 2.0,
+    "passThreshold": 0.08
+  }
+}

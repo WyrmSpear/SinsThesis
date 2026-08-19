@@ -2,6 +2,8 @@ import type { Level } from '../academy/levels'
 import type { AcademyProgress } from '../academy/progress'
 import { isUnlocked } from '../academy/progress'
 import type { InspectorResult } from '../src/engine/analysis/inspector'
+import type { SoundComparison } from '../src/engine/analysis/compare'
+import { renderMatchOverlay } from './match-sound-panel'
 
 /**
  * The academy's own panel: a level list, the current level's brief, a
@@ -21,7 +23,26 @@ import type { InspectorResult } from '../src/engine/analysis/inspector'
  * for the test suite). This file still never rewrites or summarizes
  * anything itself; it only lays out whatever `feedback` the caller hands
  * it.
+ *
+ * Match-this-sound levels (`level.mode === 'match'`) grade sound instead
+ * of topology, and "show the miss" means something more literal there: a
+ * spectrum and an envelope, the player's overlaid on the target's, built
+ * by `rack/match-sound-panel.ts`'s `renderMatchOverlay` from the same
+ * `SoundComparison` the pass/fail line and the ranked feedback sentences
+ * (`academy/sound-feedback.ts`) already came from -- one Check produces
+ * one comparison, and everything on screen after it is a view of that one
+ * object, never three independent re-derivations of it.
  */
+
+export interface MatchCheckState {
+  comparison: SoundComparison
+  target: Float32Array
+  player: Float32Array
+  sampleRate: number
+  /** Player-facing rephrasing of `comparison.detail` -- see
+   *  `academy/sound-feedback.ts`'s `describeSoundDifference`. */
+  feedback: readonly string[]
+}
 
 export interface AcademyPanelState {
   currentLevelId: string | undefined
@@ -31,11 +52,25 @@ export interface AcademyPanelState {
    *  length -- see `academy/feedback.ts`'s `describeFailures`. Ignored
    *  when `lastCheck` is undefined or passing. */
   feedback: readonly string[]
+  /** True while a match-this-sound Check or "Play target" is mid-render --
+   *  both take a real (if short) offline render, unlike a build-this-patch
+   *  Check, which is synchronous. Buttons disable and say so rather than
+   *  looking stuck. Always false for a build-this-patch level. */
+  busy: boolean
+  /** The most recent match-this-sound Check result for the current level,
+   *  if any -- undefined for a build-this-patch level, or before its first
+   *  Check this visit. */
+  lastMatch: MatchCheckState | undefined
 }
 
 export interface AcademyPanelOptions {
   onSelectLevel: (id: string) => void
   onCheck: () => void
+  /** Match-this-sound only: play the level's target sound through the live
+   *  AudioContext. As many times as the player wants -- Section 3's "a
+   *  player must be able to hear the target on demand", because comparing
+   *  from memory is a different, harder skill than the one this teaches. */
+  onPlayTarget: () => void
 }
 
 export function renderAcademyPanel(
@@ -106,13 +141,63 @@ export function renderAcademyPanel(
   brief.append(title, body)
   container.append(brief)
 
+  if (current.mode === 'match') {
+    const playBtn = document.createElement('button')
+    playBtn.type = 'button'
+    playBtn.className = 'academy-play-target-btn'
+    playBtn.dataset['testid'] = 'academy-play-target'
+    playBtn.textContent = state.busy ? 'Rendering…' : 'Play target sound'
+    playBtn.disabled = state.busy
+    playBtn.addEventListener('click', () => opts.onPlayTarget())
+    container.append(playBtn)
+  }
+
   const checkBtn = document.createElement('button')
   checkBtn.type = 'button'
   checkBtn.className = 'academy-check-btn'
   checkBtn.dataset['testid'] = 'academy-check'
-  checkBtn.textContent = 'Check my patch'
+  checkBtn.textContent = state.busy ? 'Rendering…' : 'Check my patch'
+  checkBtn.disabled = state.busy
   checkBtn.addEventListener('click', () => opts.onCheck())
   container.append(checkBtn)
+
+  const hasNext = levels.some((l, i) => levels[i - 1]?.id === current.id)
+  const passMessage = hasNext
+    ? `Level complete! The next level is unlocked below.`
+    : `Level complete! That's every level in the academy so far.`
+
+  if (current.mode === 'match') {
+    if (!state.lastMatch) return
+    const { comparison, feedback: lines, target, player, sampleRate } = state.lastMatch
+
+    const feedback = document.createElement('div')
+    feedback.className = `academy-feedback ${comparison.pass ? 'academy-feedback-pass' : 'academy-feedback-fail'}`
+    feedback.dataset['testid'] = 'academy-feedback'
+
+    if (comparison.pass) {
+      feedback.textContent = passMessage
+      container.append(feedback)
+    } else {
+      const heading = document.createElement('p')
+      heading.className = 'academy-feedback-heading'
+      heading.textContent = `Not yet — here's what's off:`
+
+      const ul = document.createElement('ul')
+      ul.className = 'academy-feedback-list'
+      for (const line of lines) {
+        const li = document.createElement('li')
+        li.textContent = line
+        ul.append(li)
+      }
+      feedback.append(heading, ul)
+      container.append(feedback)
+
+      const overlay = document.createElement('div')
+      renderMatchOverlay(overlay, target, player, sampleRate)
+      container.append(overlay)
+    }
+    return
+  }
 
   if (!state.lastCheck) return
 
@@ -121,10 +206,7 @@ export function renderAcademyPanel(
   feedback.dataset['testid'] = 'academy-feedback'
 
   if (state.lastCheck.pass) {
-    const hasNext = levels.some((l, i) => levels[i - 1]?.id === current.id)
-    feedback.textContent = hasNext
-      ? `Level complete! The next level is unlocked below.`
-      : `Level complete! That's every level in the academy so far.`
+    feedback.textContent = passMessage
   } else {
     const heading = document.createElement('p')
     heading.className = 'academy-feedback-heading'

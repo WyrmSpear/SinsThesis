@@ -97,8 +97,37 @@ describe('academy levels', () => {
         }
       })
 
+      if (level.mode === 'match') {
+        // match-this-sound levels have no InspectorQuery -- their "solution"
+        // is the target sound itself, rendered offline at Check time
+        // (renderPatch needs a real AudioContext, so that side is proven in
+        // tests/browser/rack-match-sound.test.ts instead). What a plain-Node
+        // suite *can* still prove: the target patch loads clean under this
+        // build's registry, has exactly one output for renderPatch to find,
+        // and its own match rubric is internally sane.
+        it('the target patch loads with no ghosts', () => {
+          loadGraph(level.solution)
+        })
+
+        it('the target patch has exactly one output module', () => {
+          const outputs = level.solution.modules.filter((m) => m.type === 'output')
+          expect(outputs.length).toBe(1)
+        })
+
+        it('has a positive render duration and pass threshold', () => {
+          expect(level.match!.seconds).toBeGreaterThan(0)
+          expect(level.match!.passThreshold).toBeGreaterThan(0)
+        })
+
+        it('a gate schedule is only given when the target actually has an ADSR to gate', () => {
+          const hasAdsr = level.solution.modules.some((m) => m.type === 'adsr')
+          if (level.match!.gate) expect(hasAdsr).toBe(true)
+        })
+        return
+      }
+
       it('every module type the query requires is granted', () => {
-        for (const type of level.query.hasModule ?? []) {
+        for (const type of level.query!.hasModule ?? []) {
           expect(level.grantedModules, `query.hasModule requires "${type}", which is not granted`).toContain(type)
         }
       })
@@ -119,11 +148,11 @@ describe('academy levels', () => {
         }
 
         const types = new Set<string>()
-        for (const [fromRef, , toRef] of level.query.connected ?? []) {
+        for (const [fromRef, , toRef] of level.query!.connected ?? []) {
           types.add(refType(fromRef))
           types.add(refType(toRef))
         }
-        for (const p of level.query.params ?? []) types.add(refType(p.module))
+        for (const p of level.query!.params ?? []) types.add(refType(p.module))
 
         for (const type of types) {
           expect(level.grantedModules, `query references type "${type}", which is not granted`).toContain(type)
@@ -132,14 +161,14 @@ describe('academy levels', () => {
 
       it('is satisfiable: the solution patch, loaded, passes the query', () => {
         const graph = loadGraph(level.solution)
-        const result = inspect(graph, level.query)
+        const result = inspect(graph, level.query!)
         expect(result.failures, 'a completable level must have a passing solution').toEqual([])
         expect(result.pass).toBe(true)
       })
 
       it('is not already solved by its own starting patch', () => {
         const graph = loadGraph(level.startingPatch)
-        const result = inspect(graph, level.query)
+        const result = inspect(graph, level.query!)
         expect(result.pass, `${level.id}'s starting patch already satisfies its own query -- nothing to do`).toBe(false)
       })
     })

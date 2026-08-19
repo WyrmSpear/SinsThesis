@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "meta": { "name": "Level 7 — Match: Hollow Square (target)", "created": "2026-08-19T00:00:00.000Z", "author": "academy" },
+  "modules": [
+    { "id": "vco-1", "type": "vco", "slot": [0, 0], "params": { "shape": 1, "pulseWidth": 0.25 } },
+    { "id": "output-1", "type": "output", "slot": [0, 1], "params": {} }
+  ],
+  "cables": [
+    { "from": ["vco-1", "out"], "to": ["output-1", "in"] }
+  ]
+}

@@ -1301,3 +1301,75 @@ body {
   border-color: var(--lamp-warn) !important;
   box-shadow: 0 0 0 2px var(--lamp-warn-glow);
 }
+
+/* ---- match-this-sound: the "Play target" button, and both buttons'
+ * disabled state while a Check or a target render is mid-flight (Section
+ * 3: "hear the target on demand" -- but a render takes real, if short,
+ * time, unlike build-this-patch's synchronous inspect()). Same
+ * token-reuse rule as the rest of this panel: no new theme tokens. ---- */
+.academy-play-target-btn {
+  align-self: flex-start;
+  font-family: inherit;
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  padding: 0.5rem 1rem;
+  background: transparent;
+  color: var(--knob-indicator);
+  border: 1px solid var(--knob-indicator);
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.academy-play-target-btn:hover:not(:disabled) { filter: brightness(1.1); }
+
+.academy-check-btn:disabled,
+.academy-play-target-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+  filter: none;
+}
+
+/* ---- the match-this-sound overlay: "show the miss" as an actual overlay,
+ * not a bare score -- the player's spectrum and envelope plotted against
+ * the target's. Canvas colors are drawn live via getComputedStyle in
+ * rack/match-sound-panel.ts (a <canvas> doesn't participate in the CSS
+ * cascade); this stylesheet only positions the DOM around it. ---- */
+.match-overlay {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-top: 0.6rem;
+  padding: 0.7rem 0.9rem;
+  background: var(--surface-recess);
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+}
+
+.match-overlay-legend {
+  display: flex;
+  gap: 1rem;
+  font-size: var(--text-2xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.match-legend-target { color: var(--text-dim); }
+.match-legend-player { color: var(--text-accent); }
+
+.match-overlay-label {
+  margin: 0.2rem 0 0;
+  font-size: var(--text-2xs);
+  color: var(--text-dim);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.match-overlay-canvas {
+  width: 100%;
+  max-width: 320px;
+  height: auto;
+  border: 1px solid var(--panel-border);
+  border-radius: 3px;
+}
