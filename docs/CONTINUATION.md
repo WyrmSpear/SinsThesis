@@ -1,13 +1,24 @@
 # SinsThesis — continuation
 
-**Updated:** 2026-08-19. Phase 1A merged; a playable dev harness now exists.
-**Branch:** `master` — 56 commits.
-**State:** 251 tests pass (209 node + 42 browser), `typecheck` clean, tree clean.
+**Updated:** 2026-08-18. The rack is now the front door; four themes prove
+Section 8's "a theme is a token file" claim.
+**Branch:** `master`.
+**State:** node + browser tests pass, `typecheck` clean, tree clean.
 
-**You can hear it.** `npm run dev`, open the URL, click POWER ON. The ASDF row
-plays, or click the on-screen piano. HOLD drones a note so you can sweep the
-filter while it sounds. This is a dev harness — test-equipment styling, no
-themes, no patch cables — not the Phase 1B rack.
+**You can hear it.** `npm run dev`, open the URL: **`index.html` is the rack**
+now, not the old slider harness. Click POWER ON, then click a piano key or an
+ASDF-row letter. The theme switcher lives in the rack's header and works even
+before POWER ON, since it only ever writes `document.documentElement.dataset.theme`
+— it never touches the AudioContext. Four themes exist as token files under
+`rack/theme-*.css` (Reaktor Dark is the default; Moog Wood, Phosphor Lab and
+Ableton Live prove a second, third and fourth skin cost nothing but a token
+file — see `.superpowers/sdd/themes-report.md`), and the choice persists in
+`localStorage` across reloads.
+
+The old dev harness — test-equipment styling, a real oscilloscope and
+spectrum analyzer, no themes, no patch cables — now lives at `/harness.html`,
+linked from the rack's header. Reach for it for engine work: it is still the
+one page with a scope and spectrum, which the rack does not have.
 
 Read this file first. Then `docs/audio/PHASE1A-LEDGER.md` for every decision made
 and why.
@@ -18,24 +29,24 @@ and why.
 
 ```bash
 cd ~/Desktop/SinsThesis
-git checkout feat/phase1a-engine
+git checkout master
 npm install                 # if node_modules is gone
 npx playwright install chromium
 npm run build:worklets      # MUST run before browser tests
-npm test                    # 209 node tests
-npm run test:browser        # 38 browser tests
+npm test                    # node tests
+npm run test:browser        # browser tests
 npm run typecheck
 ```
 
-`npm test` runs the node project only. No single command runs all 247 — worth
-adding.
+`npm test` runs the node project only. No single command runs both.
 
 ---
 
 ## What exists
 
-The audio engine, plus a dev harness page that plays it. The themed modular
-rack is still Phase 1B and deliberately absent.
+The audio engine, plus two pages that play it: the rack (the product's front
+door) and the dev harness (kept for engine work — it has the scope and
+spectrum the rack doesn't).
 
 ```
 src/engine/
@@ -44,8 +55,11 @@ src/engine/
   worklets/   vco, ladder, wavefolder, segment, passthrough + audioworklet-globals.d.ts
   modules/    fifteen descriptors + index.ts
   graph.ts  patch.ts  cycle.ts  render.ts  clock.ts  midi.ts  types.ts  registry.ts
+rack/         main.ts, panel.ts, knob.ts, switch.ts, cables.ts, palette.ts,
+              patch-io.ts, theme-switcher.ts, style.css, theme-*.css (4 themes)
 dev/          main.ts, piano.ts, controls.ts, presets.ts, scope.ts, style.css
-index.html    the dev harness — npm run dev
+index.html    the rack — npm run dev — the product's front door
+harness.html  the dev harness — engine work, scope + spectrum
 scripts/build-worklets.mjs    one Rollup bundle per worklet
 docs/superpowers/specs/2026-08-18-sinsthesis-phase1-design.md    the binding spec
 docs/superpowers/plans/2026-08-18-phase1a-engine.md              the 18-task plan

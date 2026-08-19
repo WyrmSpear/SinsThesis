@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 /**
- * Drives the real rack page (rack.html + rack/main.ts) in an actual
+ * Drives the real rack page (index.html + rack/main.ts) in an actual
  * Chromium tab, following the same pattern as tests/browser/dev-page.test.ts
  * and for the same reasons: a real Vite dev server plus real, trusted
  * pointer/keyboard input (via Playwright's CDP-backed `page.mouse` /
@@ -73,7 +73,7 @@ async function powerOn(page: Page): Promise<void> {
   // landed on nothing draggable. A tall viewport sidesteps it rather than
   // scrolling mid-drag, which two different jacks could each need.
   await page.setViewportSize({ width: 1600, height: 1150 })
-  await page.goto(baseUrl + '/rack.html', { waitUntil: 'load' })
+  await page.goto(baseUrl + '/', { waitUntil: 'load' })
   const powerBtn = page.getByTestId('power')
   await powerBtn.waitFor({ state: 'visible' })
   await powerBtn.click()

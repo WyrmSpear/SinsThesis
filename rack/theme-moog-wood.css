@@ -1,0 +1,93 @@
+/**
+ * Moog Wood -- walnut cheeks, cream knobs, serif engraving, one orange lamp
+ * (spec Section 8's list). Same rule as every theme file: this is nothing
+ * but CSS custom properties, `rack/style.css` and every rack/*.ts component
+ * are untouched, and geometry (panel widths, knob sizes, jack positions)
+ * lives outside the token system entirely (rack/panel.ts, rack/knob.ts).
+ *
+ * Two tokens here carry more than a flat color: `--surface-rack` and
+ * `--rail-surface` are each substituted as the *entire* value of a
+ * `background` property in rack/style.css (`body { background:
+ * var(--surface-rack); }`, `.rack-surface { background:
+ * var(--rail-surface); }`) -- neither call site wraps its token in a
+ * gradient function the way `.module-panel` does. That means a token file
+ * can hand back a full multi-layer background (grain streaks over a
+ * diagonal base), not just a hex code, with zero component changes. It is
+ * how the walnut-cheek grain below actually renders.
+ *
+ * `--surface-panel`/`--surface-panel-alt`, by contrast, are only ever read
+ * as the two color stops of a *fixed* two-stop linear-gradient baked into
+ * `.module-panel` -- a token file cannot put grain texture on the module
+ * panels themselves without a component edit. Two well-chosen wood tones
+ * standing in for the gradient's light/dark stops is the ceiling of what
+ * the token system can do there, and it is what this file does.
+ */
+:root[data-theme='moog-wood'] {
+  /* ---- surfaces ---- */
+  --surface-rack:
+    repeating-linear-gradient(100deg, rgba(0, 0, 0, 0.05) 0px, rgba(0, 0, 0, 0.05) 2px, transparent 2px, transparent 7px),
+    linear-gradient(160deg, #2c1c10 0%, #1c1108 100%);
+  --surface-panel: #4a3320;
+  --surface-panel-alt: #3a2818;
+  --surface-recess: #1c120a;
+
+  /* ---- engraving: hairline strokes and shadow ---- */
+  --panel-border: #2a1c10;
+  --panel-border-strong: #6b4b2a;
+  --shadow-panel: rgba(0, 0, 0, 0.55);
+  --shadow-ambient: rgba(0, 0, 0, 0.4);
+  --shadow-inset: rgba(0, 0, 0, 0.6);
+  --highlight-edge: rgba(255, 232, 196, 0.08);
+
+  /* ---- type: serif engraving ---- */
+  --font-mono: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, 'Times New Roman', serif;
+  --text-primary: #ecdfc4;
+  --text-dim: #a9895f;
+  --text-faint: #6e5539;
+  --text-accent: #cf8a3d;
+  --text-warn: #d7a24f;
+  --text-2xs: 0.64rem;
+  --text-xs: 0.72rem;
+  --text-sm: 0.82rem;
+  --text-md: 0.98rem;
+  --text-lg: 1.24rem;
+  --tracking-label: 0.05em;
+  --tracking-title: 0.09em;
+
+  /* ---- knob material: cream body, brass pointer ---- */
+  --knob-body: #ece0c4;
+  --knob-body-hi: #f9f3e2;
+  --knob-ring: #8a6a3c;
+  --knob-indicator: #6b3f1d;
+  --knob-indicator-glow: rgba(207, 138, 61, 0.45);
+  --knob-readout: #cf8a3d;
+  --knob-readout-drag: #e8ac5c;
+
+  /* ---- jacks ---- */
+  --jack-socket: #140d07;
+  --jack-ring: #8a6a3c;
+  --jack-ring-hover: #cf8a3d;
+
+  /* ---- cables, warm family, still discriminable per signal type ---- */
+  --cable-audio: #cf8a3d;
+  --cable-cv: #a3543a;
+  --cable-gate: #7c5a78;
+  --cable-preview: #a9895f;
+  --cable-delayed-glow: rgba(215, 162, 79, 0.85);
+  --cable-hover-glow: rgba(255, 232, 196, 0.4);
+  --cable-inactive: #6e5539;
+
+  /* ---- lamps: power switch, hold/drone, module-active -- the one orange lamp ---- */
+  --lamp-on: #dd7a2c;
+  --lamp-on-glow: rgba(221, 122, 44, 0.65);
+  --lamp-off: #3a2818;
+  --lamp-off-border: #6b4b2a;
+  --lamp-warn: #b8863f;
+  --lamp-warn-glow: rgba(184, 134, 63, 0.55);
+
+  /* ---- rack surfaces: rail, screws ---- */
+  --rail-surface:
+    repeating-linear-gradient(95deg, rgba(0, 0, 0, 0.07) 0px, rgba(0, 0, 0, 0.07) 1.5px, transparent 1.5px, transparent 5px),
+    #1c120a;
+  --screw: #8a6a3c88;
+}

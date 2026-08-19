@@ -29,6 +29,7 @@ body {
 }
 
 .dim { color: var(--dim); }
+.dim a { color: var(--accent); }
 
 .masthead h1 {
   margin: 0 0 0.25rem;

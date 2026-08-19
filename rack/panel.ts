@@ -161,6 +161,23 @@ export function buildPanel(
   // hard `width` here and the piano silently overflowed into the next
   // panel's column, invisible in the DOM and obvious the moment the page
   // was actually looked at.
+  //
+  // A *second* version (Section 8 theme work) tried a hard `width` again,
+  // this time for every ordinary module, to stop a theme's font tokens
+  // from nudging shrink-to-fit panel width by a few px between themes
+  // (tests/browser/theme-geometry.test.ts caught it: Moog Wood's serif and
+  // Phosphor Lab's wider Courier New each grew every panel measurably
+  // versus Reaktor Dark's IBM Plex Mono). That version screenshotted
+  // *worse*, not better: ADSR's hp (8, i.e. 128px) divided across its
+  // four-knob row leaves each grid track well under the 38px a knob
+  // dial actually needs, and `min-width`'s shrink-to-fit growth had been
+  // silently bailing that out the whole time -- a hard `width` removed
+  // the bailout and the knobs visibly overlapped. `min-width` stays; the
+  // handful of px of shrink-to-fit width drift a theme's own font tokens
+  // can introduce is documented as a known, cosmetically-minor gap in
+  // Section 8's "geometry stays identical" claim (.superpowers/sdd/
+  // themes-report.md) rather than "fixed" by trading it for a worse,
+  // visibly broken bug.
   panel.style.minWidth = `${Math.max(MIN_PANEL_PX, descriptor.hp * HP_PX)}px`
 
   const header = document.createElement('div')

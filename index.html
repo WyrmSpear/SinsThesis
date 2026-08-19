@@ -4,13 +4,52 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="icon" href="data:," />
-  <link rel="stylesheet" href="/dev/style.css" />
-  <title>SinsThesis — dev harness</title>
+  <!--
+    Theme bootstrap: sets `data-theme` on <html> from localStorage before
+    any stylesheet below is parsed, so the page never flashes Reaktor Dark
+    before repainting into a stored preference. Plain, synchronous, inline
+    -- an ES module (`type="module"`, like rack/main.ts below) is always
+    deferred, which runs it after CSSOM/first-paint timing and would bring
+    the flash right back. rack/theme-switcher.ts owns every *other* piece
+    of theme state (the visible switcher, persisting a change) -- this
+    script's only job is "the first paint already has the right attribute."
+  -->
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem('sinsthesis-theme');
+        document.documentElement.dataset.theme = stored || 'reaktor-dark';
+      } catch (e) {
+        document.documentElement.dataset.theme = 'reaktor-dark';
+      }
+    })();
+  </script>
+  <!--
+    All four theme files are loaded, not just the active one -- each scopes
+    its custom properties under `:root[data-theme="<id>"]` (see any
+    rack/theme-*.css file's own header comment), so exactly one theme's
+    rules ever win and switching is a single attribute write with no
+    network request, no flash, no re-render of anything but computed style.
+  -->
+  <link rel="stylesheet" href="/rack/theme-reaktor-dark.css" />
+  <link rel="stylesheet" href="/rack/theme-moog-wood.css" />
+  <link rel="stylesheet" href="/rack/theme-phosphor-lab.css" />
+  <link rel="stylesheet" href="/rack/theme-ableton-live.css" />
+  <link rel="stylesheet" href="/rack/style.css" />
+  <title>SinsThesis — rack</title>
 </head>
 <body>
   <header class="masthead">
-    <h1>SINSTHESIS <span class="dim">// dev harness</span></h1>
-    <p class="dim">vco &rarr; vcf &rarr; (wavefolder) &rarr; vca &rarr; output. computer keyboard is the controller.</p>
+    <div class="masthead-row">
+      <div>
+        <h1>SINSTHESIS <span class="dim">// rack</span></h1>
+        <p class="dim">descriptor-driven panels, draggable patch cables — four themes, same geometry.</p>
+      </div>
+      <div id="theme-switcher" class="theme-switcher" data-testid="theme-switcher"></div>
+    </div>
+    <p class="dim harness-link">
+      Need the scope and spectrum for engine work? <a href="/harness.html">Open the dev harness</a>.
+    </p>
   </header>
 
   <section id="power-section" class="power-section">
@@ -19,78 +58,20 @@
   </section>
 
   <main id="app" hidden data-testid="app">
-    <section class="panel hold-panel">
-      <button id="hold-btn" data-testid="hold" class="hold-btn" type="button" aria-pressed="false">
-        HOLD <span class="dim hold-sub">(drone -- gate stays open after release)</span>
-      </button>
-    </section>
-
-    <section class="panel keyboard-panel">
-      <h2>KEYBOARD</h2>
-      <p class="dim">
-        A W S E D F T G Y H U J K O L is the piano — Z / X shift octave, or click/drag the
-        keys below.
-        <span class="dim">octave: <strong id="octave-readout">4</strong></span>
-      </p>
-      <div id="keys-held" class="keys-held" data-testid="keys-held"></div>
-      <div class="note-readout dim">sounding: <strong id="note-readout" data-testid="note-readout">—</strong></div>
-      <div id="piano-mount" class="piano-mount" data-testid="piano-mount"></div>
-    </section>
-
-    <section class="panel scope-panel">
-      <div class="scope-block">
-        <h2>OSCILLOSCOPE</h2>
-        <canvas id="scope-wave" width="640" height="160" data-testid="scope-wave"></canvas>
-      </div>
-      <div class="scope-block">
-        <h2>SPECTRUM</h2>
-        <canvas id="scope-spectrum" width="640" height="160" data-testid="scope-spectrum"></canvas>
-      </div>
-    </section>
-
-    <section class="panel presets-panel">
-      <h2>PRESETS</h2>
-      <div class="preset-buttons">
-        <button id="preset-bass" data-testid="preset-bass" class="preset-btn">BASS</button>
-        <button id="preset-lead" data-testid="preset-lead" class="preset-btn">LEAD</button>
-      </div>
-    </section>
-
-    <div class="rack">
-      <section class="panel" id="vco-panel">
-        <h2>VCO</h2>
-        <div class="controls" id="vco-controls"></div>
-      </section>
-
-      <section class="panel" id="vcf-panel">
-        <h2>LADDER VCF</h2>
-        <div class="controls" id="vcf-controls"></div>
-      </section>
-
-      <section class="panel" id="adsr-panel">
-        <h2>ADSR</h2>
-        <div class="controls" id="adsr-controls"></div>
-      </section>
-
-      <section class="panel" id="wavefolder-panel">
-        <h2>WAVEFOLDER</h2>
-        <div class="toggle-row" id="wavefolder-toggle"></div>
-        <div class="controls" id="wavefolder-controls"></div>
-      </section>
-
-      <section class="panel" id="lfo-panel">
-        <h2>LFO &rarr; CUTOFF</h2>
-        <div class="toggle-row" id="lfo-toggle"></div>
-        <div class="controls" id="lfo-controls"></div>
-      </section>
-
-      <section class="panel" id="master-panel">
-        <h2>MASTER</h2>
-        <div class="controls" id="master-controls"></div>
-      </section>
+    <div id="toolbar" class="toolbar" data-testid="toolbar">
+      <button id="palette-toggle" data-testid="palette-toggle" class="toolbar-btn">+ Add Module</button>
+      <input id="patch-name" data-testid="patch-name" class="patch-name-input" value="Untitled" aria-label="Patch name" />
+      <button id="save-patch" data-testid="save-patch" class="toolbar-btn">Save .sinp</button>
+      <button id="load-patch" data-testid="load-patch" class="toolbar-btn">Load .sinp</button>
+      <input id="load-file" data-testid="load-file-input" type="file" accept=".sinp,application/json" hidden />
+    </div>
+    <div id="palette-drawer" class="palette-drawer" data-testid="palette-drawer" hidden></div>
+    <div id="status-banner" class="status-banner" data-testid="status-banner" hidden></div>
+    <div id="rack-surface" class="rack-surface" data-testid="rack-surface">
+      <div id="rack-modules" class="rack-modules" data-testid="rack-modules"></div>
     </div>
   </main>
 
-  <script type="module" src="/dev/main.ts"></script>
+  <script type="module" src="/rack/main.ts"></script>
 </body>
 </html>

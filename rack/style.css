@@ -38,6 +38,56 @@ body {
   font-size: var(--text-sm);
 }
 
+.masthead-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+/* ---- theme switcher (Section 8): always visible, works before power-on
+ * since it only ever writes `document.documentElement.dataset.theme` --
+ * see rack/theme-switcher.ts. ---- */
+.theme-switcher {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.theme-btn {
+  font-family: inherit;
+  font-size: var(--text-2xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  padding: 0.35rem 0.6rem;
+  background: var(--surface-panel);
+  color: var(--text-dim);
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.theme-btn:hover {
+  border-color: var(--knob-indicator);
+  color: var(--knob-indicator);
+}
+
+.theme-btn-active {
+  color: var(--text-accent);
+  border-color: var(--knob-indicator);
+  box-shadow: 0 0 0 1px var(--knob-indicator-glow);
+}
+
+.harness-link {
+  font-size: var(--text-xs);
+  color: var(--text-dim);
+}
+
+.harness-link a {
+  color: var(--text-accent);
+}
+
 /* ---- power switch: a lamp, not a workaround (Section 11) ---- */
 .power-section {
   display: flex;
@@ -572,8 +622,20 @@ body {
   padding: 0.3rem;
 }
 
-/* ---- keyboard module's custom content ---- */
-.keyboard-panel-content { width: 100%; min-width: 420px; }
+/* ---- keyboard module's custom content ----
+ * `width: 420px`, not `width: 100%; min-width: 420px`: this box's own
+ * panel (rack/panel.ts) is sized with `min-width`, not a hard `width`,
+ * specifically so this content can grow past its nominal hp -- but a
+ * *percentage* width here does not give the ancestor panel's shrink-to-fit
+ * computation a fixed number to work with, so `.kb-hint`'s own unwrapped
+ * text (its real length, in whatever the active theme's font happens to
+ * be) bubbled straight up into the panel's rendered width instead of
+ * wrapping inside it -- caught by tests/browser/theme-geometry.test.ts,
+ * where Phosphor Lab's wider Courier New measurably widened this one
+ * module and nothing else. A definite `420px` here is itself a stable
+ * number regardless of font, so it settles what the panel picks up
+ * *before* `.kb-hint`'s own wrapping is ever in question. */
+.keyboard-panel-content { width: 420px; }
 
 .kb-hint {
   margin: 0 0 0.25rem;

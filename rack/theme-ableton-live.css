@@ -1,0 +1,91 @@
+/**
+ * Ableton Live -- flat grey, 1px borders, one yellow, densest (spec
+ * Section 8's list). Same rule as every theme file: nothing but CSS custom
+ * properties, `rack/style.css` and every rack/*.ts component untouched,
+ * geometry unaffected (rack/panel.ts, rack/knob.ts own that instead) -- so
+ * "densest" is delivered by the type-scale tokens below (smaller sizes,
+ * near-zero letter-spacing), not by shrinking the panel/knob/jack geometry
+ * the spec pins identical across every theme. That is a real ceiling on
+ * this theme's brief, not a workaround: Section 8 is explicit that geometry
+ * does not move, so the honest way to chase "densest" from a token file
+ * alone is tighter type, not tighter layout.
+ *
+ * "Flat" is two more token-only tricks, no component edit:
+ *  - `.module-panel` and `.knob-dial`/`.switch-control` each hard-code a
+ *    *two-stop* gradient function in rack/style.css, reading only the stop
+ *    colors from `--surface-panel`/`--surface-panel-alt` and
+ *    `--knob-body`/`--knob-body-hi`. Giving both stops of a pair the exact
+ *    same value makes the gradient paint as a flat, uniform fill --
+ *    interpolating a color against itself is that color at every point.
+ *  - `--highlight-edge` is the panel's inset top-edge sheen
+ *    (`box-shadow: ... inset 0 1px 0 var(--highlight-edge)`); set to fully
+ *    transparent here, it removes the last bit of skeuomorphic gloss the
+ *    other three themes all keep.
+ */
+:root[data-theme='ableton-live'] {
+  /* ---- surfaces: flat grey, no gradient banding ---- */
+  --surface-rack: #2b2b2b;
+  --surface-panel: #333333;
+  --surface-panel-alt: #333333;
+  --surface-recess: #202020;
+
+  /* ---- engraving: uniform 1px borders, minimal shadow ---- */
+  --panel-border: #4a4a4a;
+  --panel-border-strong: #4a4a4a;
+  --shadow-panel: rgba(0, 0, 0, 0.15);
+  --shadow-ambient: rgba(0, 0, 0, 0.12);
+  --shadow-inset: rgba(0, 0, 0, 0.2);
+  --highlight-edge: transparent;
+
+  /* ---- type: dense, tight, sans -- Live's own UI is grotesque sans, not
+     the mono the other three themes lean on; nothing in rack/style.css
+     assumes monospace metrics, so swapping the family costs nothing ---- */
+  --font-mono: 'Inter', 'Helvetica Neue', Arial, ui-sans-serif, sans-serif;
+  --text-primary: #e0e0e0;
+  --text-dim: #9a9a9a;
+  --text-faint: #6a6a6a;
+  --text-accent: #f6c945;
+  --text-warn: #c9a227;
+  --text-2xs: 0.58rem;
+  --text-xs: 0.66rem;
+  --text-sm: 0.76rem;
+  --text-md: 0.88rem;
+  --text-lg: 1.05rem;
+  --tracking-label: 0.01em;
+  --tracking-title: 0.03em;
+
+  /* ---- knob material: flat grey body, one yellow indicator ---- */
+  --knob-body: #3a3a3a;
+  --knob-body-hi: #3a3a3a;
+  --knob-ring: #555555;
+  --knob-indicator: #f6c945;
+  --knob-indicator-glow: rgba(246, 201, 69, 0.15);
+  --knob-readout: #f6c945;
+  --knob-readout-drag: #fff2c2;
+
+  /* ---- jacks ---- */
+  --jack-socket: #1a1a1a;
+  --jack-ring: #555555;
+  --jack-ring-hover: #f6c945;
+
+  /* ---- cables: the one yellow is audio; everything else reads by value, not hue ---- */
+  --cable-audio: #f6c945;
+  --cable-cv: #b0b0b0;
+  --cable-gate: #707070;
+  --cable-preview: #9a9a9a;
+  --cable-delayed-glow: rgba(246, 201, 69, 0.4);
+  --cable-hover-glow: rgba(246, 201, 69, 0.3);
+  --cable-inactive: #555555;
+
+  /* ---- lamps: the one yellow again, kept subtle -- flat means no glow bloom ---- */
+  --lamp-on: #f6c945;
+  --lamp-on-glow: rgba(246, 201, 69, 0.3);
+  --lamp-off: #3a3a3a;
+  --lamp-off-border: #555555;
+  --lamp-warn: #c9a227;
+  --lamp-warn-glow: rgba(201, 162, 39, 0.25);
+
+  /* ---- rack surfaces: rail, screws ---- */
+  --rail-surface: #202020;
+  --screw: #ffffff14;
+}

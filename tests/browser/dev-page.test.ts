@@ -4,7 +4,7 @@ import { chromium, type Browser, type Page } from 'playwright'
 import { fileURLToPath } from 'node:url'
 
 /**
- * Drives the real dev harness page (index.html + dev/main.ts) in an actual
+ * Drives the real dev harness page (harness.html + dev/main.ts) in an actual
  * Chromium tab, not vitest's own in-page browser project: this needs a
  * real Vite dev server and a real, trusted user gesture to satisfy the
  * browser's autoplay policy on `AudioContext` -- a JS-dispatched
@@ -75,7 +75,7 @@ describe('dev harness page', () => {
     })
     page.on('pageerror', (err) => consoleErrors.push(String(err)))
 
-    await page.goto(baseUrl, { waitUntil: 'load' })
+    await page.goto(baseUrl + '/harness.html', { waitUntil: 'load' })
 
     const powerBtn = page.getByTestId('power')
     await powerBtn.waitFor({ state: 'visible' })
@@ -144,7 +144,7 @@ describe('dev harness page', () => {
     })
     page.on('pageerror', (err) => consoleErrors.push(String(err)))
 
-    await page.goto(baseUrl, { waitUntil: 'load' })
+    await page.goto(baseUrl + '/harness.html', { waitUntil: 'load' })
 
     const powerBtn = page.getByTestId('power')
     await powerBtn.waitFor({ state: 'visible' })

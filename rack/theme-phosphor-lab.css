@@ -1,0 +1,89 @@
+/**
+ * Phosphor Lab -- CRT amber on black, scanlines, everything glows (spec
+ * Section 8's list). Same rule as every theme file: nothing but CSS custom
+ * properties, `rack/style.css` and every rack/*.ts component untouched,
+ * geometry unaffected (rack/panel.ts, rack/knob.ts own that instead).
+ *
+ * The scanlines are the same trick as Moog Wood's wood grain, applied to
+ * the same two call sites: `body`'s `background` and `.rack-surface`'s
+ * `background` in rack/style.css are each a bare `var(--surface-rack)` /
+ * `var(--rail-surface)` with no gradient wrapped around them, so the token
+ * can hand back a `repeating-linear-gradient` of 1px dark bands over a
+ * near-black base and it renders as scanlines with zero component changes.
+ * "Everything glows" leans on glow tokens rack/style.css already reads via
+ * `box-shadow`/`filter: drop-shadow` -- `--knob-indicator-glow`,
+ * `--lamp-on-glow`, `--lamp-warn-glow`, `--cable-hover-glow`,
+ * `--cable-delayed-glow`, and `--highlight-edge` (the panel's own inset
+ * top-edge sheen) -- turned up in alpha and tuned to amber, rather than any
+ * new glow mechanic.
+ */
+:root[data-theme='phosphor-lab'] {
+  /* ---- surfaces: near-black with a scanline raster ---- */
+  --surface-rack:
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.4) 0px, rgba(0, 0, 0, 0.4) 1px, transparent 1px, transparent 3px),
+    radial-gradient(ellipse at 50% 0%, rgba(255, 176, 0, 0.06), transparent 65%),
+    #050301;
+  --surface-panel: #0e0a05;
+  --surface-panel-alt: #171006;
+  --surface-recess: #020101;
+
+  /* ---- engraving: hairline strokes and shadow ---- */
+  --panel-border: #3a2708;
+  --panel-border-strong: #5a3c0e;
+  --shadow-panel: rgba(0, 0, 0, 0.8);
+  --shadow-ambient: rgba(0, 0, 0, 0.6);
+  --shadow-inset: rgba(0, 0, 0, 0.85);
+  --highlight-edge: rgba(255, 176, 0, 0.1);
+
+  /* ---- type: terminal monospace, phosphor amber ---- */
+  --font-mono: 'Courier New', Consolas, 'IBM Plex Mono', ui-monospace, monospace;
+  --text-primary: #ffb000;
+  --text-dim: #9a6816;
+  --text-faint: #4f3407;
+  --text-accent: #ffcb52;
+  --text-warn: #ff6a3c;
+  --text-2xs: 0.62rem;
+  --text-xs: 0.7rem;
+  --text-sm: 0.8rem;
+  --text-md: 0.95rem;
+  --text-lg: 1.2rem;
+  --tracking-label: 0.08em;
+  --tracking-title: 0.16em;
+
+  /* ---- knob material: dark bronze body, bright amber pointer ---- */
+  --knob-body: #1c1408;
+  --knob-body-hi: #2e2109;
+  --knob-ring: #b87c1f;
+  --knob-indicator: #ffb000;
+  --knob-indicator-glow: rgba(255, 176, 0, 0.75);
+  --knob-readout: #ffb000;
+  --knob-readout-drag: #ffe08a;
+
+  /* ---- jacks ---- */
+  --jack-socket: #020101;
+  --jack-ring: #7a5410;
+  --jack-ring-hover: #ffb000;
+
+  /* ---- cables, all within the phosphor family, discriminable by hue shift ---- */
+  --cable-audio: #ffb000;
+  --cable-cv: #ff8c1a;
+  --cable-gate: #ff5a3c;
+  --cable-preview: #9a6816;
+  --cable-delayed-glow: rgba(255, 140, 26, 0.9);
+  --cable-hover-glow: rgba(255, 176, 0, 0.9);
+  --cable-inactive: #4f3407;
+
+  /* ---- lamps: everything glows ---- */
+  --lamp-on: #ffb000;
+  --lamp-on-glow: rgba(255, 176, 0, 0.85);
+  --lamp-off: #170f05;
+  --lamp-off-border: #5a3c0e;
+  --lamp-warn: #ff5a3c;
+  --lamp-warn-glow: rgba(255, 90, 60, 0.75);
+
+  /* ---- rack surfaces: rail, screws ---- */
+  --rail-surface:
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.35) 0px, rgba(0, 0, 0, 0.35) 1px, transparent 1px, transparent 3px),
+    #020101;
+  --screw: #7a541088;
+}

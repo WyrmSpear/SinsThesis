@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="/dev/style.css" />
+  <title>SinsThesis — dev harness</title>
+</head>
+<body>
+  <header class="masthead">
+    <h1>SINSTHESIS <span class="dim">// dev harness</span></h1>
+    <p class="dim">vco &rarr; vcf &rarr; (wavefolder) &rarr; vca &rarr; output. computer keyboard is the controller.</p>
+    <p class="dim">Looking for the themed modular rack? <a href="/">Open the rack</a>.</p>
+  </header>
+
+  <section id="power-section" class="power-section">
+    <button id="power-btn" data-testid="power" class="power-btn">POWER ON</button>
+    <p class="dim">audio requires a user gesture — nothing runs until this is pressed.</p>
+  </section>
+
+  <main id="app" hidden data-testid="app">
+    <section class="panel hold-panel">
+      <button id="hold-btn" data-testid="hold" class="hold-btn" type="button" aria-pressed="false">
+        HOLD <span class="dim hold-sub">(drone -- gate stays open after release)</span>
+      </button>
+    </section>
+
+    <section class="panel keyboard-panel">
+      <h2>KEYBOARD</h2>
+      <p class="dim">
+        A W S E D F T G Y H U J K O L is the piano — Z / X shift octave, or click/drag the
+        keys below.
+        <span class="dim">octave: <strong id="octave-readout">4</strong></span>
+      </p>
+      <div id="keys-held" class="keys-held" data-testid="keys-held"></div>
+      <div class="note-readout dim">sounding: <strong id="note-readout" data-testid="note-readout">—</strong></div>
+      <div id="piano-mount" class="piano-mount" data-testid="piano-mount"></div>
+    </section>
+
+    <section class="panel scope-panel">
+      <div class="scope-block">
+        <h2>OSCILLOSCOPE</h2>
+        <canvas id="scope-wave" width="640" height="160" data-testid="scope-wave"></canvas>
+      </div>
+      <div class="scope-block">
+        <h2>SPECTRUM</h2>
+        <canvas id="scope-spectrum" width="640" height="160" data-testid="scope-spectrum"></canvas>
+      </div>
+    </section>
+
+    <section class="panel presets-panel">
+      <h2>PRESETS</h2>
+      <div class="preset-buttons">
+        <button id="preset-bass" data-testid="preset-bass" class="preset-btn">BASS</button>
+        <button id="preset-lead" data-testid="preset-lead" class="preset-btn">LEAD</button>
+      </div>
+    </section>
+
+    <div class="rack">
+      <section class="panel" id="vco-panel">
+        <h2>VCO</h2>
+        <div class="controls" id="vco-controls"></div>
+      </section>
+
+      <section class="panel" id="vcf-panel">
+        <h2>LADDER VCF</h2>
+        <div class="controls" id="vcf-controls"></div>
+      </section>
+
+      <section class="panel" id="adsr-panel">
+        <h2>ADSR</h2>
+        <div class="controls" id="adsr-controls"></div>
+      </section>
+
+      <section class="panel" id="wavefolder-panel">
+        <h2>WAVEFOLDER</h2>
+        <div class="toggle-row" id="wavefolder-toggle"></div>
+        <div class="controls" id="wavefolder-controls"></div>
+      </section>
+
+      <section class="panel" id="lfo-panel">
+        <h2>LFO &rarr; CUTOFF</h2>
+        <div class="toggle-row" id="lfo-toggle"></div>
+        <div class="controls" id="lfo-controls"></div>
+      </section>
+
+      <section class="panel" id="master-panel">
+        <h2>MASTER</h2>
+        <div class="controls" id="master-controls"></div>
+      </section>
+    </div>
+  </main>
+
+  <script type="module" src="/dev/main.ts"></script>
+</body>
+</html>

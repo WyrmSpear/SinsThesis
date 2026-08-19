@@ -10,11 +10,17 @@ import { buildPalette } from './palette'
 import { CableLayer } from './cables'
 import { buildKeyboardPanel } from './keyboard-panel'
 import { downloadPatch, readPatchFile, saveAutosave, loadAutosave, debounce } from './patch-io'
+import { initThemeSwitcher } from './theme-switcher'
 
 // Same guard as dev/main.ts, same reason: registerAllModules() throws on a
 // second call, and a fresh page load is the only case that should ever run
 // it (docs/CONTINUATION.md).
 if (!getModule('vco')) registerAllModules()
+
+// Independent of power-on: the switcher only ever writes
+// `document.documentElement.dataset.theme`, never touches the AudioContext
+// or the graph, so a visitor can preview every skin before pressing POWER.
+initThemeSwitcher(document.getElementById('theme-switcher')!)
 
 function $<T extends HTMLElement>(id: string): T {
   const el = document.getElementById(id)

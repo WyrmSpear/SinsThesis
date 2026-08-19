@@ -74,7 +74,7 @@ interface ThumpResult {
  *  A real, trusted click (via CDP, not `dispatchEvent`) is what lets the
  *  `AudioContext` this harness creates actually start running. */
 async function bootOnce(page: Page): Promise<ThumpResult> {
-  await page.goto(baseUrl, { waitUntil: 'load' })
+  await page.goto(baseUrl + '/harness.html', { waitUntil: 'load' })
   await page.addScriptTag({ url: '/dev/thump-harness.ts', type: 'module' })
 
   await page.evaluate(() => {

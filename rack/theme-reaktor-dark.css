@@ -1,18 +1,28 @@
 /**
- * Reaktor Dark -- the spec's default theme (Section 8), and the only one
- * this slice implements. Every color, material and type-scale value the
- * rack draws with lives here, as CSS custom properties, and nowhere else.
- * `rack/style.css` never contains a literal color: it only ever reads one
- * of these tokens. That is the test of the theme system -- a second theme
- * is a second file exactly like this one, swapped in, with zero component
- * changes.
+ * Reaktor Dark -- the spec's default theme (Section 8): graphite, hairlines,
+ * teal arcs. Every color, material and type-scale value the rack draws with
+ * lives here, as CSS custom properties, and nowhere else. `rack/style.css`
+ * never contains a literal color: it only ever reads one of these tokens.
+ * That is the test of the theme system -- a second theme is a second file
+ * exactly like this one, swapped in, with zero component changes. Three
+ * more themes now prove it: theme-moog-wood.css, theme-phosphor-lab.css,
+ * theme-ableton-live.css.
  *
  * Geometry (panel widths, knob sizes, jack positions) is deliberately
  * absent here -- Section 8 states it stays identical across all eight
  * themes, so it lives as plain constants in rack/panel.ts and rack/knob.ts
  * instead of as a token.
+ *
+ * Selector is `:root[data-theme="reaktor-dark"]`, not bare `:root`: every
+ * theme file uses the same attribute-selector shape (rack/theme-switcher.ts
+ * sets `document.documentElement.dataset.theme`), so exactly one theme's
+ * rules ever win regardless of file load order, and swapping themes is a
+ * single attribute write rather than a stylesheet swap. `index.html` still
+ * defaults the attribute to "reaktor-dark" before any theme file loads (an
+ * inline bootstrap script, reading localStorage) so this stays the default
+ * with no flash of the wrong skin.
  */
-:root {
+:root[data-theme='reaktor-dark'] {
   /* ---- surfaces ---- */
   --surface-rack: #16191b;
   --surface-panel: #1d2124;
