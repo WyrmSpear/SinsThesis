@@ -1,22 +1,23 @@
 # SinsThesis — continuation
 
-**Updated:** 2026-08-20. Engine, rack, analysis, all three academy grading modes,
-studio recording, stereo, and a preset bank.
-**Branch:** `main` — 109 commits. Public at github.com/WyrmSpear/SinsThesis (MIT).
+**Updated:** 2026-08-20.
+**Branch:** `main` — 127 commits. Public at github.com/WyrmSpear/SinsThesis (MIT).
 **Live** at `ryanoglelmt.com/portfolio/sinsthesis/`.
-**State:** 756 tests pass (609 node + 147 browser), `typecheck` clean, tree clean.
+**State:** 1007 tests pass (782 node + 225 browser), `typecheck` clean, tree clean.
 
 **Run it:** `npm run dev`, open the URL, POWER ON.
 
-- **Free play** — a modular rack. Twenty-one module types, drag-to-patch cables,
+- **Free play** — a modular rack. Twenty-six module types, drag-to-patch cables,
   drag-to-reorder, twelve themes, `.sinp` save/load with autosave, a programmable
-  16-step sequencer, a Scope, and a stereo output stage.
-- **Presets** — ten genre patches loadable from the toolbar, each playable the
+  16-step sequencer, a Sampler, a Scope, and a stereo output stage.
+- **Presets** — thirteen patches loadable from the toolbar, each playable the
   instant it loads.
-- **Academy** — sixteen levels across two tracks. Three grading modes:
-  build-this-patch (graph topology), match-this-sound (perceptual distance), and
-  constrained challenge (feature rubric with a module limit).
-- **Studio** — live recording and offline bounce, both stereo, exported as WAV.
+- **Academy** — twenty-two levels across three tracks (foundations, bass,
+  history). Three grading modes: build-this-patch (graph topology),
+  match-this-sound (perceptual distance), constrained challenge (feature rubric
+  with a module limit).
+- **Studio** — live recording and offline bounce, both stereo, exported as WAV,
+  with a pitch display reading frequency, note and cents.
 - **Dev harness** at `/harness.html` — scope and spectrum for engine work.
 
 Read this file first. Then `docs/audio/PHASE1A-LEDGER.md` for every decision made
@@ -54,7 +55,7 @@ src/engine/
   dsp/        wavetable.ts, ladder.ts, wavefolder.ts, segment.ts, polyblep.ts (unimported, kept as reference)
   worklets/   vco, ladder, wavefolder, segment, passthrough, peak-tap (test-only)
               + registry.ts (WORKLET_MODULES) + audioworklet-globals.d.ts
-  modules/    twenty-one descriptors + index.ts
+  modules/    twenty-six descriptors + index.ts
   graph.ts  patch.ts  cycle.ts  render.ts  clock.ts  midi.ts  param-smoothing.ts
   types.ts  registry.ts  version.ts
 rack/         main.ts, panel.ts, ghost-panel.ts, knob.ts, slider.ts, switch.ts,
@@ -424,6 +425,50 @@ state-variable filter's doc comments crediting Moog, Buchla and Oberheim by
 name — describing a real lineage in prose instead of borrowing it as a
 product name. Full rename map and reasoning in
 `.superpowers/sdd/theme-rename-report.md`.
+
+## The most recent arcs
+
+**A sampler, and what it cost.** The first module whose state is not just
+numbers. Samples embed in the `.sinp` as base64 PCM16 through a generic
+`serializeState`/`restoreState` hook, chosen over a file reference a browser
+cannot durably resolve, and over silently dropping the audio. The demo preset
+is 141 KB, nearly all audio — real bloat, taken deliberately.
+
+Two audit findings followed and both were real. A **hot sample was silently
+hard-clipped on save** (1.4 peak reloading as 1.0) and the round-trip test only
+checked `fileName` and `durationSeconds`, never the audio — which is why it
+shipped. Now samples normalise on save with the gain recorded, and the test
+compares actual sample values, verified by disabling the fix and watching it go
+red. Separately the **DC test was measuring a truncation artifact**, reading
+−42.9 dB where real DC control is −123 to −157 dB; it now measures DC on a
+window the source actually fills, against a bar ten times stricter.
+
+**Psychoacoustic modules, deliberately claim-free.** Binaural, Isochronic and a
+sixteen-entry Frequency Bank. Because this ships from a licensed therapist's
+practice site, the modules describe mechanisms and never assert physiological
+effects — a grep for benefit language across every new file returns exactly one
+hit, the disclaimer saying what is not claimed. Binaural holds a 0.3 Hz beat
+with zero measurable drift over three minutes; the isochronic gate's edge
+discontinuity is 0.0027 against 1.0000 for a hard gate; every bank frequency is
+within 3.6e-5 Hz of its claim.
+
+That work also corrected its own doc comment after measuring it: summing a
+binaural signal to mono does **not** silence the beat, it produces real acoustic
+interference amplitude modulation.
+
+**Trademarks out of the UI.** Six themes shipped third-party marks as
+selectable names. They were renamed (Graphite, Walnut & Cream, Flat Grid, Patch
+Lab, Brushed Steel, Toy Piano) with a localStorage migration so returning
+players keep their theme, and the real names moved into prose — module doc
+comments now credit Moog's ladder, Buchla's wavefolder and Oberheim's
+state-variable topology, which is nominative fair use and the honest place for
+them. The README carries a non-affiliation line.
+
+**A history track.** Six levels tracing the lineage, graded by the existing
+modes rather than presented as prose. The strongest is East Coast / West Coast,
+which uses a mechanism-agnostic feature so the ladder route and the wavefolder
+route both satisfy the same bound — you learn the Moog/Buchla fork by walking
+both paths. Titles stay descriptive; real names live in the briefs.
 
 ## Smaller things, recorded but not urgent
 
