@@ -130,6 +130,7 @@ describe('A1: wavetable generation timing', () => {
       rate: new Float32Array([2]),
       shape: new Float32Array([0]), // 'saw'
       depth: new Float32Array([1]),
+      division: new Float32Array([0]), // 'Free' -- exercises the legacy hard-sync path too
     }
 
     for (let block = 0; block < 50; block++) {

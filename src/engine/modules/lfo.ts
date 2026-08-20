@@ -1,5 +1,6 @@
 import type { ModuleDescriptor, ModuleInstance } from '../types'
 import { scheduleParam } from '../param-smoothing'
+import { DIVISION_LABELS } from '../dsp/clock-sync'
 
 export const lfoDescriptor: ModuleDescriptor = {
   type: 'lfo',
@@ -9,6 +10,9 @@ export const lfoDescriptor: ModuleDescriptor = {
   // it -- the previous single-row layout put the SHAPE switch's widest
   // readout text ("TRIANGLE") directly against DEPTH's column, which is
   // exactly the collision reported live; stacking removes the adjacency.
+  // `division` shares depth's row for the same reason -- its widest label
+  // ('1/16.', 5 characters) is the same order as SHAPE's abbreviated
+  // 'Pulse', so it fits the same column that fix already proved out.
   hp: 8,
   group: 'modulation',
   ports: [
@@ -31,11 +35,28 @@ export const lfoDescriptor: ModuleDescriptor = {
       labels: ['Saw', 'Pulse', 'Tri', 'Sine'],
     },
     { id: 'depth', label: 'Depth', min: 0, max: 1, default: 1, curve: 'lin', unit: '' },
+    {
+      id: 'division',
+      label: 'Div',
+      min: 0,
+      max: DIVISION_LABELS.length - 1,
+      default: 0,
+      curve: 'lin',
+      unit: '',
+      // Index 0 ('Free') is today's plain behavior, unchanged: the Rate
+      // knob's raw Hz value, sync hard-resets phase on every rising edge.
+      // Any other position locks the rate to the incoming clock's measured
+      // pulse period instead -- see dsp/clock-sync.ts's module doc comment
+      // for the tempo-inference math and how a first pulse, a stopped
+      // clock, and a tempo change are each handled without a glitch.
+      labels: DIVISION_LABELS,
+    },
   ],
   layout: [
     { kind: 'knob', ref: 'rate', x: 0, y: 0 },
     { kind: 'knob', ref: 'shape', x: 1, y: 0 },
     { kind: 'knob', ref: 'depth', x: 0, y: 1 },
+    { kind: 'knob', ref: 'division', x: 1, y: 1 },
     { kind: 'jack', ref: 'sync', x: 0, y: 3 },
     { kind: 'jack', ref: 'out', x: 1, y: 3 },
   ],
@@ -51,13 +72,14 @@ export const lfoDescriptor: ModuleDescriptor = {
     return {
       inputs: new Map<string, AudioNode | AudioParam>([['sync', syncIn]]),
       outputs: new Map([['out', node as AudioNode]]),
-      // rate and depth are continuous and smooth. shape indexes a fixed
-      // waveform table in the worklet (SHAPES[Math.round(shape)]) -- a
-      // value between two shapes is meaningless, so it stays instant. B3.
+      // rate and depth are continuous and smooth. shape and division both
+      // index a fixed table/branch in the worklet (SHAPES[Math.round(shape)],
+      // DIVISION_MULTIPLIERS[Math.round(division)]) -- a value between two
+      // positions is meaningless for either, so both stay instant. B3.
       setParam(id, value, atTime) {
         const param = node.parameters.get(id)
         if (!param) return
-        if (id === 'shape') param.value = value
+        if (id === 'shape' || id === 'division') param.value = value
         else scheduleParam(param, value, ctx, atTime)
       },
       dispose() {
