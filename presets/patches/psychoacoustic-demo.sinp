@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "meta": { "name": "Psychoacoustic Demo", "created": "2026-08-20T00:00:00.000Z", "author": "presets" },
+  "modules": [
+    { "id": "binaural-1", "type": "binaural", "slot": [0, 0], "params": { "carrier": 220, "beat": 5, "beatCvAmount": 0 } },
+    { "id": "isochronic-1", "type": "isochronic", "slot": [0, 1], "params": { "carrier": 300, "rate": 5, "duty": 0.4, "edge": 15, "division": 0 } },
+    { "id": "freq-bank-1", "type": "freq-bank", "slot": [0, 2], "params": { "frequency": 4, "octave": -1 } },
+    { "id": "output-1", "type": "output", "slot": [0, 3], "params": { "level": 0.3 } }
+  ],
+  "cables": [
+    { "from": ["binaural-1", "out"], "to": ["output-1", "in"] },
+    { "from": ["isochronic-1", "out"], "to": ["output-1", "in"] },
+    { "from": ["freq-bank-1", "out"], "to": ["output-1", "in"] }
+  ]
+}

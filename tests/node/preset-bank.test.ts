@@ -20,6 +20,9 @@ import { outputDescriptor } from '../../src/engine/modules/output'
 import { pingpongDescriptor } from '../../src/engine/modules/pingpong'
 import { samplerDescriptor } from '../../src/engine/modules/sampler'
 import { bitcrusherDescriptor } from '../../src/engine/modules/bitcrusher'
+import { binauralDescriptor } from '../../src/engine/modules/binaural'
+import { isochronicDescriptor } from '../../src/engine/modules/isochronic'
+import { freqBankDescriptor } from '../../src/engine/modules/freq-bank'
 import type { ModuleDescriptor, ModuleInstance } from '../../src/engine/types'
 
 /**
@@ -60,6 +63,7 @@ const REAL_DESCRIPTORS = [
   lfoDescriptor, noiseDescriptor, wavefolderDescriptor, driveDescriptor,
   mixerDescriptor, clockDescriptor, sequencerDescriptor, keyboardMidiDescriptor, outputDescriptor,
   pingpongDescriptor, samplerDescriptor, bitcrusherDescriptor,
+  binauralDescriptor, isochronicDescriptor, freqBankDescriptor,
 ]
 
 describe('patch bank', () => {

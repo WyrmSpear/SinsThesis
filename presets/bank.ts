@@ -64,6 +64,7 @@ import grimeLeadRaw from './patches/grime-lead.sinp?raw'
 import pingpongLeadRaw from './patches/pingpong-lead.sinp?raw'
 import samplerChopRaw from './patches/sampler-chop.sinp?raw'
 import motorikRaw from '../academy/levels/history-02-motorik.sinp?raw'
+import psychoacousticDemoRaw from './patches/psychoacoustic-demo.sinp?raw'
 
 function parseSinp(raw: string): PatchFile {
   return JSON.parse(raw) as PatchFile
@@ -137,6 +138,12 @@ export const PRESET_BANK: PresetEntry[] = [
     name: 'Motorik',
     description: 'Clock into Sequencer into a filtered VCO, no envelope at all -- the mid-1970s Kraftwerk/Moroder idea that the sequencer is the whole band, not an accessory. From the history academy track.',
     file: parseSinp(motorikRaw),
+  },
+  {
+    id: 'psychoacoustic-demo',
+    name: 'Psychoacoustic Demo',
+    description: 'Three ways to land on a specific frequency: a per-ear pair five hertz apart (headphones make the difference audible as two separate tones; a speaker just mixes the two), a sine switched on and off five times a second with softened edges, and a switch-selected 264 Hz reference tone, all summed at the Output.',
+    file: parseSinp(psychoacousticDemoRaw),
   },
 ]
 
