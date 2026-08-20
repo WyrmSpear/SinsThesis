@@ -413,21 +413,98 @@ describe('sampleAt: loop wrap has no click', () => {
 })
 
 // ---- DC offset --------------------------------------------------------------
+//
+// The original version of this test used a fixed 8000-sample source and a
+// fixed 6000-sample analysis window across rates up to 4x, against a weak
+// `< -40 dB` bar. Reproducing it exactly at 4x reads -42.9 dB -- but not
+// because DC is poorly controlled: at 4x the one-shot exhausts its
+// 8000-sample source partway through the 6000-sample window and drops to
+// silence mid-buffer, and that truncation transient's broadband energy is
+// what a Blackman-Harris FFT's bin 0 was actually reading. A source long
+// enough that the buffer never runs dry reads -123 dB at the same rate.
+// Separately, the original test never checked a rate below 1x at all,
+// where a different confound is worse: the *played-back* period stretches
+// as rate drops (a fixed-frequency source plays back at `f0 * rate`), so a
+// fixed-size window captures fewer and fewer real cycles the slower the
+// rate -- at 0.125x a 4096-sample window holds only ~3 cycles of the
+// 300 Hz test tone and reads -41.6 dB purely from that leakage, improving
+// to -133 dB once the window is widened to ~50+ cycles' worth. Neither
+// confound is a sampler defect; both are the test measuring window
+// artifacts and mislabeling them as "DC" (full account in
+// .superpowers/sdd/audit-sampler.md).
+//
+// Fixed by sizing both the source and the analysis window off the actual
+// played-back period at each tested rate: `measureDcDb` below builds a
+// window wide enough to hold `DC_PERIODS` played cycles (curing the
+// leakage confound) from a source generated long enough to cover
+// warmup + window at that rate without the one-shot running dry (curing
+// the truncation confound) -- exactly the two fixes the audit's own
+// "Methodology correction" prescribed.
+
+const DC_F0 = 300 // source-domain frequency of the zero-mean test tone
+// Enough played-back cycles that a Blackman-Harris window's own leakage
+// doesn't dominate a genuine DC read even at the slowest rate tested
+// (0.125x, the audit's own worst case) -- see this block's comment.
+const DC_PERIODS = 60
+const DC_WARMUP = 2048 // skipped before the window -- past the trigger's own attack transient
+
+function nextPow2(n: number): number {
+  let p = 1
+  while (p < n) p *= 2
+  return p
+}
+
+/** DC (bin 0) magnitude, in dB, of `sampleAt` playing a zero-mean
+ *  `DC_F0`-Hz tone at `octaves`, on a window sized to the *played-back*
+ *  period at that rate and a source built long enough not to exhaust
+ *  within it. */
+function measureDcDb(octaves: number): number {
+  const rate = 2 ** octaves
+  const playedHz = DC_F0 * rate
+  const periodSamples = SR / playedHz
+  const windowSamples = nextPow2(Math.max(4096, Math.ceil(periodSamples * DC_PERIODS)))
+  const total = DC_WARMUP + windowSamples
+  // Long enough that the one-shot source never exhausts within
+  // warmup + window at this rate, regardless of how fast it's consumed.
+  const sourceFrames = Math.ceil(total * Math.max(rate, 1)) + 8
+  const mono = sineTone(sourceFrames, DC_F0)
+  const buf = buildSamplerBuffer(mono, SR)
+  const state = createSamplerState()
+  const p: SamplerParams = { ...baseParams }
+  const out = new Float32Array(total)
+  sampleAt(state, buf, 1, octaves, p, SR) // rising edge
+  for (let i = 0; i < total; i++) out[i] = sampleAt(state, buf, 1, octaves, p, SR)
+  const mags = fftMagnitude(out.subarray(DC_WARMUP), 'blackman-harris')
+  return 20 * Math.log10(Math.max(mags[0]!, 1e-12))
+}
 
 describe('sampleAt: DC offset', () => {
-  it('playing a zero-mean tone at various rates introduces no meaningful DC', () => {
-    for (const octaves of [0, 1, -1, 2]) {
-      const mono = sineTone(8000, 300)
-      const buf = buildSamplerBuffer(mono, SR)
-      const state = createSamplerState()
-      const p: SamplerParams = { ...baseParams }
-      const out = new Float32Array(6000)
-      sampleAt(state, buf, 1, octaves, p, SR)
-      for (let i = 0; i < 6000; i++) out[i] = sampleAt(state, buf, 1, octaves, p, SR)
-      const mags = fftMagnitude(out.subarray(0, 4096), 'blackman-harris')
-      const dcDb = 20 * Math.log10(Math.max(mags[0]!, 1e-12))
-      expect(dcDb).toBeLessThan(-40)
+  it('playing a zero-mean tone at various rates, including slow (<1x) rates the original test never checked, introduces no meaningful DC', () => {
+    // 0.125x/0.5x are slow rates the original test never ran at all (see
+    // this block's comment on the leakage confound there); 1x/2x/4x are
+    // the original test's own rates, now correctly measured; 16x is the
+    // top of the sampler's covered range.
+    const rates = [
+      { octaves: -3, rate: 0.125 },
+      { octaves: -1, rate: 0.5 },
+      { octaves: 0, rate: 1 },
+      { octaves: 1, rate: 2 },
+      { octaves: 2, rate: 4 },
+      { octaves: 4, rate: 16 },
+    ]
+    const results: string[] = []
+    for (const { octaves, rate } of rates) {
+      const dcDb = measureDcDb(octaves)
+      results.push(`rate ${rate}x: ${dcDb.toFixed(2)} dB`)
+      // Genuine DC control measures -120 to -140 dB once both confounds
+      // are corrected for (see this block's own comment). -100 dB leaves
+      // comfortable margin below that measured range while still being 60
+      // dB tighter than the original -40 dB bar it replaces, so a real DC
+      // regression would still be caught.
+      expect(dcDb).toBeLessThan(-100)
     }
+    // eslint-disable-next-line no-console
+    console.log(results.join('\n'))
   })
 })
 
