@@ -35,6 +35,8 @@
  * project relies on to lose.
  */
 
+import { prewarp } from './zdf'
+
 export interface LadderState {
   /** Integrator state, one per pole. */
   s: [number, number, number, number]
@@ -83,14 +85,9 @@ export function ladderSample(
   resonance: number,
   sampleRate: number,
 ): number {
-  const nyquist = sampleRate * 0.5
-  const fc = Math.min(Math.max(cutoffHz, 10), nyquist * 0.99)
-
-  // Bilinear prewarp, so the digital cutoff matches the analog one.
-  const wd = 2 * Math.PI * fc
-  const T = 1 / sampleRate
-  const wa = (2 / T) * Math.tan((wd * T) / 2)
-  const g = (wa * T) / 2
+  // Bilinear prewarp, so the digital cutoff matches the analog one. Shared
+  // with svf.ts -- see zdf.ts's doc comment.
+  const { g } = prewarp(cutoffHz, sampleRate)
   const G = g / (1 + g)
 
   // 4.0 is the linear self-oscillation threshold, and tanh's unity small-signal
