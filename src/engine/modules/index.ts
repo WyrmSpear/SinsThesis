@@ -24,6 +24,7 @@ import { samplerDescriptor } from './sampler'
 import { bitcrusherDescriptor } from './bitcrusher'
 import { binauralDescriptor } from './binaural'
 import { isochronicDescriptor } from './isochronic'
+import { freqBankDescriptor } from './freq-bank'
 
 /** The Phase 1 module set, plus Phase 2's scope, the state-variable filter
  *  (the roadmap's "biggest gap" -- see docs/ROADMAP.md section 1 and
@@ -44,7 +45,9 @@ import { isochronicDescriptor } from './isochronic'
  *  Isochronic (a mono amplitude-gated carrier, the second of three
  *  psychoacoustic tone-generation modules -- see isochronic.ts's own doc
  *  comment for the shaped-envelope click fix and the clock-sync it shares
- *  with lfo.ts).
+ *  with lfo.ts), and the Frequency Bank (the third, a switch-selected
+ *  bank of sixteen exact tuned frequencies on a native OscillatorNode --
+ *  see freq-bank.ts's own doc comment for why no worklet was needed).
  *  The other twenty-one modules stay mono end to end, deliberately (see
  *  ROADMAP section 1a's "do not make everything stereo" ruling); stereo
  *  appears only at Panner/Ping-Pong/Width/Binaural plus output.ts's now
@@ -52,7 +55,7 @@ import { isochronicDescriptor } from './isochronic'
  *  filter it, which is how a Phase 4 level grants four modules and
  *  withholds the rest. */
 export const ALL_DESCRIPTORS = [
-  vcoDescriptor, noiseDescriptor, samplerDescriptor, binauralDescriptor, isochronicDescriptor,
+  vcoDescriptor, noiseDescriptor, samplerDescriptor, binauralDescriptor, isochronicDescriptor, freqBankDescriptor,
   vcfDescriptor, svfDescriptor, vcaDescriptor, wavefolderDescriptor, driveDescriptor, bitcrusherDescriptor,
   adsrDescriptor, lfoDescriptor, shDescriptor,
   mixerDescriptor, multipleDescriptor, delayDescriptor, pingpongDescriptor,

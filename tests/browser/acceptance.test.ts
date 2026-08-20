@@ -20,10 +20,10 @@ describe('Phase 1 acceptance', () => {
     // Drive (a plain saturation stage -- see drive.ts's own doc comment),
     // the three ROADMAP section 1a stereo modules (Panner, Ping-Pong
     // Delay, Width), the Sampler, the Bitcrusher (see each module's own
-    // doc comment), and Binaural and Isochronic, the first two of three
-    // psychoacoustic tone-generation modules (see each module's own doc
-    // comment).
-    expect(ALL_DESCRIPTORS.length).toBe(25)
+    // doc comment), and Binaural, Isochronic and the Frequency Bank -- the
+    // three psychoacoustic tone-generation modules (see each module's own
+    // doc comment).
+    expect(ALL_DESCRIPTORS.length).toBe(26)
   })
 
   it('renders the classic voice: VCO into VCF into VCA into Output', async () => {
