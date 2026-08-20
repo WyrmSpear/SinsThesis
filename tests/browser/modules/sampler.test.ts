@@ -4,6 +4,8 @@ import { ensureWorklets } from '../../../src/engine/render'
 import { registerModule, clearRegistry } from '../../../src/engine/registry'
 import { samplerDescriptor, type SamplerInstance } from '../../../src/engine/modules/sampler'
 import { peakHz, rms } from '../../../src/engine/analysis/features'
+import { encodeWav } from '../../../src/engine/wav'
+import { bytesToBase64 } from '../../../src/engine/base64'
 
 const SR = 48000
 
@@ -261,7 +263,7 @@ describe('Sampler module (real worklet)', () => {
     instance.dispose()
   })
 
-  it('serializeState/restoreState round-trip through the real module (embedded-audio persistence)', async () => {
+  it('serializeState/restoreState round-trip through the real module (metadata)', async () => {
     const ctx = new OfflineAudioContext(1, 128, SR)
     await ensureWorklets(ctx)
     const instance = samplerDescriptor.create(ctx) as SamplerInstance
@@ -280,5 +282,156 @@ describe('Sampler module (real worklet)', () => {
 
     instance.dispose()
     restored.dispose()
+  })
+
+  // ---- the round trip actually carries the audio, not just metadata ------
+  //
+  // The suite above only ever checked `fileName`/`durationSeconds` -- it
+  // would pass identically if `restoreState` produced silence, white noise,
+  // or a hot sample silently clipped to unity. These tests instead render a
+  // known buffer straight through the real worklet (mode='One-Shot',
+  // tune=0, rate 1, forward, the same "reproduces the source almost
+  // exactly" configuration `tests/node/dsp/sampler.test.ts`'s own
+  // interpolation-sanity test uses) both before and after a save/reload,
+  // and diff the two renders sample by sample. Because both renders go
+  // through the identical worklet/DSP path, any difference is attributable
+  // only to the persistence round trip (PCM16 quantisation, plus the
+  // hot-sample gain fix below) -- not to interpolation or alignment
+  // artifacts the DSP layer already has its own tests for.
+
+  /** Loads `mono` into a throwaway, unconnected instance purely to produce
+   *  the same `serializeState()` a real Save would write -- mirrors a
+   *  genuine save/reload using a *different* module instance than the one
+   *  that plays the restored audio back, the same way loading a `.sinp` in
+   *  a fresh session does. */
+  async function savedState(
+    mono: Float32Array, sampleRate: number, fileName: string,
+  ): Promise<ReturnType<NonNullable<SamplerInstance['serializeState']>>> {
+    const ctx = new OfflineAudioContext(1, 128, sampleRate)
+    await ensureWorklets(ctx)
+    const instance = samplerDescriptor.create(ctx) as SamplerInstance
+    instance.loadBuffer([mono], sampleRate, fileName)
+    const state = instance.serializeState!()
+    instance.dispose()
+    return state
+  }
+
+  /** Renders a one-shot, rate-1, forward playthrough of whatever `configure`
+   *  loads -- the DSP-level round-trip config `tests/node/dsp/sampler.test.ts`
+   *  already measures as reproducing its source almost exactly, so any
+   *  post-configure difference between two such renders is the persistence
+   *  path's own error, not this shape of playback's. */
+  function renderOneShotThrough(
+    seconds: number, configure: (ctx: OfflineAudioContext, g: PatchGraph, sampler: SamplerInstance) => void,
+  ): Promise<Float32Array> {
+    return renderWithSample(seconds, (ctx, g) => {
+      const id = g.addModule('sampler', 'sampler')
+      const sampler = g.getInstance(id) as SamplerInstance
+      configure(ctx, g, sampler)
+      g.setParam(id, 'mode', 0) // one-shot -- plays the whole loaded region once, forward
+      gateOn(ctx, sampler.inputs.get('gate')!)
+      return { outputId: id, sampler }
+    })
+  }
+
+  /** Max absolute per-sample difference, and its dBFS-style figure
+   *  (`20*log10`, same convention the audit used for "max error 1.526e-5
+   *  (~-96 dBFS)") -- compared over the loaded region's own length; both
+   *  renders go silent identically beyond it, so comparing further adds no
+   *  information. */
+  function maxErrorDb(a: Float32Array, b: Float32Array, frames: number): { maxErr: number; db: number } {
+    let maxErr = 0
+    for (let i = 0; i < frames; i++) maxErr = Math.max(maxErr, Math.abs(a[i]! - b[i]!))
+    return { maxErr, db: 20 * Math.log10(Math.max(maxErr, 1e-12)) }
+  }
+
+  // The tolerance asserted below is -80 dBFS: the audit's own direct
+  // (encoder-only) measurement of this exact PCM16 path was ~-96 dBFS: with
+  // 20 dB of margin above the measured figure to absorb this test's extra
+  // worklet/render-graph plumbing (a real AudioWorkletNode round trip, not
+  // a bare function call) without being so loose it would miss a real
+  // regression -- and it is still far below this engine's own DSP noise
+  // floor (docs/CONTINUATION.md's measured-quality table has nothing worse
+  // than -45 dB, and most figures are -60 dB or better), i.e. genuinely
+  // inaudible.
+  const TOLERANCE_DB = -80
+
+  it('a normal (never-hot) sample survives save/reload within the stated PCM16 tolerance', async () => {
+    const frames = 4800
+    const mono = sineChannel(frames, 220, SR, 0.8)
+    const state = await savedState(mono, SR, 'rt.wav')
+
+    const reference = await renderOneShotThrough(0.15, (_ctx, _g, sampler) => {
+      sampler.loadBuffer([mono], SR, 'rt.wav')
+    })
+    const restored = await renderOneShotThrough(0.15, (_ctx, _g, sampler) => {
+      sampler.restoreState!(state)
+    })
+
+    const { maxErr, db } = maxErrorDb(reference, restored, frames)
+    // eslint-disable-next-line no-console
+    console.log(`sampler round-trip error: ${maxErr.toExponential(3)} (${db.toFixed(1)} dBFS)`)
+    expect(db).toBeLessThanOrEqual(TOLERANCE_DB)
+  })
+
+  it('a hot (peak 1.4) sample survives save/reload without being clipped -- the finding-1 regression case', async () => {
+    const frames = 4800
+    const mono = sineChannel(frames, 220, SR, 1.4) // peaks at 1.4, well above unity
+    const state = await savedState(mono, SR, 'hot.wav')
+
+    // Before the fix, `encodeWav`'s PCM16 path clamped every sample to
+    // [-1, 1] on save with no warning -- this state's `gain` field is what
+    // now lets `restoreState` undo that clamp instead of baking it in
+    // permanently.
+    expect((state as { gain?: number }).gain).toBeCloseTo(1.4, 1)
+
+    const reference = await renderOneShotThrough(0.15, (_ctx, _g, sampler) => {
+      sampler.loadBuffer([mono], SR, 'hot.wav')
+    })
+    const restored = await renderOneShotThrough(0.15, (_ctx, _g, sampler) => {
+      sampler.restoreState!(state)
+    })
+
+    let referencePeak = 0
+    let restoredPeak = 0
+    for (let i = 0; i < frames; i++) {
+      referencePeak = Math.max(referencePeak, Math.abs(reference[i]!))
+      restoredPeak = Math.max(restoredPeak, Math.abs(restored[i]!))
+    }
+    // eslint-disable-next-line no-console
+    console.log(`hot sample peak: reference ${referencePeak.toFixed(3)}, restored ${restoredPeak.toFixed(3)}`)
+    // The regression this catches: pre-fix, `restoredPeak` would have
+    // measured ~1.0 -- silently clipped, no error, no warning. It must now
+    // reach essentially the same peak the un-persisted reference does.
+    expect(restoredPeak).toBeGreaterThan(1.3)
+
+    const { maxErr, db } = maxErrorDb(reference, restored, frames)
+    // eslint-disable-next-line no-console
+    console.log(`hot sample round-trip error: ${maxErr.toExponential(3)} (${db.toFixed(1)} dBFS)`)
+    expect(db).toBeLessThanOrEqual(TOLERANCE_DB)
+  })
+
+  it('an old-format saved state (no "gain" field) still loads correctly -- pre-fix compatibility', async () => {
+    // Hand-built with the same, unchanged `wav.ts` encoder rather than via
+    // today's `serializeState`, so this is byte-faithful to what every
+    // `.sinp` written before this fix (including the shipped presets and
+    // every academy level solution -- see `tests/browser/analysis/
+    // history-rubric-render.test.ts`'s own "history-05-chop" coverage,
+    // which loads a real one end to end) actually contains: `{fileName,
+    // wavBase64}`, no `gain` key at all.
+    const frames = 4800
+    const mono = sineChannel(frames, 220, SR, 0.8) // never hot -- pre-fix files never clipped this case
+    const wavBytes = new Uint8Array(encodeWav([mono], SR, 'pcm16'))
+    const legacyState = { fileName: 'legacy.wav', wavBase64: bytesToBase64(wavBytes) }
+
+    const reference = await renderOneShotThrough(0.15, (_ctx, _g, sampler) => {
+      sampler.loadBuffer([mono], SR, 'legacy.wav')
+    })
+    const restored = await renderOneShotThrough(0.15, (_ctx, _g, sampler) => {
+      sampler.restoreState!(legacyState)
+    })
+
+    const { db } = maxErrorDb(reference, restored, frames)
+    expect(db).toBeLessThanOrEqual(TOLERANCE_DB)
   })
 })
