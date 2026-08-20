@@ -121,27 +121,116 @@ interface CaptureResult {
 }
 
 /**
- * Resets the clock's phase to "now" (`graph.setParam` on `bpm` always calls
- * `rescheduleGate`, per clock-module.ts) and, in the same synchronous
- * `page.evaluate` call, wires an `AudioWorkletNode` tap onto the VCO's raw
- * output -- before the VCF/VCA/ADSR chain, matching the engine-level test's
- * own measurement point. Doing both in one call (no `await` between them)
- * is what makes "now" mean the same instant for the clock's new epoch and
- * for the tap's first captured sample, so the window offsets below line up
- * with the step grid.
+ * Retimes the clock's phase to "now" (`graph.setParam` on `bpm` always
+ * calls `rescheduleGate`, per clock-module.ts), forces the sequencer back
+ * to step 0, and wires an `AudioWorkletNode` tap onto the VCO's raw output
+ * -- before the VCF/VCA/ADSR chain, matching the engine-level test's own
+ * measurement point. All three happen in one synchronous `page.evaluate`
+ * call so every scheduled time below is relative to the exact same `t0`.
+ *
+ * Root cause of the flake this guards against (see .superpowers/sdd/themes-
+ * ten-eleven-twelve-report.md for the full account, reproduced with 4-way
+ * parallel full-suite contention until it hit reliably): `rescheduleGate`
+ * only re-times the *clock's own* gate edges from "now" -- it has no idea
+ * the sequencer downstream exists, and correctly does not reset its step
+ * counter (a tempo knob on real hardware doesn't rewind a running
+ * sequence). `wireSequencerVoice` connects `clock.gate -> seq.clock`
+ * *before* the drag under test even happens, at whatever tempo the clock
+ * module's own default (120 BPM) gives it, and that clock keeps ticking on
+ * the *audio* clock throughout however long the rest of the test setup
+ * takes on the *main thread* -- normally a few hundred ms, easily several
+ * seconds once the suite is fully loaded and every `page.evaluate` round
+ * trip queues up behind sibling Chromium processes. By the time this
+ * function's own reset runs, `sequencerStep`'s internal `state.index` (dsp/
+ * segment.ts) has already advanced through however many steps the old
+ * schedule fired in the meantime -- fast in isolation, arbitrarily far
+ * under load -- so "the clock's first new edge after reset" lands on
+ * whatever step the drift left it on, not step 0. Only `step1` was ever
+ * programmed; every other step is still its default (0 oct, 440 Hz), so
+ * landing on any step but 0 reads back as 440 Hz regardless of what the
+ * drag set -- exactly the "two octaves low" symptom, and exactly why it
+ * read as "the drag didn't register": from the audio's point of view nothing
+ * downstream of the drag was ever wrong, the sequencer just wasn't looking
+ * at step 1 anymore when the tap started listening.
+ *
+ * The fix drives the sequencer's own `reset` port (already in its
+ * descriptor, just never wired by this test) directly: a throwaway
+ * `ConstantSourceNode` pulsed 0 -> 1 -> 0 onto the same front `GainNode`
+ * `wireSequencerVoice`'s cable would have driven. Two things had to be true
+ * for this to actually be deterministic rather than just less flaky,
+ * both found by reproducing under 4-way parallel full-suite contention
+ * rather than assumed:
+ *
+ * 1. It must not race the OLD (pre-retime) schedule. A first attempt
+ *    pulsed reset in its own `page.evaluate` call, then `waitForTimeout`ed
+ *    before retiming the clock in a second call -- but during that real
+ *    wall-clock gap the *old*, not-yet-cancelled schedule (still running on
+ *    the audio clock regardless of JS timing) could fire another edge and
+ *    immediately undo the reset. Measured: this made the failure rate
+ *    *worse*, not better. The fix is ordering: retime the clock FIRST --
+ *    `rescheduleGate`'s own `cancelScheduledValues` kills the old schedule
+ *    atomically, with no gap for it to sneak in one more edge -- and only
+ *    then reset.
+ * 2. It must not race the NEW (post-retime) schedule's own immediate first
+ *    edge. `ctx.currentTime` only advances once per 128-sample render
+ *    quantum (~2.7 ms at 48 kHz), and two reads of it microseconds apart in
+ *    the same JS task routinely return the identical value -- so scheduling
+ *    the reset at bare `ctx.currentTime` right after the retime (still in
+ *    the same call) could still land the reset's rising edge in the exact
+ *    same quantum as the new schedule's own near-immediate first edge.
+ *    `sequencerStep` processes both within that one call in that case: the
+ *    reset sets `state.index = 0`, and the *same* sample's clock edge
+ *    immediately advances it to 1 -- skipping step 0 and landing one step
+ *    early. The fix is an explicit future offset, `RESET_SETTLE` (0.35 s),
+ *    passed to `setValueAtTime` rather than "now" -- Web Audio schedules it
+ *    exactly there in audio-clock time regardless of when the JS call
+ *    itself actually runs, comfortably inside the 1 s gap between the new
+ *    schedule's first edge (~0 s) and second edge (1 s), so it can never
+ *    coincide with either.
+ *
+ * `windowAt` calls below read the first (step 1) window at
+ * `RESET_SETTLE + MARGIN`, not bare `MARGIN`, to stay clear of the reset
+ * pulse itself; the second (step 2) window stays at `1 + MARGIN` exactly as
+ * before, since that boundary is the retime's own second edge and is
+ * untouched by any of this.
  */
-async function captureVcoAudio(page: Page, captureMs: number): Promise<CaptureResult> {
-  await page.evaluate((clockId) => {
+export const RESET_SETTLE = 0.35 // seconds after the clock retime before the reset pulse fires
+
+async function captureVcoAudio(page: Page, captureMs: number, seqId: string): Promise<CaptureResult> {
+  await page.evaluate(({ clockId, seqId, resetSettle }) => {
     const win = window as unknown as {
-      __sinsthesis: { graph: { setParam(id: string, param: string, value: number): void; getInstance(id: string): { outputs: Map<string, AudioNode> }; moduleIds: readonly string[]; getType(id: string): string }; ctx: AudioContext }
+      __sinsthesis: {
+        graph: {
+          setParam(id: string, param: string, value: number): void
+          getInstance(id: string): { inputs: Map<string, AudioNode | AudioParam>; outputs: Map<string, AudioNode> }
+          moduleIds: readonly string[]
+          getType(id: string): string
+        }
+        ctx: AudioContext
+      }
       __seqTapChunks: { frame: number; samples: Float32Array }[]
     }
     const { graph, ctx } = win.__sinsthesis
+
     // 60 BPM, division 1 -- one step per second, matching
-    // tests/browser/modules/sequencer.test.ts's own timing exactly, and
-    // resets the step grid to start "now".
+    // tests/browser/modules/sequencer.test.ts's own timing exactly.
+    // Retime FIRST (see point 1 above): this atomically cancels whatever
+    // schedule was already running and commits a fresh one from "now",
+    // before the reset pulse below touches anything.
     graph.setParam(clockId, 'bpm', 60)
     graph.setParam(clockId, 'division', 1)
+
+    // Force the sequencer to step 0, scheduled comfortably clear of both
+    // the retime's own immediate first edge and its second edge one second
+    // later (see point 2 above).
+    const t0 = ctx.currentTime
+    const resetFront = graph.getInstance(seqId).inputs.get('reset') as AudioNode
+    const resetPulse = new ConstantSourceNode(ctx, { offset: 0 })
+    resetPulse.connect(resetFront)
+    resetPulse.start()
+    resetPulse.offset.setValueAtTime(1, t0 + resetSettle)
+    resetPulse.offset.setValueAtTime(0, t0 + resetSettle + 0.03)
+    resetPulse.stop(t0 + resetSettle + 0.05)
 
     const tap = new AudioWorkletNode(ctx, 'peak-tap', {
       numberOfInputs: 1,
@@ -160,7 +249,7 @@ async function captureVcoAudio(page: Page, captureMs: number): Promise<CaptureRe
 
     const vcoId = graph.moduleIds.find((id) => graph.getType(id) === 'vco')!
     graph.getInstance(vcoId).outputs.get('out')!.connect(tap)
-  }, await resolveClockId(page))
+  }, { clockId: await resolveClockId(page), seqId, resetSettle: RESET_SETTLE })
 
   await page.waitForTimeout(captureMs)
 
@@ -234,10 +323,10 @@ describe('rack sequencer', () => {
     const expectedStep1Hz = 440 * 2 ** step1Value
     const expectedStep2Hz = 440 * 2 ** step2Value
 
-    const result = await captureVcoAudio(page, 2200)
+    const result = await captureVcoAudio(page, 2200, seqId)
     const samples = Float32Array.from(result.samples)
 
-    const step1Hz = peakHz(windowAt(samples, MARGIN), result.sampleRate)
+    const step1Hz = peakHz(windowAt(samples, RESET_SETTLE + MARGIN), result.sampleRate)
     const step2Hz = peakHz(windowAt(samples, 1 + MARGIN), result.sampleRate)
 
     console.log(`rack-sequencer step program: step1=${step1Hz.toFixed(1)}Hz (expected ~${expectedStep1Hz.toFixed(1)}), step2=${step2Hz.toFixed(1)}Hz (expected ~${expectedStep2Hz.toFixed(1)})`)
@@ -292,10 +381,10 @@ describe('rack sequencer', () => {
     const step1Value = params['step1']!
     const expectedHz = 440 * 2 ** step1Value
 
-    const result = await captureVcoAudio(page, 2200)
+    const result = await captureVcoAudio(page, 2200, seqId)
     const samples = Float32Array.from(result.samples)
 
-    const firstWindowHz = peakHz(windowAt(samples, MARGIN), result.sampleRate)
+    const firstWindowHz = peakHz(windowAt(samples, RESET_SETTLE + MARGIN), result.sampleRate)
     const secondWindowHz = peakHz(windowAt(samples, 1 + MARGIN), result.sampleRate)
 
     console.log(`rack-sequencer steps=1: window1=${firstWindowHz.toFixed(1)}Hz window2=${secondWindowHz.toFixed(1)}Hz expected=${expectedHz.toFixed(1)}Hz`)
