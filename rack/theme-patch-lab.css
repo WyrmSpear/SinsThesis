@@ -1,9 +1,12 @@
 /**
- * Korg MS-20 -- charcoal, white tick scales, chrome jacks; the most legible
- * patching surface ever made (spec Section 8's list). Same rule as every
- * theme file: nothing but CSS custom properties, `rack/style.css` and every
- * rack/*.ts component untouched, geometry unaffected (rack/panel.ts,
- * rack/knob.ts own that instead).
+ * Patch Lab -- charcoal, white tick scales, chrome jacks; the most legible
+ * patching surface this token system can render (spec Section 8's list).
+ * Named "Korg MS-20" until the trademark rename (see
+ * .superpowers/sdd/theme-rename-report.md) -- the palette is unchanged,
+ * only the id and label moved. Same rule as every theme file: nothing but
+ * CSS custom properties, `rack/style.css` and every rack/*.ts component
+ * untouched, geometry unaffected (rack/panel.ts, rack/knob.ts own that
+ * instead).
  *
  * Where every other theme reaches for a texture (a grain, a scanline, a
  * trace grid) on `--surface-rack`, this one deliberately doesn't -- flat
@@ -12,18 +15,18 @@
  * with what's printed on it. The legibility claim isn't just a color
  * choice either: `--text-2xs`/`--text-xs`/`--text-sm`/`--text-md`/`--text-lg`
  * are all a notch larger than every other theme's, and `--tracking-label`
- * is modest rather than either extreme (Reaktor Dark's wide 0.1em or
- * Ableton Live's tight 0.01em) -- the actual "most legible" claim, made of
- * ordinary type-scale tokens rather than a slogan. The real MS-20's two
- * signature colors split across two different roles instead of one: white
+ * is modest rather than either extreme (Graphite's wide 0.1em or Flat
+ * Grid's tight 0.01em) -- the actual "most legible" claim, made of
+ * ordinary type-scale tokens rather than a slogan. The two signature colors
+ * this theme evokes split across two different roles instead of one: white
  * is what you *read* (the tick-scale pointer, the readout, module names'
- * dim/faint tiers), and the hardware's iconic orange is what you *touch or
+ * dim/faint tiers), and the hardware-orange accent is what you *touch or
  * plug in* (the power lamp, jack-hover ring, and the primary/audio cable
  * color) -- orange even shows up as `--knob-readout-drag`, the one moment
  * a knob's own readout briefly borrows the accent while it's actively
  * being turned.
  */
-:root[data-theme='korg-ms20'] {
+:root[data-theme='patch-lab'] {
   /* ---- surfaces: flat charcoal, no texture competing with the print ---- */
   --surface-rack: radial-gradient(ellipse at 50% -5%, rgba(255, 255, 255, 0.03), transparent 60%), #232325;
   --surface-panel: #2c2c2e;

@@ -1,9 +1,13 @@
 /**
- * Moog Wood -- walnut cheeks, cream knobs, serif engraving, one orange lamp
- * (spec Section 8's list). Same rule as every theme file: this is nothing
- * but CSS custom properties, `rack/style.css` and every rack/*.ts component
- * are untouched, and geometry (panel widths, knob sizes, jack positions)
- * lives outside the token system entirely (rack/panel.ts, rack/knob.ts).
+ * Walnut & Cream -- walnut cheeks, cream knobs, serif engraving, one orange
+ * lamp (spec Section 8's list). Named "Moog Wood" until the trademark
+ * rename (see .superpowers/sdd/theme-rename-report.md) -- the palette is
+ * unchanged, only the id and label moved.
+ *
+ * Same rule as every theme file: this is nothing but CSS custom properties,
+ * `rack/style.css` and every rack/*.ts component are untouched, and
+ * geometry (panel widths, knob sizes, jack positions) lives outside the
+ * token system entirely (rack/panel.ts, rack/knob.ts).
  *
  * Two tokens here carry more than a flat color: `--surface-rack` and
  * `--rail-surface` are each substituted as the *entire* value of a
@@ -22,7 +26,7 @@
  * standing in for the gradient's light/dark stops is the ceiling of what
  * the token system can do there, and it is what this file does.
  */
-:root[data-theme='moog-wood'] {
+:root[data-theme='walnut-cream'] {
   /* ---- surfaces ---- */
   --surface-rack:
     repeating-linear-gradient(100deg, rgba(0, 0, 0, 0.05) 0px, rgba(0, 0, 0, 0.05) 2px, transparent 2px, transparent 7px),

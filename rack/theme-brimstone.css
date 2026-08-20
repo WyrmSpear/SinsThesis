@@ -15,7 +15,7 @@
  * turned out to still be zero component changes, same call sites as always:
  * `body`'s `background` and `.rack-surface`'s `background` in
  * rack/style.css are each a bare `var(--surface-rack)` / `var(--rail-surface)`
- * with no gradient wrapped around them (see Moog Wood's and Phosphor Lab's
+ * with no gradient wrapped around them (see Walnut & Cream's and Phosphor Lab's
  * own header comments for why that matters), and the CSS `background`
  * shorthand accepts an arbitrary list of comma-separated layers -- an
  * `url(...)` image layer is exactly as legal there as another
@@ -74,8 +74,8 @@
   /* Brightened from an initial #8a5a48 (2.9-3.4:1 against the panel
    * surfaces -- checked, not assumed) up to a measured 4.2-5.2:1 across
    * --surface-panel/-alt/-recess, matching or beating every other theme's
-   * own --text-dim contrast (Reaktor Dark 4.25:1, Circuit/PCB 4.66:1,
-   * Moog Wood 3.60:1). This is the color knob labels, jack labels and
+   * own --text-dim contrast (Graphite 4.25:1, Circuit/PCB 4.66:1,
+   * Walnut & Cream 3.60:1). This is the color knob labels, jack labels and
    * palette entries render in at 0.62rem -- the smallest type on the
    * page -- so it got a WCAG contrast pass the other tokens below didn't
    * need. */

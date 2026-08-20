@@ -195,8 +195,8 @@ export function buildPanel(
   // the panel shrink-to-fit its widest child -- which, for ordinary
   // modules, means the widest *label text*, and a label's rendered width
   // depends on the active theme's font-family/letter-spacing/font-size
-  // tokens (Moog Wood's serif vs. Phosphor Lab's wider Courier New vs.
-  // Reaktor Dark's own IBM Plex Mono measurably disagreed on it). A first
+  // tokens (Walnut & Cream's serif vs. Phosphor Lab's wider Courier New vs.
+  // Graphite's own IBM Plex Mono measurably disagreed on it). A first
   // attempt at a hard `width` here broke ADSR -- not because `width` is
   // wrong, but because ADSR's own `hp` (8, 128px) was too small for its
   // four knobs in the first place: 128px split four ways leaves each grid

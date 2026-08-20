@@ -1,6 +1,10 @@
 /**
- * Geist Groovebox -- brushed metal, orange arcs plus cyan (spec Section 8's
- * list). Same rule as every theme file: nothing but CSS custom properties,
+ * Brushed Steel -- brushed metal, orange arcs plus cyan (spec Section 8's
+ * list). Named "Geist Groovebox" until the trademark rename (see
+ * .superpowers/sdd/theme-rename-report.md) -- the palette is unchanged,
+ * only the id and label moved.
+ *
+ * Same rule as every theme file: nothing but CSS custom properties,
  * `rack/style.css` and every rack/*.ts component untouched, geometry
  * unaffected (rack/panel.ts, rack/knob.ts own that instead).
  *
@@ -16,7 +20,7 @@
  * rings) is cyan -- one warm, one cool, the two-LED-color look of a real
  * hardware groovebox's pads, without inventing a third accent to blur it.
  */
-:root[data-theme='geist-groovebox'] {
+:root[data-theme='brushed-steel'] {
   /* ---- surfaces: brushed aluminum ---- */
   --surface-rack:
     repeating-linear-gradient(97deg, rgba(255, 255, 255, 0.035) 0px, rgba(255, 255, 255, 0.035) 1px, transparent 1px, transparent 2px),

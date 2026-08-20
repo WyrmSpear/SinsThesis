@@ -6,21 +6,41 @@
   <link rel="icon" href="data:," />
   <!--
     Theme bootstrap: sets `data-theme` on <html> from localStorage before
-    any stylesheet below is parsed, so the page never flashes Reaktor Dark
+    any stylesheet below is parsed, so the page never flashes Graphite
     before repainting into a stored preference. Plain, synchronous, inline
     -- an ES module (`type="module"`, like rack/main.ts below) is always
     deferred, which runs it after CSSOM/first-paint timing and would bring
     the flash right back. rack/theme-switcher.ts owns every *other* piece
     of theme state (the visible switcher, persisting a change) -- this
     script's only job is "the first paint already has the right attribute."
+
+    OLD_THEME_IDS below mirrors rack/theme-switcher.ts's own OLD_THEME_IDS
+    exactly, migrating a returning visitor's pre-rename theme id (see
+    .superpowers/sdd/theme-rename-report.md) to its current id -- without
+    this, a stored old id would match no `:root[data-theme="..."]` selector
+    any theme file below still defines, and the page would render unstyled
+    until rack/theme-switcher.ts's own (deferred) migration ran. Duplicated
+    rather than imported because this script has to run synchronously,
+    before any ES module is even fetched; keep both maps in sync if a theme
+    is ever renamed again.
   -->
   <script>
     (function () {
+      var OLD_THEME_IDS = {
+        'reaktor-dark': 'graphite',
+        'moog-wood': 'walnut-cream',
+        'ableton-live': 'flat-grid',
+        'korg-ms20': 'patch-lab',
+        'geist-groovebox': 'brushed-steel',
+        casiotone: 'toy-piano',
+      };
       try {
         var stored = localStorage.getItem('sinsthesis-theme');
-        document.documentElement.dataset.theme = stored || 'reaktor-dark';
+        var id = (stored && OLD_THEME_IDS[stored]) || stored || 'graphite';
+        document.documentElement.dataset.theme = id;
+        if (stored && stored !== id) localStorage.setItem('sinsthesis-theme', id);
       } catch (e) {
-        document.documentElement.dataset.theme = 'reaktor-dark';
+        document.documentElement.dataset.theme = 'graphite';
       }
     })();
   </script>
@@ -31,14 +51,14 @@
     rules ever win and switching is a single attribute write with no
     network request, no flash, no re-render of anything but computed style.
   -->
-  <link rel="stylesheet" href="/rack/theme-reaktor-dark.css" />
-  <link rel="stylesheet" href="/rack/theme-moog-wood.css" />
+  <link rel="stylesheet" href="/rack/theme-graphite.css" />
+  <link rel="stylesheet" href="/rack/theme-walnut-cream.css" />
   <link rel="stylesheet" href="/rack/theme-phosphor-lab.css" />
-  <link rel="stylesheet" href="/rack/theme-ableton-live.css" />
+  <link rel="stylesheet" href="/rack/theme-flat-grid.css" />
   <link rel="stylesheet" href="/rack/theme-circuit-pcb.css" />
-  <link rel="stylesheet" href="/rack/theme-geist-groovebox.css" />
-  <link rel="stylesheet" href="/rack/theme-casiotone.css" />
-  <link rel="stylesheet" href="/rack/theme-korg-ms20.css" />
+  <link rel="stylesheet" href="/rack/theme-brushed-steel.css" />
+  <link rel="stylesheet" href="/rack/theme-toy-piano.css" />
+  <link rel="stylesheet" href="/rack/theme-patch-lab.css" />
   <link rel="stylesheet" href="/rack/theme-brimstone.css" />
   <link rel="stylesheet" href="/rack/theme-space-station.css" />
   <link rel="stylesheet" href="/rack/theme-vaporwave.css" />

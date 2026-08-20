@@ -65,18 +65,23 @@ afterAll(async () => {
 
 // The eight themes Section 8 names, plus Brimstone (the ninth), Space
 // Station, Vaporwave and Psychedelic (the tenth through twelfth -- see
-// each theme's own rack/theme-*.css header comment). Reaktor Dark is the
+// each theme's own rack/theme-*.css header comment). Graphite is the
 // default and serves as the reference every other theme is compared
-// against.
+// against. Six ids below were renamed away from a third-party trademark
+// (reaktor-dark -> graphite, moog-wood -> walnut-cream, ableton-live ->
+// flat-grid, korg-ms20 -> patch-lab, geist-groovebox -> brushed-steel,
+// casiotone -> toy-piano; see .superpowers/sdd/theme-rename-report.md) --
+// the localStorage migration for returning visitors is covered separately,
+// in tests/browser/theme-migration.test.ts.
 const THEMES = [
-  'reaktor-dark',
-  'moog-wood',
+  'graphite',
+  'walnut-cream',
   'phosphor-lab',
-  'ableton-live',
+  'flat-grid',
   'circuit-pcb',
-  'geist-groovebox',
-  'casiotone',
-  'korg-ms20',
+  'brushed-steel',
+  'toy-piano',
+  'patch-lab',
   'brimstone',
   'space-station',
   'vaporwave',
@@ -195,10 +200,10 @@ describe('theme geometry (Section 8)', () => {
       await app.waitFor({ state: 'visible' })
       await page.waitForTimeout(250)
 
-      // Reaktor Dark is the default -- verify the switcher already shows it
+      // Graphite is the default -- verify the switcher already shows it
       // active before touching anything, so a later mismatch can't be
       // blamed on this test's own setup.
-      expect(await page.evaluate(() => document.documentElement.dataset['theme'])).toBe('reaktor-dark')
+      expect(await page.evaluate(() => document.documentElement.dataset['theme'])).toBe('graphite')
 
       // Add every module type through the palette so the assertions below
       // cover every registered descriptor, not just the starter patch's
@@ -235,7 +240,7 @@ describe('theme geometry (Section 8)', () => {
       // below vacuously.
       expect(indicatorTokens.size).toBe(THEMES.length)
 
-      const reference = geometries['reaktor-dark']!
+      const reference = geometries['graphite']!
       expect(reference.length).toBeGreaterThanOrEqual(paletteTypes.length)
 
       // Every Eurorack module is 3U tall regardless of width -- the rack's
@@ -248,7 +253,7 @@ describe('theme geometry (Section 8)', () => {
       // already does.
       const referenceHeight = reference[0]!.height
       for (const panel of reference) {
-        expect(panel.height, `reaktor-dark: ${panel.type} panel height (every module is 3U)`).toBe(referenceHeight)
+        expect(panel.height, `graphite: ${panel.type} panel height (every module is 3U)`).toBe(referenceHeight)
       }
 
       for (const theme of THEMES.slice(1)) {

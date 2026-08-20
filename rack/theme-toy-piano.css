@@ -1,9 +1,12 @@
 /**
- * Casiotone -- beige plastic, primary colour coding; the only unserious one,
- * and that is its value (spec Section 8's list). Same rule as every theme
- * file: nothing but CSS custom properties, `rack/style.css` and every
- * rack/*.ts component untouched, geometry unaffected (rack/panel.ts,
- * rack/knob.ts own that instead).
+ * Toy Piano -- beige plastic, primary colour coding; the only unserious
+ * one, and that is its value (spec Section 8's list). Named "Casiotone"
+ * until the trademark rename (see .superpowers/sdd/theme-rename-report.md)
+ * -- the palette is unchanged, only the id and label moved.
+ *
+ * Same rule as every theme file: nothing but CSS custom properties,
+ * `rack/style.css` and every rack/*.ts component untouched, geometry
+ * unaffected (rack/panel.ts, rack/knob.ts own that instead).
  *
  * The one thing every other theme so far shares and this one breaks on
  * purpose: it is a *light* theme, cream and tan instead of any shade of
@@ -21,7 +24,7 @@
  * synth's own three-crayon palette, not three shades of one hue the way
  * Phosphor Lab or Circuit/PCB pick a family and stay in it.
  */
-:root[data-theme='casiotone'] {
+:root[data-theme='toy-piano'] {
   /* ---- surfaces: beige injection-molded plastic ---- */
   --surface-rack:
     radial-gradient(ellipse at 50% -10%, rgba(255, 255, 255, 0.5), transparent 55%),

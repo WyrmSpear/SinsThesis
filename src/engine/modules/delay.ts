@@ -20,7 +20,7 @@ export const delayDescriptor: ModuleDescriptor = {
     { id: 'time', label: 'Time', min: 0.001, max: MAX_DELAY_SECONDS, default: 0.3, curve: 'exp', unit: 's' },
     // 'Feedback' sat right at its column's edge -- fine by rounded
     // scrollWidth/clientWidth but a fraction of a px over by actual
-    // glyph-run width in two themes (moog-wood, korg-ms20), which still
+    // glyph-run width in two themes (walnut-cream, patch-lab), which still
     // paints an ellipsis. 'FB' is the standard delay/echo abbreviation and
     // removes the margin entirely rather than trusting a sub-pixel fit.
     { id: 'feedback', label: 'FB', min: 0, max: 0.95, default: 0.3, curve: 'lin', unit: '' },

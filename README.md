@@ -11,7 +11,7 @@ What makes this project unusual is that its audio quality is *measured*, not
 asserted. Every oscillator, filter and wavefolder ships with a number an
 independent audit reproduced — see below.
 
-![The rack in Reaktor Dark](docs/images/rack-reaktor-dark.png)
+![The rack in Graphite](docs/images/rack-graphite.png)
 
 ## Running it
 

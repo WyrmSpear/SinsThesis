@@ -13,13 +13,13 @@
  * stylesheet link, that sets the same attribute from localStorage
  * synchronously on load -- this module's job starts after that: rendering
  * the visible switcher and wiring its clicks. Without the inline
- * bootstrap, the page would flash Reaktor Dark and then repaint into the
+ * bootstrap, the page would flash Graphite and then repaint into the
  * stored theme once this module (an ES module, deferred by spec) finally
  * ran.
  */
 
 export const STORAGE_KEY = 'sinsthesis-theme'
-export const DEFAULT_THEME = 'reaktor-dark'
+export const DEFAULT_THEME = 'graphite'
 
 export interface ThemeOption {
   id: string
@@ -28,25 +28,60 @@ export interface ThemeOption {
 
 /** The eight themes Section 8 names, plus Brimstone, Space Station,
  *  Vaporwave and Psychedelic -- proof a twelfth is still just: drop a
- *  `rack/theme-<id>.css` file, add one line here. */
+ *  `rack/theme-<id>.css` file, add one line here. Six ids were renamed
+ *  away from a third-party trademark (see
+ *  .superpowers/sdd/theme-rename-report.md for the full map and reasoning);
+ *  see `OLD_THEME_IDS` below for what a returning visitor's localStorage
+ *  might still hold. */
 export const THEMES: readonly ThemeOption[] = [
-  { id: 'reaktor-dark', label: 'Reaktor Dark' },
-  { id: 'moog-wood', label: 'Moog Wood' },
+  { id: 'graphite', label: 'Graphite' },
+  { id: 'walnut-cream', label: 'Walnut & Cream' },
   { id: 'phosphor-lab', label: 'Phosphor Lab' },
-  { id: 'ableton-live', label: 'Ableton Live' },
+  { id: 'flat-grid', label: 'Flat Grid' },
   { id: 'circuit-pcb', label: 'Circuit/PCB' },
-  { id: 'geist-groovebox', label: 'Geist Groovebox' },
-  { id: 'casiotone', label: 'Casiotone' },
-  { id: 'korg-ms20', label: 'Korg MS-20' },
+  { id: 'brushed-steel', label: 'Brushed Steel' },
+  { id: 'toy-piano', label: 'Toy Piano' },
+  { id: 'patch-lab', label: 'Patch Lab' },
   { id: 'brimstone', label: 'Brimstone' },
   { id: 'space-station', label: 'Space Station' },
   { id: 'vaporwave', label: 'Vaporwave' },
   { id: 'psychedelic', label: 'Psychedelic' },
 ]
 
+/** Old theme ids, from before the trademark rename, mapped to their
+ *  replacement -- a returning visitor's `localStorage` entry still holds
+ *  the old id, and without this map they would silently land on
+ *  `DEFAULT_THEME` instead of keeping the theme they actually picked.
+ *  `index.html`'s inline bootstrap script duplicates this exact map: it
+ *  has to run synchronously, before any ES module (this one included) is
+ *  even fetched, to avoid a flash of an unstyled page (the old
+ *  `data-theme` value no longer matches any shipped `:root[data-theme=...]`
+ *  selector). Keep both maps in sync if a theme is ever renamed again. */
+export const OLD_THEME_IDS: Readonly<Record<string, string>> = {
+  'reaktor-dark': 'graphite',
+  'moog-wood': 'walnut-cream',
+  'ableton-live': 'flat-grid',
+  'korg-ms20': 'patch-lab',
+  'geist-groovebox': 'brushed-steel',
+  casiotone: 'toy-piano',
+}
+
+/** Migrates a possibly-stale theme id to its current one; an id that is
+ *  already current, or unrecognized entirely, passes through unchanged. */
+export function migrateThemeId(id: string): string {
+  return OLD_THEME_IDS[id] ?? id
+}
+
 function readStored(): string | null {
   try {
-    return localStorage.getItem(STORAGE_KEY)
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (raw === null) return null
+    const migrated = migrateThemeId(raw)
+    // Normalize localStorage itself once migrated, so a caller that reads
+    // the key directly (or a future map lookup) sees the current id too,
+    // not just this in-memory return value.
+    if (migrated !== raw) writeStored(migrated)
+    return migrated
   } catch {
     // Private browsing / storage disabled -- fall through to the default
     // rather than throwing during boot.
@@ -65,7 +100,13 @@ function writeStored(id: string): void {
 }
 
 export function currentTheme(): string {
-  return document.documentElement.dataset['theme'] || DEFAULT_THEME
+  // migrateThemeId as a defense-in-depth pass, not the primary migration
+  // path -- index.html's inline bootstrap script is what normally sets
+  // this attribute to an already-current id before this module even loads
+  // (see that script's own comment). This just means a stray old id left
+  // on the attribute by some other path still resolves to a real theme
+  // instead of one no `:root[data-theme=...]` selector matches.
+  return migrateThemeId(document.documentElement.dataset['theme'] || DEFAULT_THEME)
 }
 
 function applyTheme(id: string): void {

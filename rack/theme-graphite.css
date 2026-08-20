@@ -1,28 +1,32 @@
 /**
- * Reaktor Dark -- the spec's default theme (Section 8): graphite, hairlines,
- * teal arcs. Every color, material and type-scale value the rack draws with
- * lives here, as CSS custom properties, and nowhere else. `rack/style.css`
- * never contains a literal color: it only ever reads one of these tokens.
- * That is the test of the theme system -- a second theme is a second file
- * exactly like this one, swapped in, with zero component changes. Three
- * more themes now prove it: theme-moog-wood.css, theme-phosphor-lab.css,
- * theme-ableton-live.css.
+ * Graphite -- the spec's default theme (Section 8): graphite, hairlines,
+ * teal arcs. Named "Reaktor Dark" until the trademark rename (see
+ * .superpowers/sdd/theme-rename-report.md) -- the palette and every token
+ * value below are unchanged, only the id and label moved.
+ *
+ * Every color, material and type-scale value the rack draws with lives
+ * here, as CSS custom properties, and nowhere else. `rack/style.css` never
+ * contains a literal color: it only ever reads one of these tokens. That is
+ * the test of the theme system -- a second theme is a second file exactly
+ * like this one, swapped in, with zero component changes. Three more themes
+ * now prove it: theme-walnut-cream.css, theme-phosphor-lab.css,
+ * theme-flat-grid.css.
  *
  * Geometry (panel widths, knob sizes, jack positions) is deliberately
- * absent here -- Section 8 states it stays identical across all eight
+ * absent here -- Section 8 states it stays identical across all twelve
  * themes, so it lives as plain constants in rack/panel.ts and rack/knob.ts
  * instead of as a token.
  *
- * Selector is `:root[data-theme="reaktor-dark"]`, not bare `:root`: every
+ * Selector is `:root[data-theme="graphite"]`, not bare `:root`: every
  * theme file uses the same attribute-selector shape (rack/theme-switcher.ts
  * sets `document.documentElement.dataset.theme`), so exactly one theme's
  * rules ever win regardless of file load order, and swapping themes is a
  * single attribute write rather than a stylesheet swap. `index.html` still
- * defaults the attribute to "reaktor-dark" before any theme file loads (an
+ * defaults the attribute to "graphite" before any theme file loads (an
  * inline bootstrap script, reading localStorage) so this stays the default
  * with no flash of the wrong skin.
  */
-:root[data-theme='reaktor-dark'] {
+:root[data-theme='graphite'] {
   /* ---- surfaces ---- */
   --surface-rack: #16191b;
   --surface-panel: #1d2124;

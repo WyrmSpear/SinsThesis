@@ -6,7 +6,7 @@
  * rack/knob.ts own that instead).
  *
  * The trace grid on `body` and the rack rail is the same zero-component
- * trick Phosphor Lab's scanlines and Moog Wood's wood grain already proved:
+ * trick Phosphor Lab's scanlines and Walnut & Cream's wood grain already proved:
  * `body`'s `background` and `.rack-surface`'s `background` in
  * rack/style.css are each a bare `var(--surface-rack)` / `var(--rail-surface)`
  * with no gradient wrapped around them, so the token can hand back two

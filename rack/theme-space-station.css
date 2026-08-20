@@ -7,7 +7,7 @@
  * unaffected (`rack/panel.ts`, `rack/knob.ts` own that instead).
  *
  * The brief's own warning -- "misreading a value is a serious problem" --
- * is the actual design constraint, not a mood. Where Korg MS-20 (the
+ * is the actual design constraint, not a mood. Where Patch Lab (the
  * project's other "most legible" theme) bumped its type scale up a notch
  * for the same reason, this one does too: `--text-2xs` moves from the
  * baseline 0.62rem to 0.65rem, the smallest bump that still reads as
@@ -18,7 +18,7 @@
  *
  * Texture: a brushed-metal diagonal sheen plus a sparse rivet grid, both
  * carried through `--surface-rack`/`--rail-surface` exactly the way every
- * texture-bearing theme before this one does (Moog Wood's wood grain,
+ * texture-bearing theme before this one does (Walnut & Cream's wood grain,
  * Phosphor Lab's scanlines, Circuit/PCB's trace grid, Brimstone's
  * watermark) -- a `radial-gradient` dot layer plus a `linear-gradient`
  * sheen, no `url()` needed here since rivets are just small circles a

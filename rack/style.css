@@ -1,6 +1,6 @@
 /**
  * Structural styling for the rack. Every color, shadow and type value here
- * is a `var(--token)` read from rack/theme-reaktor-dark.css -- nothing in
+ * is a `var(--token)` read from rack/theme-graphite.css -- nothing in
  * this file names a literal color. That split is the actual test of
  * Section 8's theme claim: swapping the token file (and nothing else)
  * would be the entire cost of a second theme.
@@ -704,8 +704,8 @@ body {
    * overflow into the next one, but *whether* it wraps depends on the
    * active theme's font metrics and letter-spacing token -- caught here by
    * `tests/browser/theme-geometry.test.ts` measuring the VCF panel's
-   * "Cutoff" label wrapping in Reaktor Dark's own 0.1em `--tracking-label`
-   * but not in Moog Wood's 0.05em, at an identical column width. A label
+   * "Cutoff" label wrapping in Graphite's own 0.1em `--tracking-label`
+   * but not in Walnut & Cream's 0.05em, at an identical column width. A label
    * that sometimes wraps and sometimes doesn't makes the *row's* height --
    * and everything below it -- theme-dependent again, the exact bug this
    * whole file's fixed line-heights exist to close. Clipping to one line
@@ -758,7 +758,7 @@ body {
    * here specifically: this is what actually caught the theme-dependent
    * row-height bug (`tests/browser/theme-geometry.test.ts`, VCF's
    * cutoffCvAmount knob) -- its formatted value ("+0.0 oct") wrapped onto
-   * a second line in Reaktor Dark but not Moog Wood at the same column
+   * a second line in Graphite but not Walnut & Cream at the same column
    * width, doubling this element's height in one theme only and pushing
    * every knob below it in that row down by half the difference (grid
    * items stretch to their row's height by default, and `.knob-wrap`

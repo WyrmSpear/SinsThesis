@@ -31,7 +31,7 @@ records how each was reached.
 | Patching paradigm | Rack of panels at the top level; any module opens to reveal its internal node graph |
 | DSP depth | Native WebAudio for gain, delay, mixing and routing; hand-written AudioWorklets for character |
 | Engine architecture | Approach 1 now, with a monolithic-worklet engine planned behind the same interface |
-| Themes | Eight, switchable, Reaktor Dark by default |
+| Themes | Eight, switchable, Graphite by default (named Reaktor Dark until a post-launch trademark rename — see `docs/CONTINUATION.md`) |
 | Theme semantics | Skin only. No feature ever hides behind a look, and geometry stays identical across themes |
 | Voices | Monophonic, last-note priority with glide. Polyphony waits |
 | AI | Co-pilot, generative modulation, and patch morphing, against a local OpenAI-compatible endpoint. Not Phase 1 |
@@ -237,7 +237,7 @@ knob sizes, jack positions — stays identical across all eight, so a
 screenshot of one patch matches structurally in every skin, and a Playwright
 test asserts exactly that.
 
-Reaktor Dark ships as the default because it survives a sixty-module patch
+Graphite ships as the default because it survives a sixty-module patch
 and a second zoom altitude without turning to soup.
 
 ## 9. engine/analysis

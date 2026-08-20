@@ -61,8 +61,8 @@ rack/         main.ts, panel.ts, ghost-panel.ts, knob.ts, slider.ts, switch.ts,
               curve.ts, cables.ts, cable-inspector.ts, palette.ts, reorder.ts,
               keyboard-panel.ts, sequencer-panel.ts, scope-panel.ts, academy-panel.ts,
               match-sound-panel.ts, patch-io.ts, theme-switcher.ts, style.css,
-              theme-*.css (12 themes: Reaktor Dark, Moog Wood, Phosphor Lab,
-              Ableton Live, Circuit/PCB, Geist Groovebox, Casiotone, Korg MS-20,
+              theme-*.css (12 themes: Graphite, Walnut & Cream, Phosphor Lab,
+              Flat Grid, Circuit/PCB, Brushed Steel, Toy Piano, Patch Lab,
               Brimstone, Space Station, Vaporwave, Psychedelic)
 academy/      levels.ts, feedback.ts, sound-feedback.ts, constrained-feedback.ts,
               progress.ts, sinp-raw.d.ts,
@@ -185,10 +185,13 @@ keyboard, sequencer, and (added in Phase 2) the scope use the `customPanel`
 escape hatch the spec provided, and even they get generic knobs and jacks
 where they don't need bespoke UI.
 
-**A theme is a token file.** Twelve themes ship — Reaktor Dark, Moog Wood,
-Phosphor Lab, Ableton Live, Circuit/PCB, Geist Groovebox, Casiotone, Korg
-MS-20, Brimstone, Space Station, Vaporwave, Psychedelic — and adding the last
-eleven forced **zero** new tokens and **zero** component edits. Panel widths,
+**A theme is a token file.** Twelve themes ship — Graphite, Walnut & Cream,
+Phosphor Lab, Flat Grid, Circuit/PCB, Brushed Steel, Toy Piano, Patch Lab,
+Brimstone, Space Station, Vaporwave, Psychedelic — and adding the last
+eleven forced **zero** new tokens and **zero** component edits. (Six of these
+were renamed away from a third-party trademark after the fact — see "Since
+the academy closed" below and
+`.superpowers/sdd/theme-rename-report.md` — the names above are current.) Panel widths,
 knob sizes, jack positions and panel height are pixel-identical across all
 twelve, asserted by test.
 
@@ -217,7 +220,7 @@ stretch, and it still needed **zero** new tokens and **zero** component
 edits, twelve for twelve. Psychedelic reuses Brimstone's inline-SVG-through-
 `--surface-rack`/`--rail-surface` trick for its paisley-swirl watermark (an
 organic, all-curves path this time, no straight line in it); Vaporwave's
-"grid horizon" is the same trick Moog Wood's grain and Phosphor Lab's
+"grid horizon" is the same trick Walnut & Cream's grain and Phosphor Lab's
 scanlines already established, just three gradient layers instead of two.
 Legibility was the real risk on the two low-contrast palettes (Vaporwave,
 Psychedelic) — every text token was measured against all three panel

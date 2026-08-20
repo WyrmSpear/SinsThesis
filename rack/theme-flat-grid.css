@@ -1,8 +1,12 @@
 /**
- * Ableton Live -- flat grey, 1px borders, one yellow, densest (spec
- * Section 8's list). Same rule as every theme file: nothing but CSS custom
- * properties, `rack/style.css` and every rack/*.ts component untouched,
- * geometry unaffected (rack/panel.ts, rack/knob.ts own that instead) -- so
+ * Flat Grid -- flat grey, 1px borders, one yellow, densest (spec Section
+ * 8's list). Named "Ableton Live" until the trademark rename (see
+ * .superpowers/sdd/theme-rename-report.md) -- the palette is unchanged,
+ * only the id and label moved.
+ *
+ * Same rule as every theme file: nothing but CSS custom properties,
+ * `rack/style.css` and every rack/*.ts component untouched, geometry
+ * unaffected (rack/panel.ts, rack/knob.ts own that instead) -- so
  * "densest" is delivered by the type-scale tokens below (smaller sizes,
  * near-zero letter-spacing), not by shrinking the panel/knob/jack geometry
  * the spec pins identical across every theme. That is a real ceiling on
@@ -22,7 +26,7 @@
  *    transparent here, it removes the last bit of skeuomorphic gloss the
  *    other three themes all keep.
  */
-:root[data-theme='ableton-live'] {
+:root[data-theme='flat-grid'] {
   /* ---- surfaces: flat grey, no gradient banding ---- */
   --surface-rack: #2b2b2b;
   --surface-panel: #333333;
@@ -37,9 +41,10 @@
   --shadow-inset: rgba(0, 0, 0, 0.2);
   --highlight-edge: transparent;
 
-  /* ---- type: dense, tight, sans -- Live's own UI is grotesque sans, not
-     the mono the other three themes lean on; nothing in rack/style.css
-     assumes monospace metrics, so swapping the family costs nothing ---- */
+  /* ---- type: dense, tight, sans -- flat DAW interfaces of this kind lean
+     on grotesque sans, not the mono the other three themes use; nothing in
+     rack/style.css assumes monospace metrics, so swapping the family costs
+     nothing ---- */
   --font-mono: 'Inter', 'Helvetica Neue', Arial, ui-sans-serif, sans-serif;
   --text-primary: #e0e0e0;
   --text-dim: #9a9a9a;

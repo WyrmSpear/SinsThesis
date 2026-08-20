@@ -7,7 +7,7 @@
  *
  * The brief's own risk warning -- "the risk here is landing on cliche;
  * make it a coherent instrument, not a mood board" -- is answered the same
- * way Korg MS-20 answered "most legible ever made": by committing the
+ * way Patch Lab answered "most legible ever made": by committing the
  * *reference's actual mechanics* to specific tokens instead of splashing
  * the palette everywhere. "Chrome" lives specifically in the knob
  * material (`--knob-body`/`--knob-body-hi`/`--knob-ring` are cool
@@ -28,14 +28,14 @@
  * a whole `background` value in `rack/style.css`, so a token can hand back
  * more layers than a flat color -- here a radial "sun" glow, a
  * `repeating-linear-gradient` of horizontal cyan lines for the grid, and a
- * magenta-to-navy sunset gradient underneath, exactly Moog Wood's and
+ * magenta-to-navy sunset gradient underneath, exactly Walnut & Cream's and
  * Phosphor Lab's own mechanism, just three layers instead of two.
  *
  * Legibility: this is one of the two low-contrast-prone palettes named in
  * the brief, so every text token was measured, not eyeballed. Against the
  * three panel surfaces (`--surface-panel`/`-alt`/`-recess`) the worst
  * `--text-dim` reading is 7.08:1 and the worst `--text-primary` reading is
- * 13.84:1 -- both comfortably clear of Reaktor Dark's own 4.25:1 baseline,
+ * 13.84:1 -- both comfortably clear of Graphite's own 4.25:1 baseline,
  * because a saturated magenta/cyan pair needs the *surrounding* neutrals to
  * carry the actual reading contrast, not the accents. Full table in
  * `.superpowers/sdd/themes-ten-eleven-twelve-report.md`.

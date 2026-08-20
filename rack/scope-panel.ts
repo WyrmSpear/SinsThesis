@@ -35,8 +35,8 @@ import { singlePitchHz } from '../src/engine/analysis/pitch-track'
  * (~6px) + this content's `margin-top` (~10px, `.custom-panel-content`)
  * leaves roughly 205px inside the fixed 392px panel for the readout line
  * and canvas below -- a 168px-tall canvas plus a ~16px text line fits with
- * a few pixels to spare in every theme measured (Reaktor Dark, Phosphor
- * Lab, Casiotone).
+ * a few pixels to spare in every theme measured (Graphite, Phosphor
+ * Lab, Toy Piano).
  */
 
 const CANVAS_WIDTH = 272

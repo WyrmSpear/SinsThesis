@@ -4,7 +4,7 @@
  * properties, `rack/style.css` and every rack/*.ts component untouched,
  * geometry unaffected (rack/panel.ts, rack/knob.ts own that instead).
  *
- * The scanlines are the same trick as Moog Wood's wood grain, applied to
+ * The scanlines are the same trick as Walnut & Cream's wood grain, applied to
  * the same two call sites: `body`'s `background` and `.rack-surface`'s
  * `background` in rack/style.css are each a bare `var(--surface-rack)` /
  * `var(--rail-surface)` with no gradient wrapped around them, so the token
