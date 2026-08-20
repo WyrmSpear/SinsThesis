@@ -16,6 +16,7 @@ import { mixerDescriptor } from '../../src/engine/modules/mixer'
 import { clockDescriptor } from '../../src/engine/modules/clock-module'
 import { keyboardMidiDescriptor } from '../../src/engine/modules/keyboard-midi'
 import { outputDescriptor } from '../../src/engine/modules/output'
+import { pingpongDescriptor } from '../../src/engine/modules/pingpong'
 import type { ModuleDescriptor, ModuleInstance } from '../../src/engine/types'
 
 /**
@@ -55,6 +56,7 @@ const REAL_DESCRIPTORS = [
   vcoDescriptor, vcfDescriptor, svfDescriptor, adsrDescriptor, vcaDescriptor,
   lfoDescriptor, noiseDescriptor, wavefolderDescriptor, driveDescriptor,
   mixerDescriptor, clockDescriptor, keyboardMidiDescriptor, outputDescriptor,
+  pingpongDescriptor,
 ]
 
 describe('patch bank', () => {

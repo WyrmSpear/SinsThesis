@@ -7,6 +7,8 @@ export const WORKLET_MODULES = [
   'wavefolder',
   'drive',
   'segment',
+  'pingpong',
+  'width',
   'peak-tap',
   'recorder',
 ] as const

@@ -43,6 +43,7 @@ import layeredSubRaw from '../academy/levels/bass-01-layers.sinp?raw'
 import sub808Raw from './patches/808-sub.sinp?raw'
 import hihatRaw from './patches/trap-hihat.sinp?raw'
 import grimeLeadRaw from './patches/grime-lead.sinp?raw'
+import pingpongLeadRaw from './patches/pingpong-lead.sinp?raw'
 
 function parseSinp(raw: string): PatchFile {
   return JSON.parse(raw) as PatchFile
@@ -98,6 +99,12 @@ export const PRESET_BANK: PresetEntry[] = [
     name: 'Grime Lead',
     description: 'An aggressive, mid-forward driven pulse wave -- a whining grime bassline lead.',
     file: parseSinp(grimeLeadRaw),
+  },
+  {
+    id: 'pingpong-lead',
+    name: 'Ping-Pong Lead',
+    description: 'Two detuned pulses through a clock-locked Ping-Pong Delay -- echoes alternate L/R in time with the beat. Headphones recommended.',
+    file: parseSinp(pingpongLeadRaw),
   },
 ]
 

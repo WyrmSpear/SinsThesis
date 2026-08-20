@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "meta": { "name": "Ping-Pong Lead", "created": "2026-08-20T00:00:00.000Z", "author": "presets" },
+  "modules": [
+    { "id": "vco-1", "type": "vco", "slot": [0, 0], "params": { "octave": 0, "tune": -4, "shape": 1, "pulseWidth": 0.4, "fmAmount": 0 } },
+    { "id": "vco-2", "type": "vco", "slot": [0, 1], "params": { "octave": 0, "tune": 3, "shape": 1, "pulseWidth": 0.6, "fmAmount": 0 } },
+    { "id": "clock-1", "type": "clock", "slot": [0, 2], "params": { "bpm": 120, "division": 1, "pulseWidth": 0.5 } },
+    { "id": "pingpong-1", "type": "pingpong", "slot": [0, 3], "params": { "time": 0.25, "feedback": 0.55, "mix": 0.6, "division": 10 } },
+    { "id": "output-1", "type": "output", "slot": [0, 4], "params": { "level": 0.75 } }
+  ],
+  "cables": [
+    { "from": ["vco-1", "out"], "to": ["pingpong-1", "in"] },
+    { "from": ["vco-2", "out"], "to": ["pingpong-1", "in"] },
+    { "from": ["clock-1", "gate"], "to": ["pingpong-1", "sync"] },
+    { "from": ["pingpong-1", "out"], "to": ["output-1", "in"] }
+  ]
+}

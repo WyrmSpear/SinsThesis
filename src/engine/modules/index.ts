@@ -17,22 +17,29 @@ import { sequencerDescriptor } from './sequencer'
 import { keyboardMidiDescriptor } from './keyboard-midi'
 import { outputDescriptor } from './output'
 import { scopeDescriptor } from './scope'
+import { pannerDescriptor } from './panner'
+import { pingpongDescriptor } from './pingpong'
+import { widthDescriptor } from './width'
 
 /** The Phase 1 module set, plus Phase 2's scope, the state-variable filter
  *  (the roadmap's "biggest gap" -- see docs/ROADMAP.md section 1 and
  *  svf.ts's own doc comment for why a second filter *topology*, not a mode
- *  switch on the ladder), and Drive (a plain saturation stage -- distinct
+ *  switch on the ladder), Drive (a plain saturation stage -- distinct
  *  from the ladder's internal tanh and the wavefolder's fold, see
- *  drive.ts's own doc comment). The UI's palette reads this and may filter
- *  it, which is how a Phase 4 level grants four modules and withholds the
- *  rest. */
+ *  drive.ts's own doc comment), and the three stereo modules ROADMAP
+ *  section 1a calls for -- Panner, Ping-Pong Delay and Width. The other
+ *  eighteen modules stay mono end to end, deliberately (see that section's
+ *  "do not make everything stereo" ruling); stereo appears only at these
+ *  three plus output.ts's now channel-count-aware `in` jack. The UI's
+ *  palette reads this and may filter it, which is how a Phase 4 level
+ *  grants four modules and withholds the rest. */
 export const ALL_DESCRIPTORS = [
   vcoDescriptor, noiseDescriptor,
   vcfDescriptor, svfDescriptor, vcaDescriptor, wavefolderDescriptor, driveDescriptor,
   adsrDescriptor, lfoDescriptor, shDescriptor,
-  mixerDescriptor, multipleDescriptor, delayDescriptor,
+  mixerDescriptor, multipleDescriptor, delayDescriptor, pingpongDescriptor,
   clockDescriptor, sequencerDescriptor, keyboardMidiDescriptor, outputDescriptor,
-  scopeDescriptor,
+  scopeDescriptor, pannerDescriptor, widthDescriptor,
 ]
 
 export function registerAllModules(): void {
