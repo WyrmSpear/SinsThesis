@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "meta": { "name": "Level 11 — No Filter (proof patch)", "created": "2026-08-19T00:00:00.000Z", "author": "academy" },
+  "modules": [
+    { "id": "vco-1", "type": "vco", "slot": [0, 0], "params": { "octave": -2, "tune": 0, "shape": 3 } },
+    { "id": "wavefolder-1", "type": "wavefolder", "slot": [0, 1], "params": { "drive": 1, "symmetry": 0, "foldCvAmount": 4 } },
+    { "id": "adsr-1", "type": "adsr", "slot": [0, 2], "params": { "attack": 0.003, "decay": 0.15, "sustain": 0, "release": 0.05 } },
+    { "id": "vca-1", "type": "vca", "slot": [0, 3], "params": { "level": 0, "cvAmount": 1 } },
+    { "id": "output-1", "type": "output", "slot": [0, 4], "params": {} }
+  ],
+  "cables": [
+    { "from": ["vco-1", "out"], "to": ["wavefolder-1", "in"] },
+    { "from": ["wavefolder-1", "out"], "to": ["vca-1", "in"] },
+    { "from": ["adsr-1", "out"], "to": ["vca-1", "cv"] },
+    { "from": ["adsr-1", "out"], "to": ["wavefolder-1", "foldCv"] },
+    { "from": ["vca-1", "out"], "to": ["output-1", "in"] }
+  ]
+}

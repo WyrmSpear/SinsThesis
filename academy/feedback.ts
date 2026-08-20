@@ -105,6 +105,14 @@ export function describeFailure(failure: InspectorFailure, graph: PatchGraph): s
       const actual = formatParamValue(failure.module.type, failure.param, failure.actual)
       return `turn ${mod}'s "${label}" to about ${target} -- it's at ${actual} now`
     }
+
+    case 'tooManyModules': {
+      const over = failure.count - failure.max
+      return (
+        `remove ${over} module${over === 1 ? '' : 's'} -- this level allows ${failure.max}, ` +
+        `and the patch has ${failure.count} (not counting Output)`
+      )
+    }
   }
 }
 

@@ -28,6 +28,15 @@ export interface InspectorQuery {
    *  may each be an id or a `{ type }` ref (see `ModuleRef`). */
   connected?: Array<[ModuleRef, string, ModuleRef, string]>
   params?: Array<{ module: ModuleRef; param: string; value: number; tolerance?: number }>
+  /** Hard cap on how many modules the patch may use -- added for the
+   *  academy's constrained-challenge mode, whose whole premise is a
+   *  budget ("a convincing kick, three modules, no sequencer"). An Output
+   *  module never counts against this: it is structural plumbing every
+   *  patch needs to be heard at all, the same way a match-this-sound level
+   *  grants no keyboard because nothing about pressing a key is what's
+   *  being graded there -- counting it would mean a "three modules" brief
+   *  actually only leaves two, which is not what the brief says. */
+  maxModules?: number
 }
 
 /** Which concrete module a `ModuleRef` actually resolved to when a query
@@ -57,6 +66,7 @@ export type InspectorFailure =
       expected: number
       tolerance: number
     }
+  | { kind: 'tooManyModules'; count: number; max: number }
 
 export interface InspectorResult {
   pass: boolean
@@ -88,6 +98,16 @@ export function inspect(graph: PatchGraph, query: InspectorQuery): InspectorResu
   const presentTypes = graph.moduleIds.map((id) => graph.getType(id))
   for (const type of query.hasModule ?? []) {
     if (!presentTypes.includes(type)) reportMissingModule(type)
+  }
+
+  if (query.maxModules !== undefined) {
+    const count = graph.moduleIds.filter((id) => graph.getType(id) !== 'output').length
+    if (count > query.maxModules) {
+      failures.push(
+        `the patch uses ${count} modules (not counting Output), but this level allows at most ${query.maxModules}`,
+      )
+      detail.push({ kind: 'tooManyModules', count, max: query.maxModules })
+    }
   }
 
   // ---- type-ref resolution -------------------------------------------

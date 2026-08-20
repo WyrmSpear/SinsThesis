@@ -1,19 +1,24 @@
 # SinsThesis — continuation
 
-**Updated:** 2026-08-19. Engine, rack, analysis, the academy's first mode and a
-ninth theme all shipped.
-**Branch:** `master` — 75 commits.
-**State:** 359 tests pass (286 node + 73 browser), `typecheck` clean, tree clean.
+**Updated:** 2026-08-20. Engine, rack, analysis, and all three of the academy's
+grading modes are shipped -- the teaching arc this project was designed
+around is complete.
+**Branch:** `master`.
+**State:** 500 tests pass (402 node + 98 browser), `typecheck` clean, tree clean.
 
 **Run it:** `npm run dev`, open the URL, POWER ON.
 
 - **Free play** — a modular rack. Sixteen modules in a palette, drag-to-patch
   cables, drag-to-reorder, nine themes, `.sinp` save/load with autosave, a
   programmable 16-step sequencer, and a Scope module.
-- **Academy** — eight levels. Five *build-this-patch*, graded on the actual
-  patch graph; three *match-this-sound*, graded on perceptual distance between
-  your patch rendered offline and a target `.sinp`. Failures are phrased in the
-  player's own words and name which dimension is off.
+- **Academy** — eleven levels, three grading modes. Five *build-this-patch*,
+  graded on the actual patch graph; three *match-this-sound*, graded on
+  perceptual distance between your patch rendered offline and a target
+  `.sinp`; three *constrained challenge*, graded loosely on extracted
+  features against a per-level rubric ("make a convincing kick using three
+  modules and no sequencer") -- many different patches pass, a module-count
+  budget is enforced and shown live while you build. Failures are phrased in
+  the player's own words and name which property is off, in which direction.
 - **Dev harness** at `/harness.html` — scope and spectrum for engine work.
 
 Read this file first. Then `docs/audio/PHASE1A-LEDGER.md` for every decision made
@@ -46,7 +51,8 @@ work — it has the scope and spectrum the rack doesn't).
 
 ```
 src/engine/
-  analysis/   fft.ts, features.ts, inspector.ts    measurement + the academy's grader
+  analysis/   fft.ts, features.ts, inspector.ts, compare.ts, rubric.ts
+              measurement + the academy's three graders (topology, sound distance, feature bounds)
   dsp/        wavetable.ts, ladder.ts, wavefolder.ts, segment.ts, polyblep.ts (unimported, kept as reference)
   worklets/   vco, ladder, wavefolder, segment, passthrough, peak-tap (test-only)
               + registry.ts (WORKLET_MODULES) + audioworklet-globals.d.ts
@@ -56,11 +62,13 @@ src/engine/
 rack/         main.ts, panel.ts, ghost-panel.ts, knob.ts, slider.ts, switch.ts,
               curve.ts, cables.ts, cable-inspector.ts, palette.ts, reorder.ts,
               keyboard-panel.ts, sequencer-panel.ts, scope-panel.ts, academy-panel.ts,
-              patch-io.ts, theme-switcher.ts, style.css, theme-*.css (9 themes:
-              Reaktor Dark, Moog Wood, Phosphor Lab, Ableton Live, Circuit/PCB,
-              Geist Groovebox, Casiotone, Korg MS-20, Brimstone)
-academy/      levels.ts, feedback.ts, progress.ts, sinp-raw.d.ts,
-              levels/ (5 levels, each a .sinp solution + a .rubric.json)
+              match-sound-panel.ts, patch-io.ts, theme-switcher.ts, style.css,
+              theme-*.css (9 themes: Reaktor Dark, Moog Wood, Phosphor Lab,
+              Ableton Live, Circuit/PCB, Geist Groovebox, Casiotone, Korg MS-20,
+              Brimstone)
+academy/      levels.ts, feedback.ts, sound-feedback.ts, constrained-feedback.ts,
+              progress.ts, sinp-raw.d.ts,
+              levels/ (11 levels, each a .sinp solution/target/proof-patch + a .rubric.json)
 dev/          main.ts, piano.ts, controls.ts, presets.ts, scope.ts,
               thump-harness.ts (test-only, see tests/browser/startup-thump.test.ts), style.css
 index.html    the rack — npm run dev — the product's front door
@@ -289,8 +297,55 @@ predicted consumer, and `features.ts` gained `spectralPeakinessDb`. The spec's
 bet that one measurement layer would serve tests, displays and graders has now
 been tested by all three.
 
-Still unbuilt: the third mode, *constrained challenge* ("make a kick with three
-modules"), which needs a per-level feature rubric rather than a target sound.
+## The academy's third mode
+
+*Constrained challenge* grades a **class** of sounds, not one exact patch or
+one exact target — "make a convincing kick using three modules and no
+sequencer" has many right answers. A level's rubric (`mode: 'constrained'` in
+`academy/levels.ts`) combines two halves: `maxModules` (a new field on
+`InspectorQuery`, graded structurally by `inspect()`, which already counted
+what was present — Output is excluded from the count, since it's mandatory
+plumbing every patch needs to be heard at all) and `features` (a set of
+bounds, graded perceptually by `gradeFeatures`, new in
+`src/engine/analysis/rubric.ts`, against the player's own patch rendered
+offline through the same `renderPatch` match-this-sound already uses). The
+module counter is shown live in `rack/academy-panel.ts` from the moment a
+player enters the level, not only after a Check — the task's own warning that
+withholding it "they will not know they have broken the rule until they
+check."
+
+Three levels, each teaching something different: **09-thump** (percussive —
+one ADSR shared between the VCA's amplitude and the VCO's FM, teaching that
+pitch and amplitude envelopes are separate destinations even off one
+generator), **10-drift** (texture — an LFO modulating a filter's cutoff or an
+oscillator's pitch, teaching modulation, self-running with no keyboard),
+**11-fold-pluck** (hard-constrained — no VCF granted at all, forcing the
+non-obvious discovery that a wavefolder's `foldCv`, envelope-driven, can fake
+a filter's brightness-over-time with no filter in the rack).
+
+`engine/analysis` needed real extension here, not just composition:
+`features.ts` gained `peakNormalizedEnvelope`/`attackMs`/`decayMs` (generalized
+out of what `compare.ts` had kept private), `peakRms`, `driftOctaves` and its
+two wrappers `pitchDropOctaves`/`brightnessDropOctaves` (early-vs-late window
+comparison, in octaves), and `spectralCentroidMotionOctaves`. The pitch one
+needed a second pass: `peakHz`'s "loudest FFT bin" definition of pitch is the
+*spectral* peak, not the fundamental, and a heavily wavefolded tone can have a
+harmonic louder than its own fundamental — measured directly, a
+perfectly-steady-pitch wavefolder patch read a spurious ~0.8 octave "pitch
+drift" purely because the fold's own intensity changes which harmonic
+dominates. `pitchDropOctaves` now runs on the new `autocorrelationPitchHz`
+instead, which tracks the waveform's repetition period — unmoved by
+distortion reshaping the spectral envelope.
+
+Verified with the three-pass/two-fail matrix the task demanded for each
+level (real DSP, `tests/browser/analysis/rubric-render.test.ts`): at least
+three genuinely different patches pass, at least two plausible-but-wrong ones
+fail. Full numbers, the rubric-shape reasoning, and the two brief rewrites
+that came out of playing all three by hand are in
+`.superpowers/sdd/academy-constrained-report.md`.
+
+This closes out the academy's three-mode arc the spec laid out: build the
+patch, match the sound, satisfy the constraint.
 
 ## Smaller things, recorded but not urgent
 

@@ -1,0 +1,15 @@
+{
+  "id": "10-drift",
+  "title": "Texture: Something That Moves",
+  "brief": "Make a sound that changes on its own while it plays — not a flat, static tone. Three modules, no sequencer, and no keyboard: this one runs by itself. Try Noise → VCF → Output, then patch the LFO's \"Out\" into the VCF's \"CV\" jack and turn the filter's Amt knob up — the cutoff will slowly sweep instead of sitting still. (An oscillator's pitch works just as well as a filter's cutoff, if you'd rather try that instead.) Let it run for a few seconds without touching anything.",
+  "grantedModules": ["vco", "noise", "vcf", "lfo", "output"],
+  "mode": "constrained",
+  "constrained": {
+    "seconds": 3.0,
+    "maxModules": 3,
+    "features": {
+      "peakRms": { "min": 0.02 },
+      "centroidMotionOctaves": { "min": 0.3 }
+    }
+  }
+}

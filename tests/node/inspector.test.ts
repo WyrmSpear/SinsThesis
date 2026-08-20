@@ -69,6 +69,57 @@ describe('inspect', () => {
   })
 })
 
+describe('inspect - maxModules', () => {
+  beforeEach(() => {
+    clearRegistry()
+    registerModule(stubDescriptor('vco'))
+    registerModule(stubDescriptor('vca'))
+    registerModule(stubDescriptor('output'))
+  })
+
+  it('passes when the module count is at or under the cap', () => {
+    const g = new PatchGraph(stubContext())
+    g.addModule('vco')
+    g.addModule('vca')
+    g.addModule('output')
+    const result = inspect(g, { maxModules: 2 })
+    expect(result.pass).toBe(true)
+    expect(result.detail).toEqual([])
+  })
+
+  it('fails, with a tooManyModules detail entry, once the count exceeds the cap', () => {
+    const g = new PatchGraph(stubContext())
+    g.addModule('vco')
+    g.addModule('vco')
+    g.addModule('vca')
+    g.addModule('output')
+    const result = inspect(g, { maxModules: 2 })
+    expect(result.pass).toBe(false)
+    expect(result.detail).toEqual([{ kind: 'tooManyModules', count: 3, max: 2 }])
+  })
+
+  it('never counts an Output module against the cap', () => {
+    const g = new PatchGraph(stubContext())
+    g.addModule('vco')
+    g.addModule('output')
+    g.addModule('output')
+    g.addModule('output')
+    // Three Output modules, one VCO -- the cap only ever sees the one VCO.
+    const result = inspect(g, { maxModules: 1 })
+    expect(result.pass).toBe(true)
+  })
+
+  it('is independent of connected/params checks -- both kinds of failure are reported together', () => {
+    const g = new PatchGraph(stubContext())
+    g.addModule('vco')
+    g.addModule('vca')
+    g.addModule('output')
+    const result = inspect(g, { maxModules: 1, hasModule: ['output'] })
+    expect(result.pass).toBe(false)
+    expect(result.detail).toEqual([{ kind: 'tooManyModules', count: 2, max: 1 }])
+  })
+})
+
 describe('inspect - type-based addressing', () => {
   beforeEach(() => {
     clearRegistry()

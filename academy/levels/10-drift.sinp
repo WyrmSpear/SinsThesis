@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "meta": { "name": "Level 10 — Something That Moves (proof patch)", "created": "2026-08-19T00:00:00.000Z", "author": "academy" },
+  "modules": [
+    { "id": "noise-1", "type": "noise", "slot": [0, 0], "params": { "color": 0 } },
+    { "id": "vcf-1", "type": "vcf", "slot": [0, 1], "params": { "cutoff": 600, "resonance": 0.3, "cutoffCvAmount": 3.5 } },
+    { "id": "lfo-1", "type": "lfo", "slot": [0, 2], "params": { "rate": 0.3, "shape": 2, "depth": 1 } },
+    { "id": "output-1", "type": "output", "slot": [0, 3], "params": {} }
+  ],
+  "cables": [
+    { "from": ["noise-1", "out"], "to": ["vcf-1", "in"] },
+    { "from": ["vcf-1", "out"], "to": ["output-1", "in"] },
+    { "from": ["lfo-1", "out"], "to": ["vcf-1", "cutoffCv"] }
+  ]
+}

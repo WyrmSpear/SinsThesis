@@ -1,5 +1,6 @@
 import { PATCH_VERSION, type PatchFile } from '../src/engine/patch'
 import type { InspectorQuery } from '../src/engine/analysis/inspector'
+import type { FeatureBounds } from '../src/engine/analysis/rubric'
 
 import rubric01 from './levels/01-first-sound.rubric.json'
 import solution01Raw from './levels/01-first-sound.sinp?raw'
@@ -17,6 +18,12 @@ import rubric07 from './levels/07-match-waveform.rubric.json'
 import solution07Raw from './levels/07-match-waveform.sinp?raw'
 import rubric08 from './levels/08-match-resonance.rubric.json'
 import solution08Raw from './levels/08-match-resonance.sinp?raw'
+import rubric09 from './levels/09-thump.rubric.json'
+import solution09Raw from './levels/09-thump.sinp?raw'
+import rubric10 from './levels/10-drift.rubric.json'
+import solution10Raw from './levels/10-drift.sinp?raw'
+import rubric11 from './levels/11-fold-pluck.rubric.json'
+import solution11Raw from './levels/11-fold-pluck.sinp?raw'
 
 // `.sinp` is loaded with Vite's `?raw` suffix rather than a plain import,
 // so the file stays byte-identical JSON with the real `.sinp` extension --
@@ -34,6 +41,9 @@ const solution05 = parseSinp(solution05Raw)
 const solution06 = parseSinp(solution06Raw)
 const solution07 = parseSinp(solution07Raw)
 const solution08 = parseSinp(solution08Raw)
+const solution09 = parseSinp(solution09Raw)
+const solution10 = parseSinp(solution10Raw)
+const solution11 = parseSinp(solution11Raw)
 
 /**
  * The academy's level format, and why it is two files rather than one.
@@ -66,7 +76,7 @@ const solution08 = parseSinp(solution08Raw)
  * exactly that chain). A level with no `startingPatchFrom` begins from an
  * empty rack.
  *
- * **Two grading modes share this one format.** `mode: 'build'` (the
+ * **Three grading modes share this one format.** `mode: 'build'` (the
  * default, and every level through 05) grades topology via `inspect()` and
  * `query`. `mode: 'match'` (levels 06-08) grades sound instead: the
  * `.sinp` is not a model *solution* to compare a patch's wiring against --
@@ -85,6 +95,23 @@ const solution08 = parseSinp(solution08Raw)
  * match-this-sound level grants no keyboard and gets a synthetic gate
  * pulse instead), and the pass threshold measured in
  * `.superpowers/sdd/academy-match-sound-report.md`.
+ *
+ * `mode: 'constrained'` (levels 09-11) grades neither one exact topology
+ * nor one exact sound, but a *class* of sounds against a per-level feature
+ * rubric -- "make a convincing kick using three modules and no sequencer"
+ * has many right answers, not one. Its `.sinp` under `solution` is a
+ * *proof the rubric is satisfiable*, not a target to match and not the
+ * only correct wiring (tests/node/academy-levels.test.ts renders it and
+ * checks it actually passes its own rubric, structurally and by feature).
+ * A `constrained` rubric combines both halves the task this exists for
+ * asked for: `maxModules` is the structural half, graded by `inspect()`'s
+ * own `query.maxModules` (Section: "use inspect() for the structural half
+ * -- it already counts what is present"); `features` is the perceptual
+ * half, graded by `gradeFeatures` (`src/engine/analysis/rubric.ts`) against
+ * the player's own patch rendered offline through the same `renderPatch`
+ * match-this-sound already uses. See `.superpowers/sdd/academy-constrained-report.md`
+ * for why each level's bounds are shaped the way they are and the
+ * three-pass/two-fail evidence that they grade a class, not a point.
  */
 export interface MatchRubric {
   /** How long to render both the target and the player's patch, in seconds. */
@@ -99,6 +126,23 @@ export interface MatchRubric {
   passThreshold: number
 }
 
+export interface ConstrainedRubric {
+  /** How long to render the player's patch, in seconds. */
+  seconds: number
+  /** Same shape and purpose as `MatchRubric.gate` -- see its own doc
+   *  comment. Omitted for a level whose patch is meant to free-run rather
+   *  than be triggered (a texture with no `adsr` granted at all). */
+  gate?: { onAt: number; offAt?: number }
+  /** Hard cap on module count (excluding Output), graded structurally via
+   *  `inspect()`'s own `query.maxModules` -- see that field's doc comment
+   *  for why Output is excluded. */
+  maxModules: number
+  /** The perceptual half: every present bound must be satisfied by the
+   *  player's own patch, rendered offline and measured with
+   *  `gradeFeatures` (`src/engine/analysis/rubric.ts`). */
+  features: FeatureBounds
+}
+
 export interface LevelRubric {
   id: string
   title: string
@@ -107,11 +151,13 @@ export interface LevelRubric {
   startingPatchFrom?: string
   /** Defaults to 'build' when omitted, so every pre-existing rubric JSON
    *  (levels 01-05, written before this field existed) still parses. */
-  mode?: 'build' | 'match'
+  mode?: 'build' | 'match' | 'constrained'
   /** Required when `mode` is 'build' (or omitted). */
   query?: InspectorQuery
   /** Required when `mode` is 'match'. */
   match?: MatchRubric
+  /** Required when `mode` is 'constrained'. */
+  constrained?: ConstrainedRubric
 }
 
 export interface Level {
@@ -120,15 +166,18 @@ export interface Level {
   brief: string
   /** Module types the palette shows while this level is active. */
   grantedModules: readonly string[]
-  mode: 'build' | 'match'
+  mode: 'build' | 'match' | 'constrained'
   query?: InspectorQuery
   match?: MatchRubric
+  constrained?: ConstrainedRubric
   /** `mode: 'build'`: the model solution `inspect()`'s `query` is proven
    *  against (see tests/node/academy-levels.test.ts). `mode: 'match'`: the
    *  target sound itself, rendered offline through `renderPatch` on
    *  demand rather than at author time -- see this file's own header
-   *  comment for why. Either way, the academy UI never shows this patch to
-   *  the player directly. */
+   *  comment for why. `mode: 'constrained'`: one proof the rubric is
+   *  satisfiable, not the only correct wiring and never shown to the
+   *  player as a "solution" to find. Either way, the academy UI never
+   *  shows this patch to the player directly. */
   solution: PatchFile
   /** What loads into the rack when the player enters this level. */
   startingPatch: PatchFile
@@ -136,6 +185,7 @@ export interface Level {
 
 const RUBRICS: LevelRubric[] = [
   rubric01, rubric02, rubric03, rubric04, rubric05, rubric06, rubric07, rubric08,
+  rubric09, rubric10, rubric11,
 ] as unknown as LevelRubric[]
 
 const SOLUTIONS: Record<string, PatchFile> = {
@@ -147,6 +197,9 @@ const SOLUTIONS: Record<string, PatchFile> = {
   '06-match-pluck': solution06,
   '07-match-waveform': solution07,
   '08-match-resonance': solution08,
+  '09-thump': solution09,
+  '10-drift': solution10,
+  '11-fold-pluck': solution11,
 }
 
 function emptyPatch(): PatchFile {
@@ -177,6 +230,9 @@ export const LEVELS: Level[] = RUBRICS.map((r) => {
   if (mode === 'match' && !r.match) {
     throw new Error(`academy/levels.ts: level "${r.id}" is mode 'match' but has no match rubric`)
   }
+  if (mode === 'constrained' && !r.constrained) {
+    throw new Error(`academy/levels.ts: level "${r.id}" is mode 'constrained' but has no constrained rubric`)
+  }
   return {
     id: r.id,
     title: r.title,
@@ -185,6 +241,7 @@ export const LEVELS: Level[] = RUBRICS.map((r) => {
     mode,
     query: r.query,
     match: r.match,
+    constrained: r.constrained,
     solution,
     startingPatch,
   }

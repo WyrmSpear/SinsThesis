@@ -1,5 +1,8 @@
 import { fftMagnitude } from './fft'
-import { binToHz, rmsEnvelope, spectralCentroid, spectralPeakinessDb, peakHz, db, EPS } from './features'
+import {
+  binToHz, spectralCentroid, spectralPeakinessDb, peakHz, db,
+  peakNormalizedEnvelope, attackMs as attackMsOf,
+} from './features'
 
 /**
  * Perceptual-distance comparison between two rendered buffers -- the
@@ -161,33 +164,13 @@ function melSpectrogram(samples: Float32Array, sampleRate: number): Float32Array
 
 const ENV_WINDOW_MS = 20
 
+// `peakNormalizedEnvelope`/`attackMs` used to be private copies here; both
+// now live in features.ts, generalized for the constrained-challenge mode's
+// use (analysis/rubric.ts), which needs the identical measurement on a
+// single render rather than a pairwise comparison. Same window size, same
+// 10%/90% crossing rule -- behavior here is unchanged.
 function normalizedEnvelope(samples: Float32Array, sampleRate: number): Float32Array {
-  const windowSize = Math.max(1, Math.round((ENV_WINDOW_MS / 1000) * sampleRate))
-  const env = rmsEnvelope(samples, windowSize)
-  let peak = 0
-  for (const v of env) peak = Math.max(peak, v)
-  if (peak < EPS) return env // both effectively silent; leave the zeros as-is
-  const out = new Float32Array(env.length)
-  for (let i = 0; i < env.length; i++) out[i] = env[i]! / peak
-  return out
-}
-
-/** Time from the envelope's own 10% point to its own 90% point, in ms.
- *  Reads ~0 for a sound that starts already near its peak -- an unfired
- *  ADSR, or a free-running drone with nothing gating it at all -- which is
- *  the right answer: there is no attack there to measure. */
-function attackMs(normEnv: Float32Array, windowMs: number): number {
-  let tenPct = -1
-  let ninetyPct = -1
-  for (let i = 0; i < normEnv.length; i++) {
-    if (tenPct === -1 && normEnv[i]! >= 0.1) tenPct = i
-    if (ninetyPct === -1 && normEnv[i]! >= 0.9) {
-      ninetyPct = i
-      break
-    }
-  }
-  if (tenPct === -1 || ninetyPct === -1 || ninetyPct < tenPct) return 0
-  return (ninetyPct - tenPct) * windowMs
+  return peakNormalizedEnvelope(samples, sampleRate, ENV_WINDOW_MS)
 }
 
 // ---- waveform "fullness": odd-vs-even harmonic balance, the actual
@@ -285,7 +268,7 @@ export function extractSoundFeatures(samples: Float32Array, sampleRate: number):
     melDb: melSpectrogram(samples, sampleRate),
     envelope,
     centroidHz: spectralCentroid(samples, sampleRate),
-    attackMs: attackMs(envelope, ENV_WINDOW_MS),
+    attackMs: attackMsOf(envelope, ENV_WINDOW_MS),
     peakinessDb: peakiness(samples, sampleRate),
     oddEvenDb: oddEvenBalanceDb(samples, sampleRate),
   }

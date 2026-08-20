@@ -6,6 +6,20 @@ import type { SoundComparison } from '../src/engine/analysis/compare'
 import { renderMatchOverlay } from './match-sound-panel'
 
 /**
+ * Constrained-challenge's own Check result, in the same "structured data,
+ * never a bare pass/fail" shape as `InspectorResult`/`SoundComparison`.
+ * `feedback` is already player-facing prose (built by the caller from
+ * `academy/feedback.ts`'s `describeFailures` for the structural half and
+ * `academy/constrained-feedback.ts`'s `describeFeatureFailures` for the
+ * perceptual half, concatenated) -- this panel only lays it out, the same
+ * way it never rewrites `MatchCheckState.feedback` either.
+ */
+export interface ConstrainedCheckState {
+  pass: boolean
+  feedback: readonly string[]
+}
+
+/**
  * The academy's own panel: a level list, the current level's brief, a
  * Check button, and feedback -- built the same declarative,
  * rebuild-on-every-change way `rack/main.ts`'s `renderRack` draws the rack
@@ -32,6 +46,18 @@ import { renderMatchOverlay } from './match-sound-panel'
  * (`academy/sound-feedback.ts`) already came from -- one Check produces
  * one comparison, and everything on screen after it is a view of that one
  * object, never three independent re-derivations of it.
+ *
+ * Constrained-challenge levels (`level.mode === 'constrained'`) add one
+ * thing neither other mode needs: a live module counter, shown against the
+ * level's own `maxModules` from the moment the player enters, not only
+ * after a Check -- "a maximum module count... enforce it, and show the
+ * player their count against the limit while they build, or they will not
+ * know they have broken the rule until they check." Its Check feedback
+ * otherwise looks exactly like build-this-patch's plain list, because
+ * `rack/main.ts` has already flattened both the structural half (`inspect`,
+ * via `academy/feedback.ts`) and the perceptual half (`gradeFeatures`, via
+ * `academy/constrained-feedback.ts`) into one ordered list of sentences
+ * before this panel ever sees them.
  */
 
 export interface MatchCheckState {
@@ -61,6 +87,17 @@ export interface AcademyPanelState {
    *  if any -- undefined for a build-this-patch level, or before its first
    *  Check this visit. */
   lastMatch: MatchCheckState | undefined
+  /** Live count of modules in the rack right now, not counting Output --
+   *  shown against a constrained-challenge level's own `maxModules` while
+   *  the player is still building, not only after they Check. Section
+   *  "show the player their count against the limit while they build, or
+   *  they will not know they have broken the rule until they check."
+   *  Present whenever the current level is `mode: 'constrained'`;
+   *  undefined otherwise, since no other mode has a module budget to show. */
+  moduleCount: number | undefined
+  /** The most recent constrained-challenge Check result, if any --
+   *  undefined for any other mode, or before this level's first Check. */
+  lastConstrained: ConstrainedCheckState | undefined
 }
 
 export interface AcademyPanelOptions {
@@ -141,6 +178,16 @@ export function renderAcademyPanel(
   brief.append(title, body)
   container.append(brief)
 
+  if (current.mode === 'constrained' && state.moduleCount !== undefined) {
+    const max = current.constrained!.maxModules
+    const over = state.moduleCount > max
+    const counter = document.createElement('p')
+    counter.className = `academy-module-counter${over ? ' academy-module-counter-over' : ''}`
+    counter.dataset['testid'] = 'academy-module-counter'
+    counter.textContent = `Modules: ${state.moduleCount} / ${max}${over ? ' — over the limit' : ''}`
+    container.append(counter)
+  }
+
   if (current.mode === 'match') {
     const playBtn = document.createElement('button')
     playBtn.type = 'button'
@@ -196,6 +243,35 @@ export function renderAcademyPanel(
       renderMatchOverlay(overlay, target, player, sampleRate)
       container.append(overlay)
     }
+    return
+  }
+
+  if (current.mode === 'constrained') {
+    if (!state.lastConstrained) return
+    const { pass, feedback: lines } = state.lastConstrained
+
+    const feedback = document.createElement('div')
+    feedback.className = `academy-feedback ${pass ? 'academy-feedback-pass' : 'academy-feedback-fail'}`
+    feedback.dataset['testid'] = 'academy-feedback'
+
+    if (pass) {
+      feedback.textContent = passMessage
+    } else {
+      const heading = document.createElement('p')
+      heading.className = 'academy-feedback-heading'
+      const n = lines.length
+      heading.textContent = `Not yet — ${n} thing${n === 1 ? '' : 's'} to fix:`
+
+      const ul = document.createElement('ul')
+      ul.className = 'academy-feedback-list'
+      for (const line of lines) {
+        const li = document.createElement('li')
+        li.textContent = line
+        ul.append(li)
+      }
+      feedback.append(heading, ul)
+    }
+    container.append(feedback)
     return
   }
 

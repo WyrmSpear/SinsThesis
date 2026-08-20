@@ -1,0 +1,19 @@
+{
+  "id": "11-fold-pluck",
+  "title": "No Filter: Fade the Fold",
+  "brief": "Make a plucky, decaying tone whose pitch holds steady but whose color fades as it dies away — like a filter closing, without a filter. None is granted this time. Start the VCO on a Sine wave: it starts with no harmonics of its own, so folding it is what adds them, and un-folding is what takes them away again — a waveform that's already busy (Saw, Pulse) barely changes when folded less. Patch VCO → Wavefolder → VCA → Output, and the ADSR's \"Out\" into the VCA's \"CV\" jack for the volume envelope, same as always. Then patch that same \"Out\" into the Wavefolder's \"CV\" jack too, and turn its Amt knob up: the fold (and with it, the brightness) will fade along with the note, the way a filter closing usually would. Leave the VCO's \"FM\" and \"1V/Oct\" jacks empty — the pitch should stay put.",
+  "grantedModules": ["vco", "adsr", "vca", "wavefolder", "output"],
+  "mode": "constrained",
+  "constrained": {
+    "seconds": 1.0,
+    "gate": { "onAt": 0, "offAt": 0.8 },
+    "maxModules": 4,
+    "features": {
+      "peakRms": { "min": 0.05 },
+      "attackMs": { "max": 20 },
+      "decayMs": { "max": 500 },
+      "pitchDriftAbsOctaves": { "max": 0.2 },
+      "brightnessDropOctaves": { "min": 0.4 }
+    }
+  }
+}

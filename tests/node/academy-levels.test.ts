@@ -10,6 +10,8 @@ import { vcfDescriptor } from '../../src/engine/modules/vcf'
 import { adsrDescriptor } from '../../src/engine/modules/adsr'
 import { vcaDescriptor } from '../../src/engine/modules/vca'
 import { lfoDescriptor } from '../../src/engine/modules/lfo'
+import { noiseDescriptor } from '../../src/engine/modules/noise'
+import { wavefolderDescriptor } from '../../src/engine/modules/wavefolder'
 import { keyboardMidiDescriptor } from '../../src/engine/modules/keyboard-midi'
 import { outputDescriptor } from '../../src/engine/modules/output'
 import type { ModuleDescriptor, ModuleInstance } from '../../src/engine/types'
@@ -59,7 +61,8 @@ function stubbedFrom(real: ModuleDescriptor): ModuleDescriptor {
 
 const REAL_DESCRIPTORS = [
   vcoDescriptor, vcfDescriptor, adsrDescriptor, vcaDescriptor,
-  lfoDescriptor, keyboardMidiDescriptor, outputDescriptor,
+  lfoDescriptor, noiseDescriptor, wavefolderDescriptor,
+  keyboardMidiDescriptor, outputDescriptor,
 ]
 
 function loadGraph(file: PatchFile): PatchGraph {
@@ -122,6 +125,63 @@ describe('academy levels', () => {
         it('a gate schedule is only given when the target actually has an ADSR to gate', () => {
           const hasAdsr = level.solution.modules.some((m) => m.type === 'adsr')
           if (level.match!.gate) expect(hasAdsr).toBe(true)
+        })
+        return
+      }
+
+      if (level.mode === 'constrained') {
+        // Same split as match-this-sound: `gradeFeatures` needs a rendered
+        // buffer from a real AudioContext (proven in
+        // tests/browser/analysis/rubric-render.test.ts instead). What a
+        // plain-Node suite can still prove: the proof patch loads clean,
+        // has exactly one output, and -- the failure mode unique to this
+        // mode -- its own module count actually respects the very
+        // `maxModules` cap the level enforces. A rubric whose own "proof it
+        // can be done" patch breaks its own budget is not satisfiable at
+        // all, which is worse than any topology bug the other modes catch,
+        // since a player could never even match what the level's designer
+        // built.
+        it('the solution patch loads with no ghosts', () => {
+          loadGraph(level.solution)
+        })
+
+        it('the solution patch has exactly one output module', () => {
+          const outputs = level.solution.modules.filter((m) => m.type === 'output')
+          expect(outputs.length).toBe(1)
+        })
+
+        it('has a positive render duration', () => {
+          expect(level.constrained!.seconds).toBeGreaterThan(0)
+        })
+
+        it('a gate schedule is only given when the solution actually has an ADSR to gate', () => {
+          const hasAdsr = level.solution.modules.some((m) => m.type === 'adsr')
+          if (level.constrained!.gate) expect(hasAdsr).toBe(true)
+        })
+
+        it("the solution's own module count respects the level's own maxModules", () => {
+          const count = level.solution.modules.filter((m) => m.type !== 'output').length
+          expect(
+            count,
+            `${level.id}'s own proof patch uses ${count} modules (not counting Output), ` +
+              `over its own maxModules of ${level.constrained!.maxModules}`,
+          ).toBeLessThanOrEqual(level.constrained!.maxModules)
+        })
+
+        it('maxModules leaves room for at least one of every module type this level grants', () => {
+          // Not a hard requirement that every granted type gets used --
+          // "many different patches should pass" means some granted types
+          // may go unused by any one solution -- but a budget smaller than
+          // 1 would make the level unbeatable by definition (you cannot
+          // patch anything with a budget of 0), and a budget of exactly 1
+          // would only ever be satisfiable by a single bare oscillator
+          // with nothing shaping it, which none of this mode's levels ask
+          // for.
+          expect(level.constrained!.maxModules).toBeGreaterThanOrEqual(2)
+        })
+
+        it('grades at least one feature bound', () => {
+          expect(Object.keys(level.constrained!.features).length).toBeGreaterThan(0)
         })
         return
       }

@@ -5,6 +5,7 @@ import { ensureWorklets, renderPatch } from '../src/engine/render'
 import { serializePatch, loadPatch, type PatchFile } from '../src/engine/patch'
 import { inspect, type InspectorFailure, type InspectorResult } from '../src/engine/analysis/inspector'
 import { compareSounds } from '../src/engine/analysis/compare'
+import { gradeFeatures } from '../src/engine/analysis/rubric'
 import type { OutputInstance } from '../src/engine/modules/output'
 import { LiveRecorder, type RecordingResult } from '../src/engine/recorder'
 import { encodeWav, type WavFormat } from '../src/engine/wav'
@@ -22,9 +23,10 @@ import { renderPitchDisplay } from './pitch-display'
 import { initThemeSwitcher } from './theme-switcher'
 import { LEVELS, getLevel, type Level } from '../academy/levels'
 import { loadProgress, markComplete, type AcademyProgress } from '../academy/progress'
-import { renderAcademyPanel, type MatchCheckState } from './academy-panel'
+import { renderAcademyPanel, type MatchCheckState, type ConstrainedCheckState } from './academy-panel'
 import { describeFailures } from '../academy/feedback'
 import { describeSoundDifference } from '../academy/sound-feedback'
+import { describeFeatureFailures } from '../academy/constrained-feedback'
 
 /** Every match-this-sound render, target and player alike, uses this rate
  *  -- fixed rather than inherited from the live `AudioContext` (which
@@ -143,6 +145,7 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
   const targetBufferCache = new Map<string, Float32Array>()
   let checking = false
   let lastMatch: MatchCheckState | undefined
+  let lastConstrained: ConstrainedCheckState | undefined
 
   // ---- studio layer state (Phase 3's first slice): a `LiveRecorder` tap
   // for keeping a real performance, and an offline `renderPatch` bounce for
@@ -227,6 +230,7 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
   }
 
   function renderAcademy(): void {
+    const currentLevel = currentLevelId ? getLevel(currentLevelId) : undefined
     renderAcademyPanel(
       academyPanel,
       LEVELS,
@@ -237,6 +241,11 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
         feedback: lastCheck && !lastCheck.pass ? describeFailures(lastCheck, graph) : [],
         busy: checking,
         lastMatch,
+        moduleCount:
+          currentLevel?.mode === 'constrained'
+            ? graph.moduleIds.filter((id) => graph.getType(id) !== 'output').length
+            : undefined,
+        lastConstrained,
       },
       { onSelectLevel: enterLevel, onCheck: checkLevel, onPlayTarget: playTarget },
     )
@@ -381,6 +390,7 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
     currentLevelId = id
     lastCheck = undefined
     lastMatch = undefined
+    lastConstrained = undefined
     const { graph: loaded } = loadPatch(ctx, level.startingPatch)
     mountGraph(loaded)
     currentPatchName = level.title
@@ -474,6 +484,34 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
       return
     }
 
+    if (level.mode === 'constrained') {
+      checking = true
+      renderAcademy()
+      const c = level.constrained!
+      const playerPatch = serializePatch(graph, { name: currentPatchName })
+      const structural = inspect(graph, { maxModules: c.maxModules })
+      void renderPatch(playerPatch, c.seconds, { sampleRate: MATCH_SAMPLE_RATE, gate: c.gate })
+        .then((samples) => {
+          const featureResult = gradeFeatures(samples, MATCH_SAMPLE_RATE, c.features)
+          const pass = structural.pass && featureResult.pass
+          lastConstrained = {
+            pass,
+            feedback: [...describeFailures(structural, graph), ...describeFeatureFailures(featureResult.detail)],
+          }
+          if (pass) {
+            progress = markComplete(level.id)
+            clearHighlights()
+          } else {
+            highlightFailures(structural.detail)
+          }
+        })
+        .finally(() => {
+          checking = false
+          renderAcademy()
+        })
+      return
+    }
+
     const result = inspect(graph, level.query!)
     lastCheck = result
     if (result.pass) {
@@ -559,6 +597,11 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
     // to `ctx.destination` at all.
     connectedOutputs.delete(id)
     scheduleAutosave()
+    // Constrained-challenge's live module counter (Section: "show the
+    // player their count against the limit while they build") has to
+    // track every add and remove, not only a Check -- academy mode's own
+    // rebuild is cheap enough to just run on every module count change.
+    if (mode === 'academy') renderAcademy()
   }
 
   function renderModulePanel(id: string): HTMLElement {
@@ -587,6 +630,7 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
     wireOutputs()
     scheduleAutosave()
     paletteDrawer.hidden = true
+    if (mode === 'academy') renderAcademy()
   }
 
   /** Full rebuild: render every module in the graph (slot column order,

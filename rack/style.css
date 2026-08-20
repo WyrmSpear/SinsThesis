@@ -1436,6 +1436,24 @@ body {
   max-width: 70ch;
 }
 
+/* ---- constrained-challenge: the live module counter, shown against
+ * `maxModules` from the moment a player enters the level, not only after a
+ * Check -- see academy-panel.ts's own doc comment. Reuses the same
+ * pass/fail lamp tokens as `.academy-feedback-pass`/`-fail`, no new theme
+ * tokens, matching every other academy element's own token-reuse rule. ---- */
+.academy-module-counter {
+  margin: 0;
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--text-primary);
+}
+
+.academy-module-counter-over {
+  color: var(--lamp-warn);
+  font-weight: 600;
+}
+
 .academy-check-btn {
   align-self: flex-start;
   font-family: inherit;
