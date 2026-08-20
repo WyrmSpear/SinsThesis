@@ -11,6 +11,7 @@ export const WORKLET_MODULES = [
   'width',
   'peak-tap',
   'recorder',
+  'sampler',
 ] as const
 
 // `import.meta.env.BASE_URL` is Vite's own answer to "where does this build

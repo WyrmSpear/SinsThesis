@@ -18,6 +18,7 @@ import { CableLayer } from './cables'
 import { buildKeyboardPanel } from './keyboard-panel'
 import { buildSequencerPanel } from './sequencer-panel'
 import { buildScopePanel } from './scope-panel'
+import { buildSamplerPanel } from './sampler-panel'
 import { enableReorder } from './reorder'
 import { downloadPatch, downloadWav, readPatchFile, saveAutosave, loadAutosave, debounce } from './patch-io'
 import { renderStudioPanel, type StudioPanelState } from './studio-panel'
@@ -685,7 +686,10 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
     const descriptor = getModule(type)!
     return buildPanel(descriptor, id, graph, {
       jacks: cableLayer.jackRegistry,
-      customPanels: { keyboard: buildKeyboardPanel, sequencer: buildSequencerPanel, scope: buildScopePanel },
+      customPanels: {
+        keyboard: buildKeyboardPanel, sequencer: buildSequencerPanel, scope: buildScopePanel,
+        sampler: buildSamplerPanel,
+      },
       onChange: scheduleAutosave,
       onRemove: removeModuleById,
     })

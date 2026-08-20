@@ -9,6 +9,12 @@ export interface PatchModuleEntry {
   /** Rack position: [row, column], in horizontal pitch units. */
   slot: [number, number]
   params: Record<string, number>
+  /** Non-numeric module state -- see `types.ts`'s `ModuleInstance.
+   *  serializeState` doc comment. Omitted entirely for the ordinary case
+   *  (every module in the set except the Sampler), so an existing `.sinp`
+   *  and one written by this build are byte-identical for any patch that
+   *  doesn't use a stateful module. */
+  state?: unknown
 }
 
 export interface PatchCableEntry {
@@ -34,12 +40,23 @@ export function serializePatch(
       created: meta.created ?? new Date().toISOString(),
       author: meta.author ?? '',
     },
-    modules: graph.moduleIds.map((id) => ({
-      id,
-      type: graph.getType(id)!,
-      slot: graph.getSlot(id),
-      params: { ...graph.getParams(id) },
-    })),
+    modules: graph.moduleIds.map((id) => {
+      const state = graph.getExtraState(id)
+      const entry: PatchModuleEntry = {
+        id,
+        type: graph.getType(id)!,
+        slot: graph.getSlot(id),
+        params: { ...graph.getParams(id) },
+      }
+      // Omitted rather than set to `undefined`: `JSON.stringify` already
+      // drops an `undefined`-valued key, but leaving the field out of the
+      // object (not just letting stringify hide it) keeps a patch with no
+      // stateful modules structurally identical to what this function
+      // produced before `state` existed -- no diff-only-on-a-key-nobody-
+      // reads noise for the common case.
+      if (state !== undefined) entry.state = state
+      return entry
+    }),
     cables: graph.cables.map((c) => ({
       from: [c.from[0], c.from[1]] as [string, string],
       to: [c.to[0], c.to[1]] as [string, string],
@@ -90,8 +107,14 @@ export function loadPatch(
       for (const [paramId, value] of Object.entries(entry.params)) {
         graph.setParam(entry.id, paramId, value, ctx.currentTime)
       }
+      // Applied after every param, matching this function's own params
+      // convention above (defaults land first, saved values overwrite
+      // them) -- a module whose restoreState reads its own params (the
+      // Sampler's does not today, but a future one reasonably could) sees
+      // them already at their saved values, not construction defaults.
+      if ('state' in entry) graph.getInstance(entry.id)?.restoreState?.(entry.state)
     } else {
-      graph.addGhost(entry.id, entry.type, entry.params)
+      graph.addGhost(entry.id, entry.type, entry.params, 'state' in entry ? entry.state : undefined)
       if (!ghosts.includes(entry.type)) ghosts.push(entry.type)
     }
     graph.setSlot(entry.id, entry.slot)

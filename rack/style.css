@@ -1160,6 +1160,67 @@ body {
   box-shadow: inset 0 1px 3px var(--shadow-inset);
 }
 
+/* ---- sampler module's custom content ----
+ * A load row (button, filename/duration readout, a Clear button that only
+ * appears once something's loaded) plus the waveform canvas below --
+ * see rack/sampler-panel.ts's own doc comment for the panel-height budget
+ * this was measured against. Same "canvas paints with getComputedStyle
+ * tokens" reasoning as the scope's `.scope-display`.
+ */
+.sampler-panel-content { width: 100%; }
+
+.sampler-load-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.sampler-load-btn, .sampler-clear-btn {
+  font-family: inherit;
+  font-size: var(--text-2xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  padding: 0.25rem 0.5rem;
+  background: var(--surface-panel);
+  color: var(--text-dim);
+  border: 1px solid var(--panel-border-strong);
+  border-radius: 4px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.sampler-load-btn:hover, .sampler-clear-btn:hover {
+  border-color: var(--knob-indicator);
+  color: var(--knob-indicator);
+}
+
+.sampler-readout {
+  font-size: var(--text-2xs);
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.sampler-display {
+  display: block;
+  width: 100%;
+  /* Fixed px, same "fixed height, scaled width" contract `.scope-display`
+   * uses, shorter than the scope's 168px to make room for this panel's
+   * extra knob/switch row -- see this panel's own doc comment. */
+  height: 140px;
+  border: 1px solid var(--panel-border);
+  border-radius: 3px;
+  box-shadow: inset 0 1px 3px var(--shadow-inset);
+}
+
+.sampler-display.drag-over {
+  border-color: var(--knob-indicator);
+  box-shadow: 0 0 0 2px var(--knob-indicator-glow), inset 0 1px 3px var(--shadow-inset);
+}
+
 /* ---- keyboard module's custom content ----
  * `width: 100%`, not a fixed px: the ancestor panel (rack/panel.ts) now
  * sets a hard `width` from `descriptor.hp * HP_PX` -- a fixed, non-themed

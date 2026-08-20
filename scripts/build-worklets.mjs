@@ -45,6 +45,7 @@ const WORKLETS = {
   width: entry('../src/engine/worklets/width.worklet.ts'),
   'peak-tap': entry('../src/engine/worklets/peak-tap.worklet.ts'),
   recorder: entry('../src/engine/worklets/recorder.worklet.ts'),
+  sampler: entry('../src/engine/worklets/sampler.worklet.ts'),
 }
 
 const OUT_DIR = fileURLToPath(new URL('../public/worklets', import.meta.url))

@@ -77,4 +77,28 @@ export interface ModuleInstance {
   outputs: Map<string, AudioNode>
   setParam(id: string, value: number, atTime?: number): void
   dispose(): void
+  /**
+   * Escape hatch for state a module needs to persist that isn't a plain
+   * number `ParamSpec` can carry -- the Sampler's loaded audio is the
+   * motivating case (see `modules/sampler.ts`'s own doc comment for the
+   * full reasoning): `.sinp` is otherwise exactly `{params, cables}`, and
+   * every existing module's entire state already fits `Record<string,
+   * number>`. Adding a second, JSON-serializable channel here -- rather
+   * than stretching `ParamSpec`'s numeric contract to also carry strings
+   * or binary data -- keeps every other module's file shape untouched
+   * (this is optional; a module that never defines it never gains an
+   * empty `state` key in its saved entry) while giving `patch.ts` a
+   * generic place to round-trip whatever a future stateful module needs,
+   * without either module or engine caring what the payload means.
+   * `serializeState` returning `undefined` means "nothing to save," not
+   * "save undefined" -- `patch.ts` omits the field entirely in that case.
+   */
+  serializeState?(): unknown
+  /** Called after `setParam` has applied every saved param, with exactly
+   *  what this instance's own `serializeState` last returned (or, loading
+   *  a file saved by a different build, whatever shape *that* build's
+   *  `serializeState` produced -- so implementations should validate
+   *  rather than trust the shape blindly). Never called when the entry
+   *  carried no `state` field. */
+  restoreState?(data: unknown): void
 }

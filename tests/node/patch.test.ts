@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { serializePatch, loadPatch, type PatchFile } from '../../src/engine/patch'
 import { PatchGraph } from '../../src/engine/graph'
 import { registerModule, clearRegistry } from '../../src/engine/registry'
-import { stubDescriptor, stubContext } from '../helpers/stub-instance'
+import { stubDescriptor, stubContext, stubNode } from '../helpers/stub-instance'
+import type { ModuleDescriptor, ModuleInstance } from '../../src/engine/types'
 
 function buildPatch(): PatchGraph {
   const graph = new PatchGraph(stubContext())
@@ -91,5 +92,99 @@ describe('patch format', () => {
   it('rejects a file from a newer format version', () => {
     const file = { ...serializePatch(buildPatch()), version: 99 } as unknown as PatchFile
     expect(() => loadPatch(stubContext(), file)).toThrow(/version 99/)
+  })
+})
+
+/**
+ * The generic `state` channel `ModuleInstance.serializeState`/
+ * `restoreState` (types.ts) added for the Sampler -- see that module's own
+ * doc comment for why embedding audio needed a second, non-numeric
+ * persistence path at all. Exercised here against a plain stub rather than
+ * a real Sampler instance because building one needs a real `AudioContext`
+ * (an `AudioWorkletNode`), which this plain-Node suite never constructs
+ * (the same reason tests/node/preset-bank.test.ts stubs every real
+ * descriptor's `create()`) -- but the round-trip machinery under test here
+ * is entirely `patch.ts`/`graph.ts`'s own, oblivious to what a module's
+ * `state` payload actually means, so a stub proves it completely.
+ */
+function statefulDescriptor(type: string, initialState: unknown): ModuleDescriptor {
+  return {
+    ...stubDescriptor(type),
+    create(): ModuleInstance {
+      let state = initialState
+      const restoreCalls: unknown[] = []
+      const node = stubNode() as unknown as AudioNode
+      return {
+        inputs: new Map([['in', node]]),
+        outputs: new Map([['out', node]]),
+        setParam: () => {},
+        dispose: () => {},
+        serializeState: () => state,
+        restoreState: (data: unknown) => {
+          state = data
+          restoreCalls.push(data)
+        },
+        // Exposed for assertions only, not part of the interface.
+        ...({ __restoreCalls: restoreCalls } as object),
+      }
+    },
+  }
+}
+
+describe('patch format: module state (Sampler-motivated)', () => {
+  beforeEach(() => {
+    clearRegistry()
+    registerModule(stubDescriptor('vco'))
+    registerModule(statefulDescriptor('stateful', { blob: 'hello', n: 42 }))
+  })
+
+  it('omits the state field entirely for a module with no serializeState', () => {
+    const graph = new PatchGraph(stubContext())
+    graph.addModule('vco', 'osc')
+    const file = serializePatch(graph)
+    expect(file.modules[0]).not.toHaveProperty('state')
+    expect(JSON.stringify(file)).not.toContain('"state"')
+  })
+
+  it('serializes a stateful module\'s own state alongside its numeric params', () => {
+    const graph = new PatchGraph(stubContext())
+    graph.addModule('stateful', 'sub')
+    const file = serializePatch(graph)
+    expect(file.modules[0]!.state).toEqual({ blob: 'hello', n: 42 })
+  })
+
+  it('round-trips state through save -> load -> save unchanged', () => {
+    const graph = new PatchGraph(stubContext())
+    graph.addModule('stateful', 'sub')
+    const first = serializePatch(graph)
+
+    const { graph: reloaded } = loadPatch(stubContext(), first)
+    const second = serializePatch(reloaded)
+    expect(second.modules[0]!.state).toEqual(first.modules[0]!.state)
+  })
+
+  it('calls restoreState with exactly what serializeState produced, after params are applied', () => {
+    const file: PatchFile = {
+      version: 1,
+      meta: { name: 'State', created: '2026-08-20T00:00:00.000Z', author: '' },
+      modules: [{ id: 'sub', type: 'stateful', slot: [0, 0], params: { level: 0.9 }, state: { blob: 'restored', n: 7 } }],
+      cables: [],
+    }
+    const { graph } = loadPatch(stubContext(), file)
+    const instance = graph.getInstance('sub') as unknown as { __restoreCalls: unknown[] }
+    expect(instance.__restoreCalls).toEqual([{ blob: 'restored', n: 7 }])
+    expect(graph.getExtraState('sub')).toEqual({ blob: 'restored', n: 7 })
+  })
+
+  it('a ghost (unregistered type) preserves its opaque state through a round trip', () => {
+    const file: PatchFile = {
+      version: 1,
+      meta: { name: 'Future', created: '2026-08-20T00:00:00.000Z', author: '' },
+      modules: [{ id: 'x', type: 'quantum-sampler', slot: [0, 0], params: {}, state: { audio: 'base64...' } }],
+      cables: [],
+    }
+    const { graph, ghosts } = loadPatch(stubContext(), file)
+    expect(ghosts).toEqual(['quantum-sampler'])
+    expect(serializePatch(graph, file.meta)).toEqual(file)
   })
 })

@@ -18,6 +18,17 @@ interface GraphNode {
   instance: ModuleInstance | null // null for ghosts
   params: Record<string, number>
   slot: [number, number]
+  /** A ghost's own preserved copy of `PatchModuleEntry.state` (see
+   *  `types.ts`'s `ModuleInstance.serializeState` doc comment) -- unused
+   *  for a real module, whose state instead lives inside its own
+   *  `instance` and is read fresh via `serializeState()` on every save.
+   *  Without this, a patch built by a newer build (a sampler with a
+   *  sample loaded) and opened read-only by an older one that doesn't
+   *  know the "sampler" type yet would silently drop the embedded audio
+   *  the moment that older build re-saved -- ghosts already exist
+   *  precisely to prevent that class of loss for params and cables; this
+   *  closes the same gap for the state channel. */
+  ghostState?: unknown
 }
 
 /** WebAudio permits a cycle only through a DelayNode; one render quantum is
@@ -93,18 +104,30 @@ export class PatchGraph {
   }
 
   /**
-   * Hold a module the registry does not know about, preserving its type and
-   * params so the patch round-trips instead of losing data quietly.
+   * Hold a module the registry does not know about, preserving its type,
+   * params and any opaque `state` (see `GraphNode.ghostState`'s own
+   * comment) so the patch round-trips instead of losing data quietly.
    */
-  addGhost(id: string, type: string, params: Record<string, number>): void {
+  addGhost(id: string, type: string, params: Record<string, number>, state?: unknown): void {
     if (this.nodes.has(id)) {
       throw new Error(`addGhost: id "${id}" is already in the patch`)
     }
-    this.nodes.set(id, { type, instance: null, params: { ...params }, slot: [0, 0] })
+    this.nodes.set(id, { type, instance: null, params: { ...params }, slot: [0, 0], ghostState: state })
   }
 
   getInstance(id: string): ModuleInstance | undefined {
     return this.nodes.get(id)?.instance ?? undefined
+  }
+
+  /** Whatever this module's own `state` should be for the next save --
+   *  live modules answer through their own `serializeState()`, ghosts hand
+   *  back whatever they were loaded with (see `GraphNode.ghostState`'s
+   *  comment). `undefined` means "no `state` field on this entry," the same
+   *  convention `ModuleInstance.serializeState` itself uses. */
+  getExtraState(id: string): unknown {
+    const node = this.nodes.get(id)
+    if (!node) throw new Error(`getExtraState: no module "${id}"`)
+    return node.instance ? node.instance.serializeState?.() : node.ghostState
   }
 
   getType(id: string): string | undefined {
