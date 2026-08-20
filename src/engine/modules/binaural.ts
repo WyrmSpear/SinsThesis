@@ -62,7 +62,12 @@ export const binauralDescriptor: ModuleDescriptor = {
     { id: 'out', dir: 'out', signal: 'audio', label: 'Out', pos: [1, 3] },
   ],
   params: [
-    { id: 'carrier', label: 'Carrier', min: 20, max: 2000, default: 220, curve: 'exp', unit: 'Hz' },
+    // 'Carrier' overflowed this 8 HP panel's knob column and rendered as
+    // an ellipsis ("CARRI…", caught by an actual screenshot -- the same
+    // failure mode panner.ts's own doc comment documents for 'Pan CV').
+    // 'Carr' clears it, the same floor 'Sync'/'Gate'/'Thru' already
+    // establish for jack labels in this codebase.
+    { id: 'carrier', label: 'Carr', min: 20, max: 2000, default: 220, curve: 'exp', unit: 'Hz' },
     // Down to 0.01 Hz -- a fraction of a hertz, per this module's own
     // reason to exist -- up to 40 Hz, past which the two channels read as
     // two distinct pitches rather than one wavering tone.
