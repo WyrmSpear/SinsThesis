@@ -37,6 +37,7 @@ const WORKLETS = {
   passthrough: entry('../src/engine/worklets/passthrough.worklet.ts'),
   vco: entry('../src/engine/worklets/vco.worklet.ts'),
   ladder: entry('../src/engine/worklets/ladder.worklet.ts'),
+  svf: entry('../src/engine/worklets/svf.worklet.ts'),
   wavefolder: entry('../src/engine/worklets/wavefolder.worklet.ts'),
   segment: entry('../src/engine/worklets/segment.worklet.ts'),
   'peak-tap': entry('../src/engine/worklets/peak-tap.worklet.ts'),

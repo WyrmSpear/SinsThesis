@@ -3,6 +3,7 @@ export const WORKLET_MODULES = [
   'passthrough',
   'vco',
   'ladder',
+  'svf',
   'wavefolder',
   'segment',
   'peak-tap',

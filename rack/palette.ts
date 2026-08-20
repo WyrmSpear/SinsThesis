@@ -4,7 +4,7 @@ import { MODULE_GROUPS } from '../src/engine/types'
 /**
  * The module palette: every registered descriptor, grouped and offered as
  * an "add" button. Reads `listModules()` results handed to it -- never a
- * hardcoded module list -- so a sixteenth registered module appears here
+ * hardcoded module list -- so a newly registered module appears here
  * with no change to this file (`src/engine/registry.ts`'s `listModules`
  * is the only source of truth for what exists).
  *
