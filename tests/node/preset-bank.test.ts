@@ -14,6 +14,7 @@ import { wavefolderDescriptor } from '../../src/engine/modules/wavefolder'
 import { driveDescriptor } from '../../src/engine/modules/drive'
 import { mixerDescriptor } from '../../src/engine/modules/mixer'
 import { clockDescriptor } from '../../src/engine/modules/clock-module'
+import { sequencerDescriptor } from '../../src/engine/modules/sequencer'
 import { keyboardMidiDescriptor } from '../../src/engine/modules/keyboard-midi'
 import { outputDescriptor } from '../../src/engine/modules/output'
 import { pingpongDescriptor } from '../../src/engine/modules/pingpong'
@@ -57,7 +58,7 @@ function stubbedFrom(real: ModuleDescriptor): ModuleDescriptor {
 const REAL_DESCRIPTORS = [
   vcoDescriptor, vcfDescriptor, svfDescriptor, adsrDescriptor, vcaDescriptor,
   lfoDescriptor, noiseDescriptor, wavefolderDescriptor, driveDescriptor,
-  mixerDescriptor, clockDescriptor, keyboardMidiDescriptor, outputDescriptor,
+  mixerDescriptor, clockDescriptor, sequencerDescriptor, keyboardMidiDescriptor, outputDescriptor,
   pingpongDescriptor, samplerDescriptor, bitcrusherDescriptor,
 ]
 

@@ -40,6 +40,18 @@ import type { PatchFile } from '../src/engine/patch'
  * chosen answer to "what happens to a sampler's sample on save/reload,"
  * see sampler.ts's own doc comment), so it is genuinely self-contained --
  * no external sample file for this repo, or a fork of it, to go missing.
+ *
+ * **Only one history-track solution is shared here, and deliberately not
+ * more.** `history-02-motorik` (Clock -> Sequencer -> VCO -> VCF, no ADSR at
+ * all) is free-running the same way Reese/Wobble/Growl are, so it needed no
+ * changes to become a preset. The rest of the history track's levels are
+ * constrained-challenge or match-this-sound and grant no Keyboard, gated
+ * instead by a synthetic pulse at Check time (`renderPatch`'s own `gate`
+ * option) -- the same reason `bass-05-finish` above needed a bespoke
+ * self-triggering rebuild (`808-sub`) rather than being shared directly.
+ * Building an equivalent self-triggering variant of every history level's
+ * proof patch was out of scope for this pass; `history-02-motorik` is
+ * genuinely free of that problem, not a special case carved out for it.
  */
 
 import reeseRaw from '../academy/levels/bass-02-reese.sinp?raw'
@@ -51,6 +63,7 @@ import hihatRaw from './patches/trap-hihat.sinp?raw'
 import grimeLeadRaw from './patches/grime-lead.sinp?raw'
 import pingpongLeadRaw from './patches/pingpong-lead.sinp?raw'
 import samplerChopRaw from './patches/sampler-chop.sinp?raw'
+import motorikRaw from '../academy/levels/history-02-motorik.sinp?raw'
 
 function parseSinp(raw: string): PatchFile {
   return JSON.parse(raw) as PatchFile
@@ -118,6 +131,12 @@ export const PRESET_BANK: PresetEntry[] = [
     name: 'Sample Chop',
     description: 'A synthesized pluck, retriggered on the clock with an LFO wobbling its pitch, through a Bitcrusher for SP-1200-grade grit -- the sample-chop gesture jungle and hip-hop built a genre on. The audio is embedded in the patch itself; see sampler.ts\'s own doc comment for why.',
     file: parseSinp(samplerChopRaw),
+  },
+  {
+    id: 'motorik',
+    name: 'Motorik',
+    description: 'Clock into Sequencer into a filtered VCO, no envelope at all -- the mid-1970s Kraftwerk/Moroder idea that the sequencer is the whole band, not an accessory. From the history academy track.',
+    file: parseSinp(motorikRaw),
   },
 ]
 
