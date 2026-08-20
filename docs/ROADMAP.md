@@ -113,6 +113,61 @@ rather than reflex. That suits a synth better anyway.
 grade *control over time*. They teach different halves of the same skill, so it
 is a fourth mode rather than a replacement.
 
+
+## 3a. The arcade layer — expanded design notes
+
+A second round of ideas from the owner: syncing a siren oscillation to an
+animated emergency vehicle; phasers, lasers and "wub disruptors" fired at
+targets; a Defender-style sidescroller on clef measure grids; a vertical
+Space-Invaders with cascading notes to match; a panning-as-paddle game knocking
+out falling blocks; an 8-bit/beepcore arcade challenge; a screensaver mode with
+EQ-reactive visuals; and scoring an improvised soundtrack over ASCII animation.
+
+**The distinction that matters.** These are two different products and should
+not share a mode:
+
+- **The synth is the controller.** Siren sync, wub disruptor, pan-paddle,
+  note-matching. The player performs to affect the game. This is the novel
+  idea — the thing nobody else is doing — and it is where the skill-building
+  value lives.
+- **The game reacts to the sound.** Screensaver, EQ-reactive visuals, video
+  mixing. Output-only, no scoring, no skill. Worth building, but it is a
+  visualiser, not a game.
+
+**The constraint that should decide build order.** Pitch detection needs an
+analysis window — YIN needs a couple of periods, roughly 30 ms at low
+frequencies. So anything scored on *pitch* cannot be twitch-responsive.
+
+But **pan position and filter cutoff are parameter reads, not analysis, and
+carry no latency at all.** That makes the pan-as-paddle idea mechanically the
+strongest of the set: it can be as fast and responsive as any arcade game,
+where note-matching structurally cannot.
+
+**Recommended build order:**
+
+1. **Pan paddle.** Zero-latency control, immediately fun, and it teaches
+   stereo placement — a thing players otherwise ignore. The `Panner` is
+   equal-power and CV-controllable already.
+2. **Wub disruptor.** The tempo-locked LFO exists; "hit the target at the
+   right wobble rate" is directly measurable, and it teaches a real technique
+   the bass track already covers.
+3. **Siren sync.** LFO rate matching against an animated target — the same
+   mechanic as the wub, with a different skin and a gentler curve.
+4. **Note matching** (Space Invaders / clef grid). Design it around *sustained
+   accuracy and controlled movement* — gliding onto a target, holding through
+   a gate — rather than reflex, because the analysis window forbids reflex.
+5. **Screensaver / visualiser.** Separate mode. The analysis layer already
+   drives the scope and spectrum; this is rendering, not new DSP.
+
+**Aesthetic note.** The 8-bit/beepcore idea is nearly free now — the Bitcrusher
+ships, and a chiptune voice is a preset plus a theme rather than new DSP. An
+ASCII or low-RAM visual mode also suits the test-equipment look the app already
+has, and costs almost nothing to render.
+
+**What the arcade would need that does not exist:** a game loop and a scoring
+model. Everything else — real-time pitch, features, stereo, tempo lock — is
+already built and measured.
+
 ## 4. Known gaps, already recorded elsewhere
 
 - The two spec'd failure modes never implemented: a native fallback with a
