@@ -1,24 +1,22 @@
 # SinsThesis — continuation
 
-**Updated:** 2026-08-20. Engine, rack, analysis, and all three of the academy's
-grading modes are shipped -- the teaching arc this project was designed
-around is complete.
-**Branch:** `master`.
-**State:** 609 node + 147 browser tests pass, `typecheck` clean, tree clean.
+**Updated:** 2026-08-20. Engine, rack, analysis, all three academy grading modes,
+studio recording, stereo, and a preset bank.
+**Branch:** `main` — 109 commits. Public at github.com/WyrmSpear/SinsThesis (MIT).
+**Live** at `ryanoglelmt.com/portfolio/sinsthesis/`.
+**State:** 756 tests pass (609 node + 147 browser), `typecheck` clean, tree clean.
 
 **Run it:** `npm run dev`, open the URL, POWER ON.
 
-- **Free play** — a modular rack. Sixteen modules in a palette, drag-to-patch
-  cables, drag-to-reorder, twelve themes, `.sinp` save/load with autosave, a
-  programmable 16-step sequencer, and a Scope module.
-- **Academy** — eleven levels, three grading modes. Five *build-this-patch*,
-  graded on the actual patch graph; three *match-this-sound*, graded on
-  perceptual distance between your patch rendered offline and a target
-  `.sinp`; three *constrained challenge*, graded loosely on extracted
-  features against a per-level rubric ("make a convincing kick using three
-  modules and no sequencer") -- many different patches pass, a module-count
-  budget is enforced and shown live while you build. Failures are phrased in
-  the player's own words and name which property is off, in which direction.
+- **Free play** — a modular rack. Twenty-one module types, drag-to-patch cables,
+  drag-to-reorder, twelve themes, `.sinp` save/load with autosave, a programmable
+  16-step sequencer, a Scope, and a stereo output stage.
+- **Presets** — ten genre patches loadable from the toolbar, each playable the
+  instant it loads.
+- **Academy** — sixteen levels across two tracks. Three grading modes:
+  build-this-patch (graph topology), match-this-sound (perceptual distance), and
+  constrained challenge (feature rubric with a module limit).
+- **Studio** — live recording and offline bounce, both stereo, exported as WAV.
 - **Dev harness** at `/harness.html` — scope and spectrum for engine work.
 
 Read this file first. Then `docs/audio/PHASE1A-LEDGER.md` for every decision made
@@ -56,7 +54,7 @@ src/engine/
   dsp/        wavetable.ts, ladder.ts, wavefolder.ts, segment.ts, polyblep.ts (unimported, kept as reference)
   worklets/   vco, ladder, wavefolder, segment, passthrough, peak-tap (test-only)
               + registry.ts (WORKLET_MODULES) + audioworklet-globals.d.ts
-  modules/    sixteen descriptors + index.ts
+  modules/    twenty-one descriptors + index.ts
   graph.ts  patch.ts  cycle.ts  render.ts  clock.ts  midi.ts  param-smoothing.ts
   types.ts  registry.ts  version.ts
 rack/         main.ts, panel.ts, ghost-panel.ts, knob.ts, slider.ts, switch.ts,
@@ -209,7 +207,7 @@ unchanged. Zero new tokens, zero component edits, nine for nine — see
 `.superpowers/sdd/brimstone-theme-report.md` for the full account, including
 where the single `--knob-indicator` token had to arbitrate between the
 brief's two accent colors (ember for indicators, sulfur for "active") and a
-`--text-dim` contrast pass the other eight themes didn't need.
+`--text-dim` contrast pass the other themes didn't need.
 
 **Space Station, Vaporwave and Psychedelic (the tenth through twelfth) held
 the same claim under the widest brief yet.** NASA-console restraint, an
@@ -366,6 +364,50 @@ that came out of playing all three by hand are in
 
 This closes out the academy's three-mode arc the spec laid out: build the
 patch, match the sound, satisfy the constraint.
+
+## Since the academy closed
+
+**Stereo, at the destination stage.** The design decision was not to thread
+stereo through all the mono modules but to put it where hardware does — a
+stereo-capable Output, a Panner (equal-power, measured flat to 0.000 dB centre
+versus extremes), a Ping-Pong Delay with crossed feedback, and a mid-side Width
+stage. Every stereo module is mono-compatible as a first-class acceptance test:
+Width's mono sum is RMS-identical to five decimals across its whole range,
+which is why M/S was chosen over a Haas widener. Recording and bounce were made
+genuinely stereo rather than scoped down, so a stereo patch exports a stereo
+WAV.
+
+`renderGraph`/`renderPatch` stay deliberately mono with a `renderPatchStereo`
+sibling for the bounce; the Scope's mono read is `AnalyserNode`'s own spec'd
+down-mix. Both are documented choices, not oversights.
+
+**A second filter type.** There was exactly one filter — a four-pole lowpass
+ladder — so hi-hats, formant sweeps and bandpass wahs were impossible. The
+state-variable filter gives simultaneous lp/bp/hp/notch, cutoff accurate to
+0.18% from 50 Hz to 19 kHz, genuinely two-pole at −12.6 dB/oct. It deliberately
+does **not** self-oscillate: a first attempt mirroring the ladder's
+push-past-threshold trick produced a relaxation oscillator detached from the
+knob, so this one is provably BIBO-stable instead.
+
+**A bass toolkit, driven by tester requests** for dubstep, bass house, trap and
+grime. The LFO now locks to clock divisions (measured error 0.003–0.006%,
+survives a tempo change mid-note), and an antialiased Drive module adds
+saturation with soft and hard curves (alias floor −95.8 / −85.1 dB at drive 20,
+worst case −74.1 across a four-fundamental sweep).
+
+**Ten presets and a second academy track.** Four of the five bass level
+solutions *are* the shipped presets — the academy's founding decision that
+levels are authored by patching means a solution and a preset can be one file.
+Listening to them caught a load-time transient clip affecting **every** patch
+anyone loads, which measurement alone had missed.
+
+**Twelve themes.** Space Station, Vaporwave and Psychedelic joined the nine.
+Still zero new tokens and zero component edits — twelve for twelve.
+
+**Researched history.** `docs/history-of-synthesis-research.md` holds cited
+research on Kurzweil and the wider lineage, with disputed claims flagged
+unverified, plus a design for a history academy track where players rebuild
+historically important sounds rather than reading a timeline. Not yet built.
 
 ## Smaller things, recorded but not urgent
 
