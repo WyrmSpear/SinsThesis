@@ -38,7 +38,7 @@ import { fileURLToPath } from 'node:url'
  * `height` from `PANEL_HEIGHT_PX` (rack/panel.ts), the same "3U regardless
  * of width" rule a real Eurorack case enforces. The assertions below check
  * that claim two ways -- every panel in one theme shares the exact same
- * height, and each panel's height stays pixel-identical across all nine
+ * height, and each panel's height stays pixel-identical across all twelve
  * themes, mirroring how width was already checked.
  */
 
@@ -63,9 +63,10 @@ afterAll(async () => {
   await server?.close()
 })
 
-// The eight themes Section 8 names, plus Brimstone (the ninth, added after
-// Section 8 was written -- see rack/theme-brimstone.css). Reaktor Dark is
-// the default and serves as the reference every other theme is compared
+// The eight themes Section 8 names, plus Brimstone (the ninth), Space
+// Station, Vaporwave and Psychedelic (the tenth through twelfth -- see
+// each theme's own rack/theme-*.css header comment). Reaktor Dark is the
+// default and serves as the reference every other theme is compared
 // against.
 const THEMES = [
   'reaktor-dark',
@@ -77,6 +78,9 @@ const THEMES = [
   'casiotone',
   'korg-ms20',
   'brimstone',
+  'space-station',
+  'vaporwave',
+  'psychedelic',
 ] as const
 
 interface Size {
@@ -172,7 +176,7 @@ function assertNoOverflowOrOverlap(panels: PanelGeometry[]): void {
 
 describe('theme geometry (Section 8)', () => {
   it(
-    'switching every theme changes tokens and holds panel width, control size and jack position pixel-identical across all nine',
+    'switching every theme changes tokens and holds panel width, control size and jack position pixel-identical across all twelve',
     async () => {
       const page: Page = await browser.newPage()
       const consoleErrors: string[] = []
@@ -240,7 +244,7 @@ describe('theme geometry (Section 8)', () => {
       // shares one exact height (the rail claim itself -- VCO and Output
       // seated on the same line, not tops flush and bottoms ragged), and
       // then, in the cross-theme loop below, that height stays pixel-
-      // identical per panel across all nine themes the same way width
+      // identical per panel across all twelve themes the same way width
       // already does.
       const referenceHeight = reference[0]!.height
       for (const panel of reference) {

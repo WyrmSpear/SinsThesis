@@ -1,0 +1,114 @@
+/**
+ * Psychedelic -- the 1970s: warm and saturated, orange, ochre, deep purple,
+ * avocado. The furthest theme from the original nine and the best test of
+ * the token system (the brief's own framing) -- and it holds: same rule as
+ * every theme file before it, nothing but CSS custom properties,
+ * `rack/style.css` and every `rack/*.ts` component untouched, geometry
+ * unaffected (`rack/panel.ts`, `rack/knob.ts` own that instead). Zero new
+ * tokens, zero component edits, twelve for twelve.
+ *
+ * ---- the motif: a paisley/poster swirl, carried through two tokens ----
+ *
+ * "Organic curves in the ornament where the geometry allows" is Brimstone's
+ * own trick (a figurative watermark riding `--surface-rack`/`--rail-surface`
+ * as an inline SVG `data:` URI, since the CSS `background` shorthand takes
+ * a `url()` layer exactly as readily as a gradient one) pointed at a
+ * different reference: instead of a straight-edged heretic's fork, a loose
+ * paisley/teardrop swirl built entirely from cubic-bezier curves -- no
+ * straight line in it anywhere, which is the actual "organic" claim, made
+ * of path data rather than a mood. A denser, smaller-tiled copy rides
+ * `--rail-surface`, the same large-tile/small-tile split every textured
+ * theme before this one uses.
+ *
+ * "Poster-style lettering" is answered the same way Vaporwave answered
+ * "chrome" and Space Station answered "most legible ever made": in a
+ * specific token, not a slogan. `--font-mono` is a bold rounded slab
+ * serif (Cooper Black's own genre, the definitive 70s poster face) with a
+ * generous `--tracking-title` (0.16em) for its headline moments, backed by
+ * a plain serif fallback chain so the shape still reads if the display
+ * face isn't installed.
+ *
+ * Legibility: the brief's other named low-contrast risk, and the harder of
+ * the two here since all four reference colors (orange, ochre, purple,
+ * avocado) are mid-value hues that wash out fast against each other.
+ * Every text token was measured against all three panel surfaces
+ * (`--surface-panel`/`-alt`/`-recess`), worst case: `--text-dim` 5.51:1,
+ * `--text-primary` 11.00:1, `--text-accent` (avocado) 5.59:1, `--text-warn`
+ * (burnt orange) 4.78:1 -- the warn color went through two rounds of
+ * brightening to clear 4.5 against `--surface-panel-alt`, the same
+ * "measured, not assumed" pass Brimstone's own header comment describes
+ * for its `--text-dim`. Full table in
+ * `.superpowers/sdd/themes-ten-eleven-twelve-report.md`.
+ */
+:root[data-theme='psychedelic'] {
+  /* ---- surfaces: deep aubergine, ochre paisley watermark ---- */
+  --surface-rack:
+    url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMjAiIGhlaWdodD0iMTIwIiB2aWV3Qm94PSIwIDAgMTIwIDEyMCI+CjxnIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyMzAsMTQ2LDQyLDAuMzApIiBzdHJva2Utd2lkdGg9IjIuNiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIj4KPHBhdGggZD0iTTYwIDI2IEM4MiAyNiA5NiA0MiA5MiA2MiBDODggODIgNjggOTAgNTIgODAgQzQwIDcyIDQwIDU2IDUyIDUyIEM2MCA0OSA2NiA1NiA2MCA2MCIvPgo8cGF0aCBkPSJNNjAgOTQgQzM4IDk0IDI0IDc4IDI4IDU4IEMzMiAzOCA1MiAzMCA2OCA0MCBDODAgNDggODAgNjQgNjggNjggQzYwIDcxIDU0IDY0IDYwIDYwIi8+CjwvZz4KPGcgZmlsbD0icmdiYSgyMzAsMTQ2LDQyLDAuMzApIj4KPGNpcmNsZSBjeD0iNjAiIGN5PSI2MCIgcj0iMi42Ii8+CjxjaXJjbGUgY3g9IjE0IiBjeT0iMjAiIHI9IjEuNiIvPgo8Y2lyY2xlIGN4PSIxMDYiIGN5PSIxMDAiIHI9IjEuNiIvPgo8L2c+Cjwvc3ZnPg==')
+      0 0 / 150px 150px repeat,
+    radial-gradient(ellipse at 50% 0%, rgba(226, 96, 28, 0.1), transparent 60%),
+    linear-gradient(165deg, #33221a 0%, #201510 100%);
+  --surface-panel: #33221a;
+  --surface-panel-alt: #3d2a1e;
+  --surface-recess: #201510;
+
+  /* ---- engraving: hairline strokes and shadow ---- */
+  --panel-border: #5a3d26;
+  --panel-border-strong: #7a5230;
+  --shadow-panel: rgba(15, 8, 4, 0.7);
+  --shadow-ambient: rgba(15, 8, 4, 0.5);
+  --shadow-inset: rgba(10, 5, 2, 0.75);
+  --highlight-edge: rgba(255, 200, 140, 0.1);
+
+  /* ---- type: bold rounded poster slab, generous title tracking ---- */
+  --font-mono: 'Cooper Black', 'Bookman Old Style', 'Bookman', Georgia, serif;
+  --text-primary: #f5e6c8;
+  --text-dim: #c2a06a;
+  --text-faint: #7a6142;
+  --text-accent: #9caf4f;
+  --text-warn: #ef7830;
+  --text-2xs: 0.63rem;
+  --text-xs: 0.72rem;
+  --text-sm: 0.82rem;
+  --text-md: 0.98rem;
+  --text-lg: 1.24rem;
+  --tracking-label: 0.06em;
+  --tracking-title: 0.16em;
+
+  /* ---- knob material: warm brown body, pumpkin-orange pointer ---- */
+  --knob-body: #3a2717;
+  --knob-body-hi: #55391f;
+  --knob-ring: #8a5f34;
+  --knob-indicator: #f2791f;
+  --knob-indicator-glow: rgba(242, 121, 31, 0.55);
+  --knob-readout: #f2791f;
+  --knob-readout-drag: #ffb066;
+
+  /* ---- jacks: dark bronze socket, avocado on hover ---- */
+  --jack-socket: #1c1109;
+  --jack-ring: #8a5f34;
+  --jack-ring-hover: #9caf4f;
+
+  /* ---- cables: burnt orange, avocado, deep violet -- the reference's own four hues ---- */
+  --cable-audio: #ef7830;
+  --cable-cv: #9caf4f;
+  --cable-gate: #a25fc9;
+  --cable-preview: #a3865a;
+  --cable-delayed-glow: rgba(162, 95, 201, 0.85);
+  --cable-hover-glow: rgba(255, 214, 158, 0.4);
+  --cable-inactive: #5a4530;
+
+  /* ---- lamps: avocado "on," burnt-orange warn ---- */
+  --lamp-on: #9caf4f;
+  --lamp-on-glow: rgba(156, 175, 79, 0.6);
+  --lamp-off: #3a2717;
+  --lamp-off-border: #6b4526;
+  --lamp-warn: #ef7830;
+  --lamp-warn-glow: rgba(239, 120, 48, 0.65);
+
+  /* ---- rack surfaces: rail, screws -- the same swirl motif, smaller and denser ---- */
+  --rail-surface:
+    url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI3MCIgaGVpZ2h0PSI3MCIgdmlld0JveD0iMCAwIDcwIDcwIj4KPGcgZmlsbD0ibm9uZSIgc3Ryb2tlPSJyZ2JhKDIzMCwxNDYsNDIsMC4yNikiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIj4KPHBhdGggZD0iTTM1IDE1IEM0OCAxNSA1NiAyNSA1MyAzNyBDNTAgNDkgMzggNTQgMjkgNDcgQzIzIDQyIDIzIDMzIDI5IDMxIEMzNCAyOSAzOCAzMyAzNSAzNSIvPgo8L2c+CjxnIGZpbGw9InJnYmEoMjMwLDE0Niw0MiwwLjI2KSI+CjxjaXJjbGUgY3g9IjM1IiBjeT0iMzUiIHI9IjEuOCIvPgo8L2c+Cjwvc3ZnPg==')
+      0 0 / 90px 90px repeat,
+    #1a100b;
+  --screw: #8a5f3488;
+}

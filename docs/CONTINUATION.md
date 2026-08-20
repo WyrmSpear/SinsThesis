@@ -4,12 +4,12 @@
 grading modes are shipped -- the teaching arc this project was designed
 around is complete.
 **Branch:** `master`.
-**State:** 500 tests pass (402 node + 98 browser), `typecheck` clean, tree clean.
+**State:** 609 node + 147 browser tests pass, `typecheck` clean, tree clean.
 
 **Run it:** `npm run dev`, open the URL, POWER ON.
 
 - **Free play** — a modular rack. Sixteen modules in a palette, drag-to-patch
-  cables, drag-to-reorder, nine themes, `.sinp` save/load with autosave, a
+  cables, drag-to-reorder, twelve themes, `.sinp` save/load with autosave, a
   programmable 16-step sequencer, and a Scope module.
 - **Academy** — eleven levels, three grading modes. Five *build-this-patch*,
   graded on the actual patch graph; three *match-this-sound*, graded on
@@ -63,9 +63,9 @@ rack/         main.ts, panel.ts, ghost-panel.ts, knob.ts, slider.ts, switch.ts,
               curve.ts, cables.ts, cable-inspector.ts, palette.ts, reorder.ts,
               keyboard-panel.ts, sequencer-panel.ts, scope-panel.ts, academy-panel.ts,
               match-sound-panel.ts, patch-io.ts, theme-switcher.ts, style.css,
-              theme-*.css (9 themes: Reaktor Dark, Moog Wood, Phosphor Lab,
+              theme-*.css (12 themes: Reaktor Dark, Moog Wood, Phosphor Lab,
               Ableton Live, Circuit/PCB, Geist Groovebox, Casiotone, Korg MS-20,
-              Brimstone)
+              Brimstone, Space Station, Vaporwave, Psychedelic)
 academy/      levels.ts, feedback.ts, sound-feedback.ts, constrained-feedback.ts,
               progress.ts, sinp-raw.d.ts,
               levels/ (11 levels, each a .sinp solution/target/proof-patch + a .rubric.json)
@@ -187,11 +187,12 @@ keyboard, sequencer, and (added in Phase 2) the scope use the `customPanel`
 escape hatch the spec provided, and even they get generic knobs and jacks
 where they don't need bespoke UI.
 
-**A theme is a token file.** Nine themes ship — Reaktor Dark, Moog Wood,
+**A theme is a token file.** Twelve themes ship — Reaktor Dark, Moog Wood,
 Phosphor Lab, Ableton Live, Circuit/PCB, Geist Groovebox, Casiotone, Korg
-MS-20, Brimstone — and adding the last eight forced **zero** new tokens and
-**zero** component edits. Panel widths, knob sizes, jack positions and panel
-height are pixel-identical across all nine, asserted by test.
+MS-20, Brimstone, Space Station, Vaporwave, Psychedelic — and adding the last
+eleven forced **zero** new tokens and **zero** component edits. Panel widths,
+knob sizes, jack positions and panel height are pixel-identical across all
+twelve, asserted by test.
 
 **Brimstone (the ninth) was the harder test.** Every theme before it carried
 its texture (scanlines, wood grain, a PCB trace grid) as a procedural CSS
@@ -209,6 +210,25 @@ unchanged. Zero new tokens, zero component edits, nine for nine — see
 where the single `--knob-indicator` token had to arbitrate between the
 brief's two accent colors (ember for indicators, sulfur for "active") and a
 `--text-dim` contrast pass the other eight themes didn't need.
+
+**Space Station, Vaporwave and Psychedelic (the tenth through twelfth) held
+the same claim under the widest brief yet.** NASA-console restraint, an
+80s-retro-futurist reimagining, and 1970s warmth are about as far from each
+other — and from the original nine — as this token set has been asked to
+stretch, and it still needed **zero** new tokens and **zero** component
+edits, twelve for twelve. Psychedelic reuses Brimstone's inline-SVG-through-
+`--surface-rack`/`--rail-surface` trick for its paisley-swirl watermark (an
+organic, all-curves path this time, no straight line in it); Vaporwave's
+"grid horizon" is the same trick Moog Wood's grain and Phosphor Lab's
+scanlines already established, just three gradient layers instead of two.
+Legibility was the real risk on the two low-contrast palettes (Vaporwave,
+Psychedelic) — every text token was measured against all three panel
+surfaces, not eyeballed; Psychedelic's `--text-warn` went through the same
+"measured, not assumed" brightening pass Brimstone's `--text-dim` did on
+this project's first go-round. Full color tables and the contrast
+measurements are in
+`.superpowers/sdd/themes-ten-eleven-twelve-report.md`, and each theme's own
+header comment carries the reasoning specific to it.
 
 Two contract gaps the build exposed, both since closed:
 
@@ -437,6 +457,25 @@ Each of these cost real time. Do not rediscover them.
 9. **Never run two implementer agents concurrently in this tree.** It happened
    once here and one agent found the other's files staged in its index. Both
    commits survived only because both agents checked their own diffs.
+10. **Retiming the Clock module does not reset a downstream Sequencer's step
+    index**, and it shouldn't (a tempo knob rewinding a running sequence
+    would be wrong on real hardware too). `tests/browser/rack-sequencer.test.ts`
+    assumed otherwise and was flaky under full-suite contention as a result —
+    the sequencer drifts however many steps the old schedule fired during
+    setup, and `graph.setParam(clockId, 'bpm', ...)` only re-times the
+    clock's own gate edges from "now," it has no idea a sequencer is even
+    downstream. Fixed by driving the sequencer's own `reset` port directly
+    (a throwaway `ConstantSourceNode` pulsed onto its front `GainNode`), with
+    two more traps under that one, both found by reproducing under 4-way
+    parallel full-suite contention rather than reasoning: the reset pulse
+    must fire *after* retiming the clock (retiming first is what atomically
+    kills the old schedule, closing the gap it could otherwise sneak one
+    more edge through), and its scheduled time must be an explicit future
+    `ctx.currentTime` offset, not bare "now" (`ctx.currentTime` only
+    advances once per render quantum, ~2.7 ms, so "now" scheduled from two
+    calls microseconds apart routinely lands both edges in the same
+    quantum). Full account in
+    `.superpowers/sdd/themes-ten-eleven-twelve-report.md`.
 
 ---
 

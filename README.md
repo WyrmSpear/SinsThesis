@@ -74,7 +74,7 @@ entry point.
   modular rack with sixteen module types in a palette (VCO, Noise, ladder
   VCF, VCA, Wavefolder, ADSR, LFO, Sample & Hold, Mixer, Multiple, Delay,
   Clock, 16-step Sequencer, Keyboard/MIDI, Output, Scope), drag-to-patch
-  cables, drag-to-reorder panels, nine switchable themes, and `.sinp`
+  cables, drag-to-reorder panels, twelve switchable themes, and `.sinp`
   save/load with autosave. Click a cable to see what's actually flowing on
   it — waveform, fundamental, RMS.
 - **The academy** (inside the rack) — five build-this-patch levels that
@@ -140,7 +140,7 @@ Beyond that:
 
 ## What it looks like
 
-Nine themes ship as token files — no component knows which one is active, and
+Twelve themes ship as token files — no component knows which one is active, and
 panel widths, knob sizes and jack positions are pixel-identical across all of
 them.
 

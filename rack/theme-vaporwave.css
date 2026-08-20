@@ -1,0 +1,112 @@
+/**
+ * Vaporwave -- not the 1980s, but the retro-futurist reimagining of it:
+ * sunset magenta and cyan, chrome, a grid horizon, a soft glow. Same rule
+ * as every theme file before it: nothing but CSS custom properties,
+ * `rack/style.css` and every `rack/*.ts` component untouched, geometry
+ * unaffected (`rack/panel.ts`, `rack/knob.ts` own that instead).
+ *
+ * The brief's own risk warning -- "the risk here is landing on cliche;
+ * make it a coherent instrument, not a mood board" -- is answered the same
+ * way Korg MS-20 answered "most legible ever made": by committing the
+ * *reference's actual mechanics* to specific tokens instead of splashing
+ * the palette everywhere. "Chrome" lives specifically in the knob
+ * material (`--knob-body`/`--knob-body-hi`/`--knob-ring` are cool
+ * blue-greys with a bright specular highlight, not magenta or cyan at
+ * all -- a real chrome knob on a synth doesn't take on the panel's
+ * color). "Sunset" lives specifically in `--surface-rack`/`--rail-surface`
+ * (a magenta-to-navy gradient plus a cyan horizon grid). "Glow" lives in
+ * the existing glow tokens (`--knob-indicator-glow`, `--lamp-on-glow`,
+ * `--cable-hover-glow`, `--highlight-edge`), turned up the way Phosphor
+ * Lab's "everything glows" already established as this token set's
+ * mechanism for that effect, not a new one. Everything else -- panel
+ * surfaces, knob labels, jack sockets -- stays a comparatively restrained
+ * dark indigo, so the two accent hues read as *accents* against an actual
+ * instrument rather than competing with each other everywhere at once.
+ *
+ * The horizon grid is the same trick every textured theme uses:
+ * `--surface-rack`/`--rail-surface` are each a bare `var()` substituted as
+ * a whole `background` value in `rack/style.css`, so a token can hand back
+ * more layers than a flat color -- here a radial "sun" glow, a
+ * `repeating-linear-gradient` of horizontal cyan lines for the grid, and a
+ * magenta-to-navy sunset gradient underneath, exactly Moog Wood's and
+ * Phosphor Lab's own mechanism, just three layers instead of two.
+ *
+ * Legibility: this is one of the two low-contrast-prone palettes named in
+ * the brief, so every text token was measured, not eyeballed. Against the
+ * three panel surfaces (`--surface-panel`/`-alt`/`-recess`) the worst
+ * `--text-dim` reading is 7.08:1 and the worst `--text-primary` reading is
+ * 13.84:1 -- both comfortably clear of Reaktor Dark's own 4.25:1 baseline,
+ * because a saturated magenta/cyan pair needs the *surrounding* neutrals to
+ * carry the actual reading contrast, not the accents. Full table in
+ * `.superpowers/sdd/themes-ten-eleven-twelve-report.md`.
+ */
+:root[data-theme='vaporwave'] {
+  /* ---- surfaces: indigo night, magenta sunset glow, a cyan horizon grid ---- */
+  --surface-rack:
+    radial-gradient(ellipse at 50% 16%, rgba(255, 130, 210, 0.32), transparent 46%),
+    repeating-linear-gradient(0deg, rgba(77, 232, 236, 0.09) 0px, rgba(77, 232, 236, 0.09) 1px, transparent 1px, transparent 26px),
+    linear-gradient(180deg, #3a1c4d 0%, #24123a 42%, #170f26 100%);
+  --surface-panel: #211735;
+  --surface-panel-alt: #2a1d44;
+  --surface-recess: #170f26;
+
+  /* ---- engraving: hairline strokes and shadow ---- */
+  --panel-border: #4a3568;
+  --panel-border-strong: #6b4a94;
+  --shadow-panel: rgba(6, 2, 14, 0.65);
+  --shadow-ambient: rgba(6, 2, 14, 0.5);
+  --shadow-inset: rgba(4, 1, 10, 0.7);
+  --highlight-edge: rgba(255, 170, 230, 0.12);
+
+  /* ---- type: clean geometric sans, the retro-futurist reference's own choice ---- */
+  --font-mono: 'Century Gothic', 'Avenir Next', 'Futura', ui-sans-serif, sans-serif;
+  --text-primary: #f5f0ff;
+  --text-dim: #b7a8d9;
+  --text-faint: #6f5c94;
+  --text-accent: #4de8ec;
+  --text-warn: #ff7a59;
+  --text-2xs: 0.62rem;
+  --text-xs: 0.7rem;
+  --text-sm: 0.8rem;
+  --text-md: 0.95rem;
+  --text-lg: 1.2rem;
+  --tracking-label: 0.09em;
+  --tracking-title: 0.15em;
+
+  /* ---- knob material: chrome -- cool, not tinted to either accent ---- */
+  --knob-body: #4a4f5c;
+  --knob-body-hi: #dce2ec;
+  --knob-ring: #8890a2;
+  --knob-indicator: #ff3fb0;
+  --knob-indicator-glow: rgba(255, 63, 176, 0.6);
+  --knob-readout: #4de8ec;
+  --knob-readout-drag: #8ff5f7;
+
+  /* ---- jacks: chrome sockets, magenta on hover ---- */
+  --jack-socket: #120a1e;
+  --jack-ring: #8890a2;
+  --jack-ring-hover: #ff3fb0;
+
+  /* ---- cables: sunset magenta, cyan, and a golden third for gate ---- */
+  --cable-audio: #ff3fb0;
+  --cable-cv: #4de8ec;
+  --cable-gate: #ffb020;
+  --cable-preview: #a08fc4;
+  --cable-delayed-glow: rgba(255, 176, 32, 0.85);
+  --cable-hover-glow: rgba(255, 170, 230, 0.55);
+  --cable-inactive: #4a3568;
+
+  /* ---- lamps: cyan neon "on," magenta warn ---- */
+  --lamp-on: #4de8ec;
+  --lamp-on-glow: rgba(77, 232, 236, 0.7);
+  --lamp-off: #2a1d44;
+  --lamp-off-border: #6b4a94;
+  --lamp-warn: #ff3fb0;
+  --lamp-warn-glow: rgba(255, 63, 176, 0.65);
+
+  /* ---- rack surfaces: rail, screws -- the same grid, denser and dimmer ---- */
+  --rail-surface:
+    repeating-linear-gradient(0deg, rgba(77, 232, 236, 0.07) 0px, rgba(77, 232, 236, 0.07) 1px, transparent 1px, transparent 14px),
+    linear-gradient(180deg, #241540 0%, #130b20 100%);
+  --screw: #8890a288;
+}

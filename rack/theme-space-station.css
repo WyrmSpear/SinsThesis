@@ -1,0 +1,115 @@
+/**
+ * Space Station -- NASA instrumentation on a command console bridge:
+ * Apollo-era/ISS matte grey and black panels, precise white legends, amber
+ * and green status lamps, an occasional red guarded switch. Same rule as
+ * every theme file before it: nothing but CSS custom properties,
+ * `rack/style.css` and every `rack/*.ts` component untouched, geometry
+ * unaffected (`rack/panel.ts`, `rack/knob.ts` own that instead).
+ *
+ * The brief's own warning -- "misreading a value is a serious problem" --
+ * is the actual design constraint, not a mood. Where Korg MS-20 (the
+ * project's other "most legible" theme) bumped its type scale up a notch
+ * for the same reason, this one does too: `--text-2xs` moves from the
+ * baseline 0.62rem to 0.65rem, the smallest bump that still reads as
+ * "restrained" rather than "a different scale entirely," since 0.62rem is
+ * what every jack label and readout renders at across the whole rack.
+ * `--tracking-label` stays moderate (0.08em) -- wide enough to read as
+ * stencilled console lettering, not so wide it fights the smaller type.
+ *
+ * Texture: a brushed-metal diagonal sheen plus a sparse rivet grid, both
+ * carried through `--surface-rack`/`--rail-surface` exactly the way every
+ * texture-bearing theme before this one does (Moog Wood's wood grain,
+ * Phosphor Lab's scanlines, Circuit/PCB's trace grid, Brimstone's
+ * watermark) -- a `radial-gradient` dot layer plus a `linear-gradient`
+ * sheen, no `url()` needed here since rivets are just small circles a
+ * repeating radial-gradient already draws natively. Restrained on purpose:
+ * this is equipment, not decoration, so the rack surface reads as matte
+ * panel stock, not a pattern competing with the numbers printed on it.
+ *
+ * Color roles map straight onto a real console's own vocabulary rather
+ * than being picked for contrast alone: amber (`--text-accent`,
+ * `--knob-indicator`, `--cable-cv`) is the telemetry/interactive color --
+ * knobs, cursors, CV; green (`--lamp-on`, `--cable-gate`,
+ * `--jack-ring-hover`) means "nominal/go," the same role a real console's
+ * green status lamps carry; a single desaturated-but-legible red
+ * (`--text-warn`/`--lamp-warn`) is reserved for the guarded-switch case --
+ * ghost modules, status banners, failed Checks -- so it reads as the rare
+ * alarm color the brief asked for rather than a routine one. Contrast was
+ * measured, not eyeballed: `--text-dim` (the jack-label/knob-label color,
+ * the smallest type on the page) holds >=4.49:1 against every one of
+ * `--surface-panel`/`-alt`/`-recess`, and `--text-warn` >=4.74:1 against
+ * `--surface-panel`, the background it actually renders on (see
+ * `.superpowers/sdd/themes-ten-eleven-twelve-report.md` for the full
+ * measured table -- an early red draft measured 3.20:1 there and was
+ * brightened until it cleared 4.5).
+ */
+:root[data-theme='space-station'] {
+  /* ---- surfaces: matte console grey, brushed sheen, a sparse rivet grid ---- */
+  --surface-rack:
+    radial-gradient(circle at 3px 3px, rgba(255, 255, 255, 0.05) 1px, transparent 1.6px) 0 0 / 34px 34px,
+    linear-gradient(155deg, rgba(255, 255, 255, 0.03) 0%, transparent 45%),
+    linear-gradient(160deg, #2c3033 0%, #1b1e20 100%);
+  --surface-panel: #3c4044;
+  --surface-panel-alt: #464b50;
+  --surface-recess: #24282b;
+
+  /* ---- engraving: hairline strokes and shadow ---- */
+  --panel-border: #565c62;
+  --panel-border-strong: #767d84;
+  --shadow-panel: rgba(0, 0, 0, 0.55);
+  --shadow-ambient: rgba(0, 0, 0, 0.4);
+  --shadow-inset: rgba(0, 0, 0, 0.6);
+  --highlight-edge: rgba(255, 255, 255, 0.07);
+
+  /* ---- type: stencilled console lettering, sized up a notch (see header) ---- */
+  --font-mono: 'Consolas', 'Lucida Console', 'DejaVu Sans Mono', ui-monospace, monospace;
+  --text-primary: #eef1f2;
+  --text-dim: #b8bfc4;
+  --text-faint: #7d858a;
+  --text-accent: #ffb020;
+  --text-warn: #ff8f85;
+  --text-2xs: 0.65rem;
+  --text-xs: 0.73rem;
+  --text-sm: 0.82rem;
+  --text-md: 0.97rem;
+  --text-lg: 1.22rem;
+  --tracking-label: 0.08em;
+  --tracking-title: 0.14em;
+
+  /* ---- knob material: matte grey body, amber telemetry pointer ---- */
+  --knob-body: #34383c;
+  --knob-body-hi: #4a5157;
+  --knob-ring: #6b7278;
+  --knob-indicator: #ffb020;
+  --knob-indicator-glow: rgba(255, 176, 32, 0.5);
+  --knob-readout: #ffb020;
+  --knob-readout-drag: #ffd27a;
+
+  /* ---- jacks: blackened metal, green "connected" ring on hover ---- */
+  --jack-socket: #1c1f21;
+  --jack-ring: #6b7278;
+  --jack-ring-hover: #4caf6b;
+
+  /* ---- cables by signal type: audio pale signal-white, CV amber telemetry, gate green ---- */
+  --cable-audio: #e7ebee;
+  --cable-cv: #ffb020;
+  --cable-gate: #4caf6b;
+  --cable-preview: #889097;
+  --cable-delayed-glow: rgba(255, 176, 32, 0.85);
+  --cable-hover-glow: rgba(255, 255, 255, 0.45);
+  --cable-inactive: #5a6067;
+
+  /* ---- lamps: green nominal, red guarded-switch alarm ---- */
+  --lamp-on: #4caf6b;
+  --lamp-on-glow: rgba(76, 175, 107, 0.6);
+  --lamp-off: #34383c;
+  --lamp-off-border: #6b7278;
+  --lamp-warn: #ff8f85;
+  --lamp-warn-glow: rgba(255, 143, 133, 0.6);
+
+  /* ---- rack surfaces: rail, screws -- the same rivet grid, denser ---- */
+  --rail-surface:
+    radial-gradient(circle at 2px 2px, rgba(255, 255, 255, 0.045) 1px, transparent 1.4px) 0 0 / 20px 20px,
+    #1a1d1f;
+  --screw: #7c848a88;
+}

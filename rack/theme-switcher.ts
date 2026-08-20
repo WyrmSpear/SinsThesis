@@ -26,8 +26,9 @@ export interface ThemeOption {
   label: string
 }
 
-/** The eight themes Section 8 names, plus Brimstone -- proof a ninth is
- *  still just: drop a `rack/theme-<id>.css` file, add one line here. */
+/** The eight themes Section 8 names, plus Brimstone, Space Station,
+ *  Vaporwave and Psychedelic -- proof a twelfth is still just: drop a
+ *  `rack/theme-<id>.css` file, add one line here. */
 export const THEMES: readonly ThemeOption[] = [
   { id: 'reaktor-dark', label: 'Reaktor Dark' },
   { id: 'moog-wood', label: 'Moog Wood' },
@@ -38,6 +39,9 @@ export const THEMES: readonly ThemeOption[] = [
   { id: 'casiotone', label: 'Casiotone' },
   { id: 'korg-ms20', label: 'Korg MS-20' },
   { id: 'brimstone', label: 'Brimstone' },
+  { id: 'space-station', label: 'Space Station' },
+  { id: 'vaporwave', label: 'Vaporwave' },
+  { id: 'psychedelic', label: 'Psychedelic' },
 ]
 
 function readStored(): string | null {
