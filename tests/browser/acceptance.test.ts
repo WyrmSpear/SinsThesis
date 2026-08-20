@@ -19,8 +19,9 @@ describe('Phase 1 acceptance', () => {
     // Fifteen from Phase 1, Phase 2's scope, the state-variable filter,
     // Drive (a plain saturation stage -- see drive.ts's own doc comment),
     // the three ROADMAP section 1a stereo modules (Panner, Ping-Pong
-    // Delay, Width), and the Sampler (see sampler.ts's own doc comment).
-    expect(ALL_DESCRIPTORS.length).toBe(22)
+    // Delay, Width), the Sampler and the Bitcrusher (see each module's own
+    // doc comment).
+    expect(ALL_DESCRIPTORS.length).toBe(23)
   })
 
   it('renders the classic voice: VCO into VCF into VCA into Output', async () => {

@@ -116,7 +116,7 @@ export const PRESET_BANK: PresetEntry[] = [
   {
     id: 'sampler-chop',
     name: 'Sample Chop',
-    description: 'A synthesized pluck, retriggered on the clock with an LFO wobbling its pitch -- the sample-chop gesture jungle and hip-hop built a genre on. The audio is embedded in the patch itself; see sampler.ts\'s own doc comment for why.',
+    description: 'A synthesized pluck, retriggered on the clock with an LFO wobbling its pitch, through a Bitcrusher for SP-1200-grade grit -- the sample-chop gesture jungle and hip-hop built a genre on. The audio is embedded in the patch itself; see sampler.ts\'s own doc comment for why.',
     file: parseSinp(samplerChopRaw),
   },
 ]
