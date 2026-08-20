@@ -50,8 +50,8 @@ export interface SamplerInstance extends ModuleInstance {
  * **Persistence decision.** `.sinp` is plain JSON, and every other module's
  * entire state already fits `Record<string, number>` -- this is the first
  * module in the set whose state doesn't. Three options, all real:
- * (1) embed the audio in the file: lossless and portable (the saved patch
- * really is everything needed to reproduce the sound, matching this
+ * (1) embed the audio in the file: inaudibly lossy and portable (the saved
+ * patch really is everything needed to reproduce the sound, matching this
  * project's own "a solution and a preset can be one file" precedent for
  * the academy) at the cost of file size; (2) reference a file path: stays
  * small, but a browser has no persistent handle to an arbitrary local file
@@ -66,10 +66,40 @@ export interface SamplerInstance extends ModuleInstance {
  * (`wav.ts`'s existing encoder/decoder -- already this project's own choice
  * for "half the size, noise below this engine's own DSP floor," reused
  * rather than re-litigated) plus the file name for the panel to display.
- * The mip mip set itself is never serialized -- it's rebuilt from the
- * restored mono audio on load, the same as it is on a fresh file drop,
- * since it's cheap relative to the file and storing it would multiply the
- * size by `SAMPLER_MIP_LEVELS` for no benefit.
+ * "Inaudibly lossy," not "lossless": PCM16 quantization measures about
+ * -96 dBFS error against the original float32, matching the bitcrusher's
+ * own independently-measured bits=16 step -- real, but far below this
+ * engine's own DSP noise floor.
+ *
+ * **A hot sample (peak above unity) does not get silently clipped.**
+ * `encodeWav`'s own PCM16 path clamps every sample to [-1, 1] before
+ * quantizing (see its doc comment) -- with nothing else done, a sample
+ * loaded above unity (plausible from a normalized-above-0 source file, or
+ * from anything recorded through this engine's own hot patches) would have
+ * its peaks silently and irreversibly shaved off the moment a patch is
+ * saved and reloaded, with no warning anywhere. That is exactly the "player
+ * saves, reloads, and the sample is quietly different" failure this module
+ * chose to embed audio (rather than reference a file path) to avoid.
+ * `serializeState` normalises a hot buffer down to unity before encoding
+ * and records the one gain number needed to restore the original level;
+ * `restoreState` multiplies back up by it. The round trip is exactly as
+ * lossy as an already-unity sample's always was (PCM16 quantisation, now
+ * scaled by the recorded gain) and never clips. The alternative of storing
+ * float32 instead (removing quantisation loss too) was rejected on file
+ * size: it would roughly double every embedded sample, and the shipped
+ * `sampler-chop.sinp` preset is already 141 KB, nearly all audio. A gain
+ * number costs a few bytes; a doubled file costs tens of kilobytes on a
+ * preset that already ships. `gain` is omitted from the saved state
+ * entirely when the sample was never hot (the overwhelmingly common case),
+ * so an ordinary patch's file size is unchanged, and its absence on load
+ * (every `.sinp` written before this fix, including the shipped presets and
+ * every academy level solution) means "no normalisation was applied" --
+ * the old behavior for a sample that was never hot in the first place.
+ *
+ * The mip set itself is never serialized -- it's rebuilt from the restored
+ * mono audio on load, the same as it is on a fresh file drop, since it's
+ * cheap relative to the file and storing it would multiply the size by
+ * `SAMPLER_MIP_LEVELS` for no benefit.
  *
  * **The honest trade-off, stated plainly rather than discovered:** a patch
  * with a ten-second sample embeds roughly a megabyte of base64 text in its
@@ -147,7 +177,30 @@ export const samplerDescriptor: ModuleDescriptor = {
     let currentFileName = ''
     let currentWaveform: SamplerWaveform | undefined
 
-    function postBuffer(buf: SamplerBuffer): void {
+    /** Largest absolute sample value -- how far a buffer sits above (or below)
+ *  unity. Used only by `serializeState`/`restoreState` to decide whether a
+ *  save needs to normalise before handing samples to `encodeWav`'s PCM16
+ *  path, which clamps to [-1, 1] (see this file's own doc comment). */
+function peakAbs(mono: Float32Array): number {
+  let peak = 0
+  for (let i = 0; i < mono.length; i++) {
+    const a = Math.abs(mono[i]!)
+    if (a > peak) peak = a
+  }
+  return peak
+}
+
+/** `mono` scaled by `factor`, or `mono` itself unchanged when `factor` is 1
+ *  -- the identity case is the overwhelmingly common one (no hot sample
+ *  loaded), so it skips the allocation and copy entirely. */
+function scaledBy(mono: Float32Array, factor: number): Float32Array {
+  if (factor === 1) return mono
+  const out = new Float32Array(mono.length)
+  for (let i = 0; i < mono.length; i++) out[i] = mono[i]! * factor
+  return out
+}
+
+function postBuffer(buf: SamplerBuffer): void {
       node.port.postMessage({
         type: 'load', mips: buf.mips, sourceSampleRate: buf.sourceSampleRate, frames: buf.frames,
       })
@@ -192,15 +245,38 @@ export const samplerDescriptor: ModuleDescriptor = {
       },
       serializeState() {
         if (!currentMono) return undefined
-        const wavBytes = new Uint8Array(encodeWav([currentMono], currentSourceSampleRate, 'pcm16'))
-        return { fileName: currentFileName, wavBase64: bytesToBase64(wavBytes) }
+        // A hot sample (peak > 1) would otherwise be hard-clipped by
+        // encodeWav's own PCM16 clamp -- normalise it down to unity before
+        // encoding and record the gain needed to undo that on restore. See
+        // this module's own doc comment ("A hot sample... does not get
+        // silently clipped") for why this over storing float32 or clipping
+        // with a warning.
+        const peak = peakAbs(currentMono)
+        const gain = peak > 1 ? peak : 1
+        const toEncode = scaledBy(currentMono, 1 / gain)
+        const wavBytes = new Uint8Array(encodeWav([toEncode], currentSourceSampleRate, 'pcm16'))
+        const state: { fileName: string; wavBase64: string; gain?: number } = {
+          fileName: currentFileName,
+          wavBase64: bytesToBase64(wavBytes),
+        }
+        // Omitted (not written as 1) for the overwhelmingly common
+        // never-hot case, matching `patch.ts`'s own "no field written for
+        // the ordinary case" convention for `state` itself -- an ordinary
+        // patch's file size and byte content are unaffected by this fix.
+        if (gain > 1) state.gain = gain
+        return state
       },
       restoreState(data) {
         if (!data || typeof data !== 'object') return
-        const { fileName, wavBase64 } = data as { fileName?: unknown; wavBase64?: unknown }
+        const { fileName, wavBase64, gain } = data as { fileName?: unknown; wavBase64?: unknown; gain?: unknown }
         if (typeof wavBase64 !== 'string') return
         const wav = decodeWav(base64ToBytes(wavBase64).buffer as ArrayBuffer)
-        const mono = downmixToMono(wav.channels)
+        // `gain` is absent on every file saved before this fix -- including
+        // the shipped presets and every academy level solution -- and
+        // absence means "no normalisation was applied," so this reproduces
+        // the pre-fix behavior exactly for a sample that was never hot.
+        const restoreGain = typeof gain === 'number' && Number.isFinite(gain) && gain > 1 ? gain : 1
+        const mono = scaledBy(downmixToMono(wav.channels), restoreGain)
         const buf = buildSamplerBuffer(mono, wav.sampleRate)
         currentMono = mono
         currentSourceSampleRate = wav.sampleRate
