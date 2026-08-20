@@ -1,4 +1,4 @@
-import type { Level } from '../academy/levels'
+import type { AcademyTrack, Level } from '../academy/levels'
 import type { AcademyProgress } from '../academy/progress'
 import { isUnlocked } from '../academy/progress'
 import type { InspectorResult } from '../src/engine/analysis/inspector'
@@ -71,6 +71,15 @@ export interface MatchCheckState {
 }
 
 export interface AcademyPanelState {
+  /** Every selectable track, and which one is active -- rendered as a
+   *  picker row above the level list, Section: "design how tracks are
+   *  presented and selected." `levels` (the second argument to
+   *  `renderAcademyPanel`) is always scoped to `currentTrackId` already;
+   *  this panel never filters it itself, matching every other piece of
+   *  state here (`rack/main.ts` owns *what* the current track's levels
+   *  are, this file only draws whatever list it's handed). */
+  tracks: readonly AcademyTrack[]
+  currentTrackId: string
   currentLevelId: string | undefined
   progress: AcademyProgress
   lastCheck: InspectorResult | undefined
@@ -101,6 +110,7 @@ export interface AcademyPanelState {
 }
 
 export interface AcademyPanelOptions {
+  onSelectTrack: (id: string) => void
   onSelectLevel: (id: string) => void
   onCheck: () => void
   /** Match-this-sound only: play the level's target sound through the live
@@ -118,6 +128,23 @@ export function renderAcademyPanel(
 ): void {
   container.innerHTML = ''
   container.dataset['testid'] = 'academy-panel'
+
+  const trackPicker = document.createElement('div')
+  trackPicker.className = 'academy-track-picker'
+  trackPicker.dataset['testid'] = 'academy-track-picker'
+  for (const track of state.tracks) {
+    const btn = document.createElement('button')
+    btn.type = 'button'
+    const active = track.id === state.currentTrackId
+    btn.className = `academy-track-btn${active ? ' academy-track-btn-active' : ''}`
+    btn.dataset['testid'] = `academy-track-${track.id}`
+    btn.title = track.blurb
+    btn.textContent = track.title
+    btn.disabled = active
+    btn.addEventListener('click', () => opts.onSelectTrack(track.id))
+    trackPicker.append(btn)
+  }
+  container.append(trackPicker)
 
   const list = document.createElement('div')
   list.className = 'academy-level-list'

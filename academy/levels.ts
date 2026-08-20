@@ -25,6 +25,17 @@ import solution10Raw from './levels/10-drift.sinp?raw'
 import rubric11 from './levels/11-fold-pluck.rubric.json'
 import solution11Raw from './levels/11-fold-pluck.sinp?raw'
 
+import bassRubric01 from './levels/bass-01-layers.rubric.json'
+import bassSolution01Raw from './levels/bass-01-layers.sinp?raw'
+import bassRubric02 from './levels/bass-02-reese.rubric.json'
+import bassSolution02Raw from './levels/bass-02-reese.sinp?raw'
+import bassRubric03 from './levels/bass-03-wobble.rubric.json'
+import bassSolution03Raw from './levels/bass-03-wobble.sinp?raw'
+import bassRubric04 from './levels/bass-04-growl.rubric.json'
+import bassSolution04Raw from './levels/bass-04-growl.sinp?raw'
+import bassRubric05 from './levels/bass-05-finish.rubric.json'
+import bassSolution05Raw from './levels/bass-05-finish.sinp?raw'
+
 // `.sinp` is loaded with Vite's `?raw` suffix rather than a plain import,
 // so the file stays byte-identical JSON with the real `.sinp` extension --
 // the same one `rack/patch-io.ts`'s `downloadPatch` writes -- instead of
@@ -44,6 +55,12 @@ const solution08 = parseSinp(solution08Raw)
 const solution09 = parseSinp(solution09Raw)
 const solution10 = parseSinp(solution10Raw)
 const solution11 = parseSinp(solution11Raw)
+
+const bassSolution01 = parseSinp(bassSolution01Raw)
+const bassSolution02 = parseSinp(bassSolution02Raw)
+const bassSolution03 = parseSinp(bassSolution03Raw)
+const bassSolution04 = parseSinp(bassSolution04Raw)
+const bassSolution05 = parseSinp(bassSolution05Raw)
 
 /**
  * The academy's level format, and why it is two files rather than one.
@@ -149,6 +166,11 @@ export interface LevelRubric {
   brief: string
   grantedModules: string[]
   startingPatchFrom?: string
+  /** Which selectable sequence this level belongs to. Defaults to 'main'
+   *  when omitted, so every pre-existing rubric JSON (the eleven original
+   *  levels, written before tracks existed) still parses. See `TRACKS`
+   *  below for what a track is and how it's presented. */
+  track?: string
   /** Defaults to 'build' when omitted, so every pre-existing rubric JSON
    *  (levels 01-05, written before this field existed) still parses. */
   mode?: 'build' | 'match' | 'constrained'
@@ -164,6 +186,8 @@ export interface Level {
   id: string
   title: string
   brief: string
+  /** Which selectable sequence this level belongs to -- see `TRACKS`. */
+  track: string
   /** Module types the palette shows while this level is active. */
   grantedModules: readonly string[]
   mode: 'build' | 'match' | 'constrained'
@@ -186,6 +210,7 @@ export interface Level {
 const RUBRICS: LevelRubric[] = [
   rubric01, rubric02, rubric03, rubric04, rubric05, rubric06, rubric07, rubric08,
   rubric09, rubric10, rubric11,
+  bassRubric01, bassRubric02, bassRubric03, bassRubric04, bassRubric05,
 ] as unknown as LevelRubric[]
 
 const SOLUTIONS: Record<string, PatchFile> = {
@@ -200,7 +225,38 @@ const SOLUTIONS: Record<string, PatchFile> = {
   '09-thump': solution09,
   '10-drift': solution10,
   '11-fold-pluck': solution11,
+  'bass-01-layers': bassSolution01,
+  'bass-02-reese': bassSolution02,
+  'bass-03-wobble': bassSolution03,
+  'bass-04-growl': bassSolution04,
+  'bass-05-finish': bassSolution05,
 }
+
+/** Every selectable track, in the order the track picker offers them.
+ *  `id` is what `Level.track`/`LevelRubric.track` names; `title`/`blurb` are
+ *  what the picker shows before a player has chosen one. A level whose
+ *  rubric omits `track` belongs to `'main'` -- see `LevelRubric.track`'s own
+ *  doc comment -- which is why `'main'` is listed first here and is what
+ *  every pre-existing level (and this file's own default entry point,
+ *  `showAcademy` in rack/main.ts) still means by "the academy." */
+export interface AcademyTrack {
+  id: string
+  title: string
+  blurb: string
+}
+
+export const TRACKS: AcademyTrack[] = [
+  {
+    id: 'main',
+    title: 'The Academy',
+    blurb: 'Eleven levels, start to finish: build a patch, match a sound, then work within a constraint.',
+  },
+  {
+    id: 'bass',
+    title: 'Bass',
+    blurb: 'Five levels straight to sub-bass technique -- layering, the Reese, tempo-locked wobble, drive and growl, then a module-limited build of your own.',
+  },
+]
 
 function emptyPatch(): PatchFile {
   return {
@@ -233,10 +289,15 @@ export const LEVELS: Level[] = RUBRICS.map((r) => {
   if (mode === 'constrained' && !r.constrained) {
     throw new Error(`academy/levels.ts: level "${r.id}" is mode 'constrained' but has no constrained rubric`)
   }
+  const track = r.track ?? 'main'
+  if (!TRACKS.some((t) => t.id === track)) {
+    throw new Error(`academy/levels.ts: level "${r.id}" names track "${track}", which is not in TRACKS`)
+  }
   return {
     id: r.id,
     title: r.title,
     brief: r.brief,
+    track,
     grantedModules: r.grantedModules,
     mode,
     query: r.query,
@@ -251,11 +312,29 @@ export function getLevel(id: string): Level | undefined {
   return LEVELS.find((l) => l.id === id)
 }
 
+/** Every level belonging to `trackId`, in the same relative order they
+ *  appear in `LEVELS` -- the order a beginner meets them within that track,
+ *  and the order `isUnlocked` (academy/progress.ts) walks when a caller
+ *  passes it this list instead of the full, all-tracks `LEVELS`. A track
+ *  picker (rack/academy-panel.ts) shows one track's list at a time; unlock
+ *  sequencing is entirely a property of *which list* `isUnlocked` was asked
+ *  about, not anything stored per-track in `AcademyProgress` itself, so two
+ *  tracks' progress can never desync from their own definitions here. */
+export function levelsInTrack(trackId: string): Level[] {
+  return LEVELS.filter((l) => l.track === trackId)
+}
+
 export function levelIndex(id: string): number {
   return LEVELS.findIndex((l) => l.id === id)
 }
 
+/** Next level *within the same track* as `id` -- chaining (`startingPatchFrom`)
+ *  and "complete one, unlock the next" both only ever make sense inside one
+ *  track's own sequence. */
 export function nextLevel(id: string): Level | undefined {
-  const i = levelIndex(id)
-  return i === -1 ? undefined : LEVELS[i + 1]
+  const level = getLevel(id)
+  if (!level) return undefined
+  const inTrack = levelsInTrack(level.track)
+  const i = inTrack.findIndex((l) => l.id === id)
+  return i === -1 ? undefined : inTrack[i + 1]
 }

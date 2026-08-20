@@ -1,0 +1,20 @@
+{
+  "id": "bass-03-wobble",
+  "title": "Tempo-Locked Wobble",
+  "track": "bass",
+  "brief": "The dubstep wobble is a filter cutoff, modulated in time with the beat. Build VCO -> VCF -> Output (Saw Shape, Cut turned down dark). Add a Clock and an LFO. Patch the Clock's \"Gate\" jack into the LFO's \"Sync\" jack -- this locks the LFO's speed to the clock instead of its own free-running Rate knob. Turn the LFO's Div knob to \"1/8\" so it wobbles in eighth notes. Patch the LFO's \"Out\" into the VCF's \"CV\" jack, and turn the VCF's Amt knob up to around 4-5 -- that's how far the cutoff sweeps on each wobble. You should hear the filter chop in time, automatically, with no hands on the Cut knob.",
+  "grantedModules": ["vco", "vcf", "lfo", "clock", "output"],
+  "query": {
+    "hasModule": ["vco", "vcf", "lfo", "clock", "output"],
+    "connected": [
+      [{ "type": "vco" }, "out", { "type": "vcf" }, "in"],
+      [{ "type": "vcf" }, "out", { "type": "output" }, "in"],
+      [{ "type": "clock" }, "gate", { "type": "lfo" }, "sync"],
+      [{ "type": "lfo" }, "out", { "type": "vcf" }, "cutoffCv"]
+    ],
+    "params": [
+      { "module": { "type": "lfo" }, "param": "division", "value": 10, "tolerance": 0.4 },
+      { "module": { "type": "vcf" }, "param": "cutoffCvAmount", "value": 4.5, "tolerance": 2 }
+    ]
+  }
+}

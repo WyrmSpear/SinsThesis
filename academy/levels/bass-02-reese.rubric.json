@@ -1,0 +1,15 @@
+{
+  "id": "bass-02-reese",
+  "title": "The Reese",
+  "track": "bass",
+  "brief": "The Reese bass -- the foundation of jungle and neuro -- isn't one oscillator, it's two, tuned slightly apart, beating against each other. Add two VCOs, both with Shape set to Saw and Octave set the same (try -2). Then detune them: turn the first VCO's Tune knob down a little (around -0.2 semitones) and the second VCO's Tune knob up a little (around +0.2) -- a small, not-in-tune amount is the whole trick. Patch both VCOs' \"Out\" jacks into the same VCF \"In\" jack (two cables into one jack sum together, no Mixer needed), then the VCF's \"Out\" into the Output's \"In\". Turn the VCF's Cut knob down until the beating between the two oscillators is what you hear, not just a bright saw.",
+  "grantedModules": ["vco", "vcf", "output"],
+  "query": {
+    "hasModule": ["vco", "vcf", "output"],
+    "connected": [
+      ["vco-1", "out", "vcf-1", "in"],
+      ["vco-2", "out", "vcf-1", "in"],
+      ["vcf-1", "out", "output-1", "in"]
+    ]
+  }
+}

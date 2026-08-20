@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "meta": { "name": "Bass: Finish It (proof patch)", "created": "2026-08-19T00:00:00.000Z", "author": "academy" },
+  "modules": [
+    { "id": "vco-1", "type": "vco", "slot": [0, 0], "params": { "octave": -3, "tune": -5, "shape": 3, "pulseWidth": 0.5, "fmAmount": 2.5 } },
+    { "id": "adsr-1", "type": "adsr", "slot": [0, 1], "params": { "attack": 0.002, "decay": 0.4, "sustain": 0, "release": 0.2 } },
+    { "id": "vca-1", "type": "vca", "slot": [0, 2], "params": { "level": 0, "cvAmount": 1 } },
+    { "id": "output-1", "type": "output", "slot": [0, 3], "params": { "level": 0.85 } }
+  ],
+  "cables": [
+    { "from": ["vco-1", "out"], "to": ["vca-1", "in"] },
+    { "from": ["adsr-1", "out"], "to": ["vca-1", "cv"] },
+    { "from": ["adsr-1", "out"], "to": ["vco-1", "fm"] },
+    { "from": ["vca-1", "out"], "to": ["output-1", "in"] }
+  ]
+}

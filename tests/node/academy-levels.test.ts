@@ -7,11 +7,15 @@ import { LEVELS, getLevel } from '../../academy/levels'
 import { stubContext, stubNode } from '../helpers/stub-instance'
 import { vcoDescriptor } from '../../src/engine/modules/vco'
 import { vcfDescriptor } from '../../src/engine/modules/vcf'
+import { svfDescriptor } from '../../src/engine/modules/svf'
 import { adsrDescriptor } from '../../src/engine/modules/adsr'
 import { vcaDescriptor } from '../../src/engine/modules/vca'
 import { lfoDescriptor } from '../../src/engine/modules/lfo'
 import { noiseDescriptor } from '../../src/engine/modules/noise'
 import { wavefolderDescriptor } from '../../src/engine/modules/wavefolder'
+import { driveDescriptor } from '../../src/engine/modules/drive'
+import { mixerDescriptor } from '../../src/engine/modules/mixer'
+import { clockDescriptor } from '../../src/engine/modules/clock-module'
 import { keyboardMidiDescriptor } from '../../src/engine/modules/keyboard-midi'
 import { outputDescriptor } from '../../src/engine/modules/output'
 import type { ModuleDescriptor, ModuleInstance } from '../../src/engine/types'
@@ -60,8 +64,9 @@ function stubbedFrom(real: ModuleDescriptor): ModuleDescriptor {
 }
 
 const REAL_DESCRIPTORS = [
-  vcoDescriptor, vcfDescriptor, adsrDescriptor, vcaDescriptor,
-  lfoDescriptor, noiseDescriptor, wavefolderDescriptor,
+  vcoDescriptor, vcfDescriptor, svfDescriptor, adsrDescriptor, vcaDescriptor,
+  lfoDescriptor, noiseDescriptor, wavefolderDescriptor, driveDescriptor,
+  mixerDescriptor, clockDescriptor,
   keyboardMidiDescriptor, outputDescriptor,
 ]
 

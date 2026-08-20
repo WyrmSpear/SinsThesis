@@ -1,0 +1,19 @@
+{
+  "id": "bass-05-finish",
+  "title": "Finish It: Build a Sub",
+  "track": "bass",
+  "brief": "Build a convincing sub bass -- the 808-style hit that drops under a trap or grime beat -- using at most three modules (not counting Output): a VCO, an ADSR, and a VCA. No Keyboard, no Clock this time; Check renders a fixed note for you. Keep the VCO's Octave low and its Shape on Sine or Triangle -- a sub is felt more than heard, so it should stay dark. Patch the VCO's \"Out\" into the VCA's \"In\", and the ADSR's \"Out\" into the VCA's \"CV\" jack, same as any envelope-gated sound. With only three modules you don't have a filter to shape it, so patch that same ADSR \"Out\" into the VCO's \"FM\" jack too, and turn the VCO's FM knob up: the pitch itself falls as the note decays, which is the classic 808 drop and the only tool you have left in budget to make it interesting.",
+  "grantedModules": ["vco", "adsr", "vca", "output"],
+  "mode": "constrained",
+  "constrained": {
+    "seconds": 1.0,
+    "gate": { "onAt": 0, "offAt": 0.8 },
+    "maxModules": 3,
+    "features": {
+      "peakRms": { "min": 0.05 },
+      "attackMs": { "max": 30 },
+      "centroidHz": { "max": 300 },
+      "pitchDropOctaves": { "min": 0.2 }
+    }
+  }
+}

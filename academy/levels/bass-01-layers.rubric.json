@@ -1,0 +1,15 @@
+{
+  "id": "bass-01-layers",
+  "title": "Layer Two Basses",
+  "track": "bass",
+  "brief": "A big bass sound is almost never one oscillator -- it's a low one for weight stacked under a higher one for presence, summed together. Add two VCOs and a Mixer. Set the first VCO's Octave low (around -3) and its Shape to Sine -- that's the sub, the part you feel more than hear. Patch its \"Out\" into the Mixer's \"In 1\" jack. Add a second VCO, set its Octave a step or two higher (around -1 or -2) with a Saw or Triangle Shape -- that's the mid, the part that lets the note read as a pitch on small speakers. Patch its \"Out\" into the Mixer's \"In 2\" jack. Finally, patch the Mixer's \"Out\" into the Output's \"In\". Try muting each VCO by turning its Mixer level knob to zero, one at a time, and listen to what each layer alone is missing.",
+  "grantedModules": ["vco", "mixer", "output"],
+  "query": {
+    "hasModule": ["vco", "mixer", "output"],
+    "connected": [
+      ["vco-1", "out", "mixer-1", "in1"],
+      ["vco-2", "out", "mixer-1", "in2"],
+      ["mixer-1", "out", "output-1", "in"]
+    ]
+  }
+}

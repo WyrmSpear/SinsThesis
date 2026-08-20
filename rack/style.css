@@ -1420,6 +1420,35 @@ body {
   border-radius: 6px;
 }
 
+.academy-track-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.academy-track-btn {
+  font-family: inherit;
+  font-size: var(--text-xs);
+  padding: 0.35rem 0.7rem;
+  background: var(--surface-recess);
+  color: var(--text-dim);
+  border: 1px solid var(--panel-border);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.academy-track-btn:hover:not(:disabled) {
+  border-color: var(--knob-indicator);
+  color: var(--knob-indicator);
+}
+
+.academy-track-btn-active {
+  background: var(--surface-panel);
+  color: var(--knob-indicator);
+  border-color: var(--knob-indicator);
+  cursor: default;
+}
+
 .academy-level-list {
   display: flex;
   flex-wrap: wrap;

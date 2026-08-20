@@ -1,0 +1,16 @@
+{
+  "id": "bass-04-growl",
+  "title": "Drive and Growl",
+  "track": "bass",
+  "brief": "Saturation isn't just \"make it louder and dirtier\" -- moved over time, it's a growl. Patch a VCO (Saw Shape, Octave around -2) into a Drive module's \"In\" jack, and the Drive's \"Out\" into the Output's \"In\". Add an LFO and patch its \"Out\" into the Drive's \"CV\" jack -- that's the drive-amount input. Turn the Drive's Amt knob up to around 4-6: now the LFO is sweeping how hard the signal is driven, not just its pitch or its filter. Turn the LFO's Rate up past 3 Hz or so -- slow enough to hear as motion, fast enough to sound like a throat, not a wobble.",
+  "grantedModules": ["vco", "drive", "lfo", "output"],
+  "query": {
+    "hasModule": ["vco", "drive", "lfo", "output"],
+    "connected": [
+      [{ "type": "vco" }, "out", { "type": "drive" }, "in"],
+      [{ "type": "drive" }, "out", { "type": "output" }, "in"],
+      [{ "type": "lfo" }, "out", { "type": "drive" }, "driveCv"]
+    ],
+    "params": [{ "module": { "type": "drive" }, "param": "driveCvAmount", "value": 5, "tolerance": 3 }]
+  }
+}

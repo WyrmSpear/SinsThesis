@@ -23,8 +23,8 @@ import { downloadPatch, downloadWav, readPatchFile, saveAutosave, loadAutosave, 
 import { renderStudioPanel, type StudioPanelState } from './studio-panel'
 import { renderPitchDisplay } from './pitch-display'
 import { initThemeSwitcher } from './theme-switcher'
-import { LEVELS, getLevel, type Level } from '../academy/levels'
-import { loadProgress, markComplete, type AcademyProgress } from '../academy/progress'
+import { TRACKS, levelsInTrack, getLevel, type Level } from '../academy/levels'
+import { loadProgress, markComplete, setCurrentTrack, type AcademyProgress } from '../academy/progress'
 import { renderAcademyPanel, type MatchCheckState, type ConstrainedCheckState } from './academy-panel'
 import { describeFailures } from '../academy/feedback'
 import { describeSoundDifference } from '../academy/sound-feedback'
@@ -134,6 +134,13 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
   let mode: 'freeplay' | 'academy' = 'freeplay'
   let currentLevelId: string | undefined
   let progress: AcademyProgress = loadProgress()
+  // Which selectable sequence (academy/levels.ts's TRACKS) the player is
+  // looking at -- restored from wherever they last left off (best-effort,
+  // same as `progress.completed` itself), falling back to 'main' for a
+  // save from before tracks existed or if nothing was ever saved.
+  let currentTrackId: string = progress.currentTrack && TRACKS.some((t) => t.id === progress.currentTrack)
+    ? progress.currentTrack
+    : 'main'
   let lastCheck: InspectorResult | undefined
   let freePlaySnapshot: PatchFile | undefined
 
@@ -237,8 +244,10 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
     const currentLevel = currentLevelId ? getLevel(currentLevelId) : undefined
     renderAcademyPanel(
       academyPanel,
-      LEVELS,
+      levelsInTrack(currentTrackId),
       {
+        tracks: TRACKS,
+        currentTrackId,
         currentLevelId,
         progress,
         lastCheck,
@@ -251,8 +260,27 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
             : undefined,
         lastConstrained,
       },
-      { onSelectLevel: enterLevel, onCheck: checkLevel, onPlayTarget: playTarget },
+      { onSelectTrack: selectTrack, onSelectLevel: enterLevel, onCheck: checkLevel, onPlayTarget: playTarget },
     )
+  }
+
+  /** Switches the visible track and drops into its first level -- the same
+   *  "choosing a track re-enters at its own beginning" behavior
+   *  `showAcademy` already gives a fresh academy visit. Persisted
+   *  (best-effort) so returning to the academy later reopens the same
+   *  track, mirroring how `progress.completed` already survives a reload. */
+  function selectTrack(id: string): void {
+    if (id === currentTrackId) return
+    currentTrackId = id
+    progress = setCurrentTrack(id)
+    currentLevelId = undefined
+    lastCheck = undefined
+    lastMatch = undefined
+    lastConstrained = undefined
+    clearHighlights()
+    const first = levelsInTrack(currentTrackId)[0]
+    if (first) enterLevel(first.id) // also refreshes the palette and renders
+    else renderAcademy()
   }
 
   function renderStudio(): void {
@@ -534,8 +562,9 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
     modeFreeplayBtn.classList.remove('mode-toggle-btn-active')
     academyPanel.hidden = false
     paletteDrawer.hidden = true
-    if (currentLevelId === undefined && LEVELS[0]) {
-      enterLevel(LEVELS[0].id) // also refreshes the palette and renders
+    const firstOfTrack = levelsInTrack(currentTrackId)[0]
+    if (currentLevelId === undefined && firstOfTrack) {
+      enterLevel(firstOfTrack.id) // also refreshes the palette and renders
     } else {
       refreshPalette(currentLevelId ? getLevel(currentLevelId)?.grantedModules : undefined)
       renderAcademy()
