@@ -2,7 +2,10 @@
  * Graphite -- the spec's default theme (Section 8): graphite, hairlines,
  * teal arcs. Named "Reaktor Dark" until the trademark rename (see
  * .superpowers/sdd/theme-rename-report.md) -- the palette and every token
- * value below are unchanged, only the id and label moved.
+ * value below are unchanged, only the id and label moved. Evokes a dark,
+ * teal-accented software-modular workspace, patching on screen rather than
+ * a hardware panel -- the same register as this project's own "worked out
+ * numerically, not a demo page" ancestry claim in the README.
  *
  * Every color, material and type-scale value the rack draws with lives
  * here, as CSS custom properties, and nowhere else. `rack/style.css` never

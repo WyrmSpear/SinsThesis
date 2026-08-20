@@ -2,7 +2,10 @@
  * Brushed Steel -- brushed metal, orange arcs plus cyan (spec Section 8's
  * list). Named "Geist Groovebox" until the trademark rename (see
  * .superpowers/sdd/theme-rename-report.md) -- the palette is unchanged,
- * only the id and label moved.
+ * only the id and label moved. Evokes the brushed-aluminum panels and
+ * two-LED accent scheme (one warm, one cool) of hardware groove-box drum
+ * workstations -- a lineage note, not a claim of affiliation with any
+ * manufacturer past or present.
  *
  * Same rule as every theme file: nothing but CSS custom properties,
  * `rack/style.css` and every rack/*.ts component untouched, geometry

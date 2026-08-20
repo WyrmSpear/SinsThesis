@@ -2,7 +2,10 @@
  * Flat Grid -- flat grey, 1px borders, one yellow, densest (spec Section
  * 8's list). Named "Ableton Live" until the trademark rename (see
  * .superpowers/sdd/theme-rename-report.md) -- the palette is unchanged,
- * only the id and label moved.
+ * only the id and label moved. Evokes the flat, dense, no-skeuomorphism
+ * digital-audio-workstation interfaces that displaced knob-and-lamp chrome
+ * in software mixing consoles -- a lineage note, not a claim of
+ * affiliation with any software maker past or present.
  *
  * Same rule as every theme file: nothing but CSS custom properties,
  * `rack/style.css` and every rack/*.ts component untouched, geometry

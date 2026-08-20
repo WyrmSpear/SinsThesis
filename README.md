@@ -159,3 +159,7 @@ same words the brief used rather than in engine identifiers.
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+SinsThesis is inspired by classic synthesizers and drum machines but is not
+affiliated with, endorsed by, or connected to any of their manufacturers.
+All trademarks are the property of their respective owners.

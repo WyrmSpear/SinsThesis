@@ -3,7 +3,10 @@
  * patching surface this token system can render (spec Section 8's list).
  * Named "Korg MS-20" until the trademark rename (see
  * .superpowers/sdd/theme-rename-report.md) -- the palette is unchanged,
- * only the id and label moved. Same rule as every theme file: nothing but
+ * only the id and label moved. Evokes the flat-charcoal, orange-and-white,
+ * high-contrast semi-modular patching panels built for legibility above
+ * all else -- a lineage note, not a claim of affiliation with any
+ * manufacturer past or present. Same rule as every theme file: nothing but
  * CSS custom properties, `rack/style.css` and every rack/*.ts component
  * untouched, geometry unaffected (rack/panel.ts, rack/knob.ts own that
  * instead).

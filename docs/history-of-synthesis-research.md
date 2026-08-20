@@ -629,6 +629,20 @@ naming should not add to it. Concretely, for the history track:
   crossing already happened before this task started, three theme files
   ago.
 
+  **Addendum, since resolved:** this flag was acted on. All six affected
+  theme names (Reaktor Dark, Moog Wood, Ableton Live, Geist Groovebox,
+  Casiotone, Korg MS-20) were renamed to Graphite, Walnut & Cream, Flat
+  Grid, Brushed Steel, Toy Piano and Patch Lab — ids and filenames
+  included, not just the display labels — with a `localStorage` migration
+  so a returning visitor keeps their theme, and an honest, non-affiliating
+  lineage note added to each renamed theme's own CSS file and to the
+  ladder filter, wavefolder and state-variable filter's doc comments. The
+  file paths named just above (`rack/theme-moog-wood.css` and siblings) are
+  pre-rename history, kept here rather than edited, because rewriting them
+  would misrepresent what this research actually found at the time it was
+  written. Current filenames and the full rename map are in
+  `.superpowers/sdd/theme-rename-report.md`.
+
 ## Small, cheap adds worth doing alongside the track
 
 - A short, static "lineage" line already fits the existing per-module doc

@@ -1,6 +1,17 @@
 import type { ModuleDescriptor, ModuleInstance } from '../types'
 import { scheduleParam } from '../param-smoothing'
 
+/** This module's four-pole lowpass topology traces to Robert Moog's
+ *  transistor-ladder filter, filed October 10, 1966 and granted as US
+ *  Patent 3,475,623 on October 28, 1969 -- the defining "East Coast"
+ *  subtractive design (start from a harmonic-rich waveform, remove content
+ *  with a filter) this module's own cutoff calibration (see
+ *  `src/engine/dsp/ladder.ts` and trap 5 in `docs/CONTINUATION.md`) already
+ *  treats as a real reference point. Named descriptively here rather than
+ *  after the patent holder, matching the same nominative-fair-use register
+ *  as this comment itself -- a real lineage described in prose, not
+ *  borrowed as a product name (see
+ *  `.superpowers/sdd/theme-rename-report.md`). */
 export const vcfDescriptor: ModuleDescriptor = {
   type: 'vcf',
   name: 'Ladder VCF',

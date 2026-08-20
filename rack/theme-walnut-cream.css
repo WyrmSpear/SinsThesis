@@ -2,7 +2,10 @@
  * Walnut & Cream -- walnut cheeks, cream knobs, serif engraving, one orange
  * lamp (spec Section 8's list). Named "Moog Wood" until the trademark
  * rename (see .superpowers/sdd/theme-rename-report.md) -- the palette is
- * unchanged, only the id and label moved.
+ * unchanged, only the id and label moved. Evokes the wooden-cheeked,
+ * cream-knobbed American modular synthesizers of the late 1960s: walnut
+ * side panels, serif engraving, one warm indicator lamp -- a lineage note,
+ * not a claim of affiliation with any manufacturer past or present.
  *
  * Same rule as every theme file: this is nothing but CSS custom properties,
  * `rack/style.css` and every rack/*.ts component are untouched, and

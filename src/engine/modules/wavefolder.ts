@@ -1,6 +1,15 @@
 import type { ModuleDescriptor, ModuleInstance } from '../types'
 import { scheduleParam } from '../param-smoothing'
 
+/** Wavefolding -- reflecting a signal back down instead of clipping or
+ *  filtering it -- is the signature "West Coast" idea, tracing to Don
+ *  Buchla's touchplate-era instruments (the Buchla 100 series' dual-
+ *  oscillator modules, built for the San Francisco Tape Music Center in
+ *  1963-64): shape a complex timbre by folding a simple waveform, rather
+ *  than the "East Coast" approach of `vcf.ts`'s ladder filter, which
+ *  removes content from an already-complex one. See
+ *  `docs/history-of-synthesis-research.md` for the fuller East/West Coast
+ *  account this is drawn from. */
 export const wavefolderDescriptor: ModuleDescriptor = {
   type: 'wavefolder',
   name: 'Wavefolder',

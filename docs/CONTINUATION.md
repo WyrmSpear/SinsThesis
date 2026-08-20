@@ -411,6 +411,19 @@ Still zero new tokens and zero component edits — twelve for twelve.
 research on Kurzweil and the wider lineage, with disputed claims flagged
 unverified, plus a design for a history academy track where players rebuild
 historically important sounds rather than reading a timeline. Not yet built.
+That research document's own IP section flagged the live legal question it
+found already shipped: six theme names (Reaktor Dark, Moog Wood, Ableton
+Live, Geist Groovebox, Casiotone, Korg MS-20) used a manufacturer's mark as
+the theme's own selectable UI name, the weakest possible fair-use position.
+Renamed to Graphite, Walnut & Cream, Flat Grid, Brushed Steel, Toy Piano and
+Patch Lab — ids, filenames and every reference, not just the display
+labels — with a `localStorage` migration so a returning visitor keeps their
+theme. In their place: an honest, nominative lineage note in each renamed
+theme's own CSS file, plus one in each of the ladder filter, wavefolder and
+state-variable filter's doc comments crediting Moog, Buchla and Oberheim by
+name — describing a real lineage in prose instead of borrowing it as a
+product name. Full rename map and reasoning in
+`.superpowers/sdd/theme-rename-report.md`.
 
 ## Smaller things, recorded but not urgent
 

@@ -1,6 +1,12 @@
 import type { ModuleDescriptor, ModuleInstance } from '../types'
 import { scheduleParam } from '../param-smoothing'
 
+/** The simultaneous lowpass/bandpass/highpass/notch outputs below are Tom
+ *  Oberheim's state-variable topology, introduced in his SEM (1974) as the
+ *  alternative to Moog's single-output ladder (`vcf.ts`) -- trading one
+ *  steep (24 dB/oct) slope for four simultaneous shallower (12 dB/oct)
+ *  ones, patchable at once. See `src/engine/dsp/svf.ts`'s own doc comment
+ *  for the topology detail this credits. */
 export const svfDescriptor: ModuleDescriptor = {
   type: 'svf',
   name: 'State-Variable VCF',
