@@ -40,11 +40,16 @@
 const DEFAULT_MAX_SECONDS = 300 // see the doc comment on `maxSeconds` below
 
 export interface RecordingResult {
-  /** Mono -- the engine's whole signal path is mono end to end (see
-   *  render.ts's `renderGraph`/`renderPatch`, both single-channel), so a
-   *  stereo capture here would just be the same channel duplicated twice
-   *  for no benefit and double the memory. */
-  samples: Float32Array
+  /** Two channels, always -- ROADMAP section 1a gave Output a genuinely
+   *  stereo `out` (Panner, Ping-Pong Delay and Width can all feed it now;
+   *  see output.ts's doc comment), so a mono-only capture here would
+   *  silently discard exactly the signal a player patched those modules
+   *  to produce. A patch that never touches a stereo module still records
+   *  correctly: `channels[0]` and `channels[1]` arrive identical, the same
+   *  up-mix Output's own `in` jack performs (recorder.worklet.ts's doc
+   *  comment has the mechanism). Old mono-shaped code that only ever
+   *  wanted one channel reads `channels[0]`. */
+  channels: [Float32Array, Float32Array]
   sampleRate: number
   seconds: number
   /** True if the recording was cut short by `maxSeconds` rather than an
@@ -80,7 +85,8 @@ export class LiveRecorder {
   private node: AudioWorkletNode | undefined
   private mute: GainNode | undefined
   private source: AudioNode | undefined
-  private chunks: Float32Array[] = []
+  private chunksL: Float32Array[] = []
+  private chunksR: Float32Array[] = []
   private frameCount = 0
   private truncatedFlag = false
 
@@ -108,7 +114,8 @@ export class LiveRecorder {
    *  whatever `source` already feeds -- see this file's header comment. */
   start(source: AudioNode): void {
     if (this.recording) return
-    this.chunks = []
+    this.chunksL = []
+    this.chunksR = []
     this.frameCount = 0
     this.truncatedFlag = false
 
@@ -116,6 +123,13 @@ export class LiveRecorder {
       numberOfInputs: 1,
       numberOfOutputs: 1,
       outputChannelCount: [1],
+      // Forces this node's single input to always compute 2 channels --
+      // the same up-mix trick output.ts's own `in` jack uses (see that
+      // file's doc comment) -- so `source` being mono or genuinely stereo
+      // is invisible from here on; recorder.worklet.ts always sees two
+      // channels arrive.
+      channelCount: 2,
+      channelCountMode: 'explicit',
     })
     // A node must be graph-reachable from `destination` to be processed at
     // all (WebAudio's pull model starts from the destination and walks
@@ -125,7 +139,8 @@ export class LiveRecorder {
     mute.gain.value = 0
     node.connect(mute)
     mute.connect(this.ctx.destination)
-    node.port.onmessage = (event: MessageEvent<Float32Array>): void => this.onChunk(event.data)
+    node.port.onmessage = (event: MessageEvent<{ left: Float32Array; right: Float32Array }>): void =>
+      this.onChunk(event.data.left, event.data.right)
     source.connect(node)
 
     this.node = node
@@ -134,17 +149,21 @@ export class LiveRecorder {
     this.recording = true
   }
 
-  private onChunk(samples: Float32Array): void {
+  private onChunk(left: Float32Array, right: Float32Array): void {
     if (!this.recording) return
-    let usable = samples
+    let usableL = left
+    let usableR = right
     let hitCap = false
-    if (this.frameCount + samples.length >= this.maxFrames) {
-      usable = samples.subarray(0, Math.max(0, this.maxFrames - this.frameCount))
+    if (this.frameCount + left.length >= this.maxFrames) {
+      const cap = Math.max(0, this.maxFrames - this.frameCount)
+      usableL = left.subarray(0, cap)
+      usableR = right.subarray(0, cap)
       hitCap = true
     }
-    if (usable.length > 0) {
-      this.chunks.push(usable)
-      this.frameCount += usable.length
+    if (usableL.length > 0) {
+      this.chunksL.push(usableL)
+      this.chunksR.push(usableR)
+      this.frameCount += usableL.length
     }
     if (hitCap) {
       this.truncatedFlag = true
@@ -158,7 +177,12 @@ export class LiveRecorder {
    *  cap already ended the session. */
   stop(): RecordingResult {
     if (!this.recording) {
-      return { samples: new Float32Array(0), sampleRate: this.ctx.sampleRate, seconds: 0, truncated: false }
+      return {
+        channels: [new Float32Array(0), new Float32Array(0)],
+        sampleRate: this.ctx.sampleRate,
+        seconds: 0,
+        truncated: false,
+      }
     }
     return this.finish()
   }
@@ -176,18 +200,23 @@ export class LiveRecorder {
     this.mute = undefined
     this.source = undefined
 
-    const samples = new Float32Array(this.frameCount)
-    let at = 0
-    for (const chunk of this.chunks) {
-      samples.set(chunk, at)
-      at += chunk.length
+    const flatten = (chunks: Float32Array[]): Float32Array => {
+      const out = new Float32Array(this.frameCount)
+      let at = 0
+      for (const chunk of chunks) {
+        out.set(chunk, at)
+        at += chunk.length
+      }
+      return out
     }
-    this.chunks = []
+    const channels: [Float32Array, Float32Array] = [flatten(this.chunksL), flatten(this.chunksR)]
+    this.chunksL = []
+    this.chunksR = []
 
     return {
-      samples,
+      channels,
       sampleRate: this.ctx.sampleRate,
-      seconds: samples.length / this.ctx.sampleRate,
+      seconds: this.frameCount / this.ctx.sampleRate,
       truncated: this.truncatedFlag,
     }
   }

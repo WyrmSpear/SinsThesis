@@ -198,7 +198,14 @@ describe('studio: live recording and offline bounce', () => {
     const wavBuffer = await captureWavDownload(page, 'export-wav-btn')
 
     const decoded = decodeWav(wavBuffer)
-    expect(decoded.channels).toHaveLength(1) // the engine's whole signal path is mono
+    // ROADMAP section 1a: the recorder and the WAV export both capture two
+    // channels now (src/engine/recorder.ts's doc comment). This patch is a
+    // bare VCO into Output with no stereo module in the chain, so both
+    // channels carry identical content -- Output's own mono up-mix (see
+    // output.ts) -- which is exactly the boring-but-correct stereo file
+    // renderPatchStereo's doc comment describes, not a special case.
+    expect(decoded.channels).toHaveLength(2)
+    expect(decoded.channels[0]).toEqual(decoded.channels[1])
     expect(decoded.sampleRate).toBeGreaterThan(0)
     // At least ~700ms actually captured (900ms requested, minus setup/IPC slack).
     expect(decoded.channels[0]!.length / decoded.sampleRate).toBeGreaterThan(0.7)

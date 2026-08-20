@@ -23,6 +23,21 @@ export interface ScopeInstance extends ModuleInstance {
  * reads them. `rack/scope-panel.ts`'s draw loop reads their current values
  * straight off `PatchGraph.getParams` every animation frame instead, so
  * `setParam` below has nothing to forward either of them to.
+ *
+ * **Reads one channel, deliberately -- ROADMAP section 1a's decision for
+ * this module.** A player can patch a stereo module's `out` (Panner,
+ * Ping-Pong Delay, Width) straight into this scope's `in`, and the trace
+ * they see is a mono down-mix of it, not a per-channel display. This isn't
+ * a gap left unaddressed: `AnalyserNode` is specified to down-mix its input
+ * to mono before every analysis it performs (both `getFloatTimeDomainData`
+ * and `getFloatFrequencyData`), so there is no per-channel data this module
+ * could expose even by choice -- the down-mix happens inside the native
+ * node itself, before any code here runs. Building a second, stereo-aware
+ * scope display would be new, real work (two waveforms, a channel-select
+ * control, a wider panel) for a debugging/monitoring tool, not the kind of
+ * silent data loss recorder.ts's stereo capture exists to prevent; a scope
+ * losing the stereo image on its *display* costs nothing the way an export
+ * silently dropping a channel would.
  */
 export const scopeDescriptor: ModuleDescriptor = {
   type: 'scope',

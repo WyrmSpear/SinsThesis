@@ -31,6 +31,30 @@ export function ensureWorklets(ctx: BaseAudioContext): Promise<void> {
  * This is the same entry point the test suite and the academy's graders use:
  * build a graph, render it, then measure the buffer with engine/analysis.
  *
+ * **Deliberately still mono, even after ROADMAP section 1a's stereo work**
+ * (Panner, Ping-Pong Delay, Width, and a channel-count-aware Output — see
+ * those modules' own doc comments). Two reasons, not one:
+ *
+ * 1. Every consumer of this function -- the whole `tests/node`/`tests/browser`
+ *    DSP suite, and every academy grader in `engine/analysis` -- measures
+ *    with mono-shaped tools (`rms`, `peakHz`, `spectralCentroid`, ...) and
+ *    wants a single buffer to hand them, not a channel to pick first.
+ *    Changing this signature would touch every call site in both test
+ *    trees for a feature none of them are testing.
+ * 2. The `OfflineAudioContext(1, ...)` below still does something real for
+ *    a stereo patch, not merely "the old behavior": connecting a
+ *    2-channel signal to a 1-channel destination triggers WebAudio's own
+ *    stereo -> mono down-mix (`mono = 0.5 * (L + R)`), the same standard
+ *    operation this task's own acceptance criterion asks every stereo
+ *    module to survive. Every existing test that renders a patch through a
+ *    Panner, Ping-Pong Delay or Width module and asserts on the result via
+ *    this function is *already* a mono-compatibility check, for free.
+ *
+ * What this does *not* cover: a player's actual stereo export. That's a
+ * real, distinct need -- a wide pad bounced to a mono file is the "silent
+ * data-loss bug" this task's brief warns about -- and it's served by
+ * `renderPatchStereo` below instead of by changing this function.
+ *
  * @param build receives the context and an empty graph, and returns either
  *              the id of the module whose `out` port feeds the destination,
  *              or a `[moduleId, portId]` tuple to address any other port —
@@ -113,4 +137,57 @@ export async function renderPatch(
 
   const buffer = await ctx.startRendering()
   return buffer.getChannelData(0)
+}
+
+/**
+ * The stereo sibling of `renderPatch`, for exactly one real caller:
+ * `rack/main.ts`'s offline bounce, the "export my patch as a .wav" feature.
+ * `renderPatch` itself stays mono on purpose (see its own doc comment) --
+ * this exists because *that* one use is the genuine "silent data-loss bug"
+ * this task's brief warns about: a player who builds a wide pad through
+ * Width or an alternating echo through the Ping-Pong Delay and hits
+ * "Render" should get the stereo file they built, not a down-mixed mono
+ * one. `wav.ts`'s `encodeWav` already accepts an arbitrary channel array,
+ * so nothing about the file format needed to change, only how many channels
+ * this reaches it with.
+ *
+ * A mono patch (nothing but the eighteen unchanged modules, or Output's own
+ * mono up-mix left untouched) renders here as two identical channels --
+ * see output.ts's doc comment for why that up-mix happens automatically at
+ * Output's own `channelCountMode: 'explicit'` -- which is a correct, boring
+ * stereo file, not a special case this function needs to detect.
+ */
+export async function renderPatchStereo(
+  patch: PatchFile,
+  seconds: number,
+  opts: { sampleRate?: number; gate?: { onAt: number; offAt?: number } } = {},
+): Promise<{ left: Float32Array; right: Float32Array }> {
+  const sampleRate = opts.sampleRate ?? 48000
+  const ctx = new OfflineAudioContext(2, Math.ceil(seconds * sampleRate), sampleRate)
+  await ensureWorklets(ctx)
+
+  const { graph } = loadPatch(ctx, patch)
+
+  if (opts.gate) {
+    const gate = opts.gate
+    for (const id of graph.moduleIds) {
+      if (graph.getType(id) !== 'adsr') continue
+      const input = graph.getInstance(id)?.inputs.get('gate')
+      if (!(input instanceof AudioNode)) continue
+      const source = ctx.createConstantSource()
+      source.offset.setValueAtTime(1, gate.onAt)
+      if (gate.offAt !== undefined) source.offset.setValueAtTime(0, gate.offAt)
+      source.start(0)
+      source.connect(input)
+    }
+  }
+
+  const outputId = graph.moduleIds.find((id) => graph.getType(id) === 'output')
+  if (!outputId) throw new Error('renderPatchStereo: patch has no output module')
+  const out = graph.getInstance(outputId)?.outputs.get('out')
+  if (!out) throw new Error('renderPatchStereo: output module has no "out" port')
+  out.connect(ctx.destination)
+
+  const buffer = await ctx.startRendering()
+  return { left: buffer.getChannelData(0), right: buffer.getChannelData(1) }
 }

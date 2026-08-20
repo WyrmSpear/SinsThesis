@@ -1,7 +1,7 @@
 import { PatchGraph } from '../src/engine/graph'
 import { registerAllModules } from '../src/engine/modules'
 import { getModule, listModules } from '../src/engine/registry'
-import { ensureWorklets, renderPatch } from '../src/engine/render'
+import { ensureWorklets, renderPatch, renderPatchStereo } from '../src/engine/render'
 import { serializePatch, loadPatch, type PatchFile } from '../src/engine/patch'
 import { inspect, type InspectorFailure, type InspectorResult } from '../src/engine/analysis/inspector'
 import { compareSounds } from '../src/engine/analysis/compare'
@@ -169,7 +169,22 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
   let bounceBusy = false
   let bounceLengthSeconds = 4
   let lastCapture:
-    | { samples: Float32Array; sampleRate: number; source: 'recording' | 'bounce'; seconds: number; truncated: boolean }
+    | {
+        /** Left channel, kept alongside `channels` for the pitch display
+         *  and waveform (rack/pitch-display.ts), which are mono-shaped
+         *  tools with no need for a stereo image -- see that module's own
+         *  call below. */
+        samples: Float32Array
+        /** Both channels, for the WAV export -- see doExport below. A
+         *  mono capture (the common case) arrives here as two identical
+         *  channels, the same up-mix every stereo module's `in` jack
+         *  performs; see output.ts's doc comment. */
+        channels: [Float32Array, Float32Array]
+        sampleRate: number
+        source: 'recording' | 'bounce'
+        seconds: number
+        truncated: boolean
+      }
     | undefined
   let wavFormat: WavFormat = 'float32'
   let saveSinpAlongside = true
@@ -351,11 +366,18 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
       clearInterval(elapsedTimerHandle)
       elapsedTimerHandle = undefined
     }
-    if (result.samples.length === 0) {
+    if (result.channels[0].length === 0) {
       renderStudio()
       return
     }
-    lastCapture = { samples: result.samples, sampleRate: result.sampleRate, source: 'recording', seconds: result.seconds, truncated: result.truncated }
+    lastCapture = {
+      samples: result.channels[0],
+      channels: result.channels,
+      sampleRate: result.sampleRate,
+      source: 'recording',
+      seconds: result.seconds,
+      truncated: result.truncated,
+    }
     studioStatus = result.truncated
       ? `Recording stopped automatically at the ${Math.round(recorder.maxSeconds)}s limit. Export it, or start a new one.`
       : `Recorded ${result.seconds.toFixed(1)}s. Ready to export.`
@@ -387,8 +409,20 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
     try {
       const patch = serializePatch(graph, { name: currentPatchName })
       const bounceSampleRate = ctx.sampleRate
-      const samples = await renderPatch(patch, bounceLengthSeconds, { sampleRate: bounceSampleRate })
-      lastCapture = { samples, sampleRate: bounceSampleRate, source: 'bounce', seconds: bounceLengthSeconds, truncated: false }
+      // Stereo -- see renderPatchStereo's own doc comment for why the
+      // bounce specifically (unlike renderPatch's other callers, which stay
+      // mono on purpose) needs both channels: this is the "export my patch"
+      // feature, and a wide pad or a ping-pong lead bounced to mono would
+      // be exactly the silent data-loss bug ROADMAP section 1a warns about.
+      const { left, right } = await renderPatchStereo(patch, bounceLengthSeconds, { sampleRate: bounceSampleRate })
+      lastCapture = {
+        samples: left,
+        channels: [left, right],
+        sampleRate: bounceSampleRate,
+        source: 'bounce',
+        seconds: bounceLengthSeconds,
+        truncated: false,
+      }
       studioStatus = `Bounced ${bounceLengthSeconds.toFixed(1)}s. Ready to export.`
     } catch (err) {
       showBanner('error', `Bounce failed: ${(err as Error).message}`)
@@ -404,7 +438,10 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
    *  so a recording and the patch that produced it never drift apart. */
   function doExport(): void {
     if (!lastCapture) return
-    const wavBuffer = encodeWav([lastCapture.samples], lastCapture.sampleRate, wavFormat)
+    // Always writes both channels -- see the `lastCapture.channels` doc
+    // comment above. A mono-only patch exports as two identical channels,
+    // a correct (if unremarkable) stereo file, not a special case.
+    const wavBuffer = encodeWav(lastCapture.channels, lastCapture.sampleRate, wavFormat)
     downloadWav(currentPatchName, wavBuffer)
     if (saveSinpAlongside) downloadPatch(serializePatch(graph, { name: currentPatchName }))
     studioStatus = `Exported "${currentPatchName}.wav"${saveSinpAlongside ? ' and .sinp' : ''}.`
