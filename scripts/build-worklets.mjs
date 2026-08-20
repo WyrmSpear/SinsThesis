@@ -39,6 +39,7 @@ const WORKLETS = {
   ladder: entry('../src/engine/worklets/ladder.worklet.ts'),
   svf: entry('../src/engine/worklets/svf.worklet.ts'),
   wavefolder: entry('../src/engine/worklets/wavefolder.worklet.ts'),
+  drive: entry('../src/engine/worklets/drive.worklet.ts'),
   segment: entry('../src/engine/worklets/segment.worklet.ts'),
   'peak-tap': entry('../src/engine/worklets/peak-tap.worklet.ts'),
   recorder: entry('../src/engine/worklets/recorder.worklet.ts'),

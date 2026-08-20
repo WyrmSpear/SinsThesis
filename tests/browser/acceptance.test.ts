@@ -16,8 +16,9 @@ beforeEach(() => {
 describe('Phase 1 acceptance', () => {
   it('registers every module in the set', () => {
     expect(listModules()).toHaveLength(ALL_DESCRIPTORS.length)
-    // Fifteen from Phase 1, Phase 2's scope, and the state-variable filter.
-    expect(ALL_DESCRIPTORS.length).toBe(17)
+    // Fifteen from Phase 1, Phase 2's scope, the state-variable filter, and
+    // Drive (a plain saturation stage -- see drive.ts's own doc comment).
+    expect(ALL_DESCRIPTORS.length).toBe(18)
   })
 
   it('renders the classic voice: VCO into VCF into VCA into Output', async () => {

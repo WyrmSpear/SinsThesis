@@ -5,6 +5,7 @@ export const WORKLET_MODULES = [
   'ladder',
   'svf',
   'wavefolder',
+  'drive',
   'segment',
   'peak-tap',
   'recorder',
