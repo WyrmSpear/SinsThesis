@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "meta": { "name": "Grime Lead", "created": "2026-08-19T00:00:00.000Z", "author": "presets" },
+  "modules": [
+    { "id": "vco-1", "type": "vco", "slot": [0, 0], "params": { "octave": -1, "tune": 0, "shape": 1, "pulseWidth": 0.4, "fmAmount": 0 } },
+    { "id": "vcf-1", "type": "vcf", "slot": [0, 1], "params": { "cutoff": 1300, "resonance": 0.35, "cutoffCvAmount": 0, "drive": 1.5 } },
+    { "id": "output-1", "type": "output", "slot": [0, 2], "params": { "level": 0.6 } }
+  ],
+  "cables": [
+    { "from": ["vco-1", "out"], "to": ["vcf-1", "in"] },
+    { "from": ["vcf-1", "out"], "to": ["output-1", "in"] }
+  ]
+}

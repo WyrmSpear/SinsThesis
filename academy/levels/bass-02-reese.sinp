@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "meta": { "name": "Reese", "created": "2026-08-19T00:00:00.000Z", "author": "academy" },
+  "modules": [
+    { "id": "vco-1", "type": "vco", "slot": [0, 0], "params": { "octave": -2, "tune": -0.18, "shape": 0, "pulseWidth": 0.5, "fmAmount": 0 } },
+    { "id": "vco-2", "type": "vco", "slot": [0, 1], "params": { "octave": -2, "tune": 0.18, "shape": 0, "pulseWidth": 0.5, "fmAmount": 0 } },
+    { "id": "vcf-1", "type": "vcf", "slot": [0, 2], "params": { "cutoff": 900, "resonance": 0.3, "cutoffCvAmount": 0, "drive": 1.5 } },
+    { "id": "output-1", "type": "output", "slot": [0, 3], "params": { "level": 0.8 } }
+  ],
+  "cables": [
+    { "from": ["vco-1", "out"], "to": ["vcf-1", "in"] },
+    { "from": ["vco-2", "out"], "to": ["vcf-1", "in"] },
+    { "from": ["vcf-1", "out"], "to": ["output-1", "in"] }
+  ]
+}

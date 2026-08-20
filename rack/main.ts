@@ -12,6 +12,8 @@ import { encodeWav, type WavFormat } from '../src/engine/wav'
 import { buildPanel } from './panel'
 import { buildGhostPanel } from './ghost-panel'
 import { buildPalette } from './palette'
+import { buildPresetBankPanel } from './preset-bank-panel'
+import { PRESET_BANK, getPreset } from '../presets/bank'
 import { CableLayer } from './cables'
 import { buildKeyboardPanel } from './keyboard-panel'
 import { buildSequencerPanel } from './sequencer-panel'
@@ -96,12 +98,14 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
 
   const rackEl = $('rack-modules')
   const paletteDrawer = $('palette-drawer')
+  const presetBankDrawer = $('preset-bank-drawer')
   const academyPanel = $('academy-panel')
   const studioPanelEl = $('studio-panel')
   const pitchDisplayEl = $('pitch-display')
   const statusBanner = $('status-banner')
   const patchNameInput = $<HTMLInputElement>('patch-name')
   const paletteToggle = $<HTMLButtonElement>('palette-toggle')
+  const presetBankToggle = $<HTMLButtonElement>('preset-bank-toggle')
   const saveBtn = $<HTMLButtonElement>('save-patch')
   const loadBtn = $<HTMLButtonElement>('load-patch')
   const loadFileInput = $<HTMLInputElement>('load-file')
@@ -727,8 +731,34 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
   // `currentPatchName` bindings fresh on each call. ----
   refreshPalette()
   paletteToggle.addEventListener('click', () => {
+    presetBankDrawer.hidden = true
     paletteDrawer.hidden = !paletteDrawer.hidden
   })
+
+  // The patch bank: a fixed list built once (PRESET_BANK never changes at
+  // runtime, unlike the palette, which is re-filtered per academy level),
+  // wired through the identical load path an explicit "Load .sinp" already
+  // uses -- loadPatch, then mountGraph -- so a bank preset is loaded
+  // exactly the way any other patch file is, not a special second path.
+  presetBankDrawer.append(buildPresetBankPanel(PRESET_BANK, { onLoad: loadPresetFromBank }))
+  presetBankToggle.addEventListener('click', () => {
+    paletteDrawer.hidden = true
+    presetBankDrawer.hidden = !presetBankDrawer.hidden
+  })
+
+  function loadPresetFromBank(id: string): void {
+    if (recording) { showBanner('warn', 'Stop recording before loading a preset.'); return }
+    const preset = getPreset(id)
+    if (!preset) return
+    const { graph: loaded, ghosts } = loadPatch(ctx, preset.file)
+    currentPatchName = preset.file.meta.name
+    patchNameInput.value = currentPatchName
+    mountGraph(loaded)
+    if (ghosts.length > 0) showBanner('warn', ghostMessage(ghosts))
+    else clearBanner()
+    scheduleAutosave()
+    presetBankDrawer.hidden = true
+  }
 
   // A patch swap mid-recording would tear down the very module instance
   // `recorder` is tapped onto (`mountGraph` disposes the old graph), so the

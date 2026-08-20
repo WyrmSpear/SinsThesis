@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "meta": { "name": "Trap Hi-Hat", "created": "2026-08-19T00:00:00.000Z", "author": "presets" },
+  "modules": [
+    { "id": "noise-1", "type": "noise", "slot": [0, 0], "params": { "color": 0 } },
+    { "id": "svf-1", "type": "svf", "slot": [0, 1], "params": { "cutoff": 8500, "resonance": 0.35, "cutoffCvAmount": 0 } },
+    { "id": "adsr-1", "type": "adsr", "slot": [0, 2], "params": { "attack": 0.001, "decay": 0.05, "sustain": 0, "release": 0.02 } },
+    { "id": "vca-1", "type": "vca", "slot": [0, 3], "params": { "level": 0, "cvAmount": 1 } },
+    { "id": "clock-1", "type": "clock", "slot": [0, 4], "params": { "bpm": 140, "division": 4, "pulseWidth": 0.5 } },
+    { "id": "output-1", "type": "output", "slot": [0, 5], "params": { "level": 0.35 } }
+  ],
+  "cables": [
+    { "from": ["noise-1", "out"], "to": ["svf-1", "in"] },
+    { "from": ["svf-1", "bp"], "to": ["vca-1", "in"] },
+    { "from": ["adsr-1", "out"], "to": ["vca-1", "cv"] },
+    { "from": ["clock-1", "gate"], "to": ["adsr-1", "gate"] },
+    { "from": ["vca-1", "out"], "to": ["output-1", "in"] }
+  ]
+}

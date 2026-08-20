@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "meta": { "name": "Tempo-Locked Wobble", "created": "2026-08-19T00:00:00.000Z", "author": "academy" },
+  "modules": [
+    { "id": "vco-1", "type": "vco", "slot": [0, 0], "params": { "octave": -2, "tune": 0, "shape": 0, "pulseWidth": 0.5, "fmAmount": 0 } },
+    { "id": "vcf-1", "type": "vcf", "slot": [0, 1], "params": { "cutoff": 300, "resonance": 0.5, "cutoffCvAmount": 4.5, "drive": 1.2 } },
+    { "id": "lfo-1", "type": "lfo", "slot": [0, 2], "params": { "rate": 2, "shape": 2, "depth": 1, "division": 10 } },
+    { "id": "clock-1", "type": "clock", "slot": [0, 3], "params": { "bpm": 140, "division": 1, "pulseWidth": 0.5 } },
+    { "id": "output-1", "type": "output", "slot": [0, 4], "params": { "level": 0.83 } }
+  ],
+  "cables": [
+    { "from": ["vco-1", "out"], "to": ["vcf-1", "in"] },
+    { "from": ["vcf-1", "out"], "to": ["output-1", "in"] },
+    { "from": ["clock-1", "gate"], "to": ["lfo-1", "sync"] },
+    { "from": ["lfo-1", "out"], "to": ["vcf-1", "cutoffCv"] }
+  ]
+}

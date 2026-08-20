@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "meta": { "name": "808 Sub", "created": "2026-08-19T00:00:00.000Z", "author": "presets" },
+  "modules": [
+    { "id": "vco-1", "type": "vco", "slot": [0, 0], "params": { "octave": -3, "tune": -5, "shape": 3, "pulseWidth": 0.5, "fmAmount": 2.5 } },
+    { "id": "adsr-1", "type": "adsr", "slot": [0, 1], "params": { "attack": 0.002, "decay": 0.45, "sustain": 0, "release": 0.25 } },
+    { "id": "vca-1", "type": "vca", "slot": [0, 2], "params": { "level": 0, "cvAmount": 1 } },
+    { "id": "clock-1", "type": "clock", "slot": [0, 3], "params": { "bpm": 72, "division": 1, "pulseWidth": 0.5 } },
+    { "id": "output-1", "type": "output", "slot": [0, 4], "params": { "level": 0.85 } }
+  ],
+  "cables": [
+    { "from": ["vco-1", "out"], "to": ["vca-1", "in"] },
+    { "from": ["adsr-1", "out"], "to": ["vca-1", "cv"] },
+    { "from": ["adsr-1", "out"], "to": ["vco-1", "fm"] },
+    { "from": ["clock-1", "gate"], "to": ["adsr-1", "gate"] },
+    { "from": ["vca-1", "out"], "to": ["output-1", "in"] }
+  ]
+}

@@ -247,6 +247,64 @@ body {
   font-size: var(--text-2xs);
 }
 
+/* ---- patch bank drawer: same shape as the module palette drawer above
+ * (a flex-wrapped drawer of cards), a separate drawer because a preset and
+ * a module are different kinds of thing to add to a rack -- one replaces
+ * the whole patch, the other adds one block to it. */
+.preset-bank-drawer {
+  margin-bottom: 0.9rem;
+  padding: 0.9rem 1rem;
+  background: var(--surface-panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+}
+
+.preset-bank-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+}
+
+.preset-bank-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 200px;
+  max-width: 260px;
+  padding: 0.6rem 0.7rem;
+  background: var(--surface-recess);
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+}
+
+.preset-bank-entry-name {
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+}
+
+.preset-bank-entry-description {
+  font-size: var(--text-2xs);
+  color: var(--text-dim);
+  flex: 1;
+}
+
+.preset-bank-entry-load {
+  align-self: flex-start;
+  font-family: inherit;
+  font-size: var(--text-xs);
+  padding: 0.3rem 0.7rem;
+  background: var(--surface-panel);
+  color: var(--text-primary);
+  border: 1px solid var(--panel-border);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.preset-bank-entry-load:hover {
+  border-color: var(--knob-indicator);
+  color: var(--knob-indicator);
+}
+
 /* ---- status banner: ghost warnings, load errors ---- */
 .status-banner {
   margin-bottom: 0.9rem;

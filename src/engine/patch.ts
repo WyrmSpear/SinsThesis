@@ -72,8 +72,23 @@ export function loadPatch(
   for (const entry of file.modules) {
     if (getModule(entry.type)) {
       graph.addModule(entry.type, entry.id)
+      // An explicit atTime snaps every saved param straight to its file
+      // value instead of gliding from whatever `addModule` just applied as
+      // the descriptor's own default (the same seam `PatchGraph.addModule`
+      // itself uses for that first application -- see its own comment).
+      // Recalling a preset is not a live knob turn: without this, a param
+      // that differs from its default (a mixer channel trimmed down for
+      // headroom, a filter's cutoff far from center) would spend
+      // `PARAM_SMOOTH_TIME_CONSTANT`'s first few milliseconds at the old
+      // (often louder) value before easing down -- for a patch that is
+      // already sounding the instant it loads (a self-running preset, or
+      // one loaded mid-performance), that is a real, audible transient, not
+      // just an inaudible ramp. B3's smoothing is for interactive turns;
+      // loading a whole patch should snap, the same way pressing a
+      // hardware synth's preset-recall button does not glide from the
+      // previous patch's knob positions.
       for (const [paramId, value] of Object.entries(entry.params)) {
-        graph.setParam(entry.id, paramId, value)
+        graph.setParam(entry.id, paramId, value, ctx.currentTime)
       }
     } else {
       graph.addGhost(entry.id, entry.type, entry.params)

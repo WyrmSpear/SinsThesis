@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "meta": { "name": "Layered Sub", "created": "2026-08-19T00:00:00.000Z", "author": "academy" },
+  "modules": [
+    { "id": "vco-1", "type": "vco", "slot": [0, 0], "params": { "octave": -3, "tune": -5, "shape": 3, "pulseWidth": 0.5, "fmAmount": 0 } },
+    { "id": "vco-2", "type": "vco", "slot": [0, 1], "params": { "octave": -2, "tune": -5, "shape": 0, "pulseWidth": 0.5, "fmAmount": 0 } },
+    { "id": "mixer-1", "type": "mixer", "slot": [0, 2], "params": { "level1": 1, "level2": 0.7, "level3": 1, "level4": 1 } },
+    { "id": "output-1", "type": "output", "slot": [0, 3], "params": { "level": 0.75 } }
+  ],
+  "cables": [
+    { "from": ["vco-1", "out"], "to": ["mixer-1", "in1"] },
+    { "from": ["vco-2", "out"], "to": ["mixer-1", "in2"] },
+    { "from": ["mixer-1", "out"], "to": ["output-1", "in"] }
+  ]
+}
