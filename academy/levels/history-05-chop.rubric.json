@@ -1,0 +1,15 @@
+{
+  "id": "history-05-chop",
+  "title": "The Chop",
+  "track": "history",
+  "brief": "Route a sample through a clock-driven retrigger and a lo-fi crush -- the mechanism the Akai MPC (designed by Roger Linn, released 1988) and its era ran on: sampling and sequencing in the same box, so a recorded sound becomes a rhythm instrument instead of a fixed recording. Sampling itself is older -- the Mellotron (1960s) pulled prerecorded tape under a playback head one key at a time, and the Fairlight CMI (1979) was the first to do it digitally, at a rough 8-bit resolution, which is what this level's Bitcrusher recreates on purpose. This level only checks the wiring, not any particular sound -- drop a short audio clip onto the Sampler (its Load button, or drag one straight onto the module) to actually hear the chop, though the patch grades correctly either way. Patch the Clock's \"Gate\" jack into the Sampler's \"Gate\" jack -- every clock pulse retriggers the sample from its start -- then the Sampler's \"Out\" into the Bitcrusher's \"In\", and the Bitcrusher's \"Out\" into the Output's \"In\". Turn the Bitcrusher's Bits knob down for the crunch.",
+  "grantedModules": ["clock", "sampler", "bitcrusher", "output"],
+  "query": {
+    "hasModule": ["clock", "sampler", "bitcrusher", "output"],
+    "connected": [
+      [{ "type": "clock" }, "gate", { "type": "sampler" }, "gate"],
+      [{ "type": "sampler" }, "out", { "type": "bitcrusher" }, "in"],
+      [{ "type": "bitcrusher" }, "out", { "type": "output" }, "in"]
+    ]
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "id": "history-01-modular-lead",
+  "title": "The Modular Lead",
+  "track": "history",
+  "brief": "Match this sound: a held, singing lead tone that snaps bright the instant it starts, then eases back as it sustains. Press \"Play target\" to hear it. This is the patch that first made a synthesizer sound like a *lead instrument* rather than a sound effect -- Wendy Carlos played whole Bach keyboard works on a Moog modular this way for 1968's Switched-On Bach, the record that got synthesizers taken seriously as instruments you could actually play repertoire on. Build VCO (Saw) -> VCF -> VCA -> Output, then patch the ADSR's \"Out\" into both the VCA's \"CV\" jack (the volume envelope, same as always) and the VCF's \"CV\" jack (a second copy of the same envelope, now opening the filter). A quick Attack and a Decay that settles to a mid-height Sustain gives you the snap-then-settle brightness the target has; push the VCF's \"Amt\" knob up so that envelope actually has somewhere to sweep to.",
+  "grantedModules": ["vco", "vcf", "adsr", "vca", "output"],
+  "mode": "match",
+  "match": {
+    "seconds": 1.5,
+    "gate": { "onAt": 0, "offAt": 0.9 },
+    "passThreshold": 0.35
+  }
+}

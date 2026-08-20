@@ -1,0 +1,19 @@
+{
+  "id": "history-06-east-west",
+  "title": "East Coast, West Coast",
+  "track": "history",
+  "brief": "Make a short plucked note whose tone fades as it dies -- bright at the strike, duller by the tail -- using only one shaping module: the Ladder VCF or the Wavefolder, your choice. Around 1963-64, Robert Moog (Trumansburg, New York) and Don Buchla (building for the San Francisco Tape Music Center) arrived at two genuinely different answers to \"how do you make a complex tone,\" not just two brands of the same idea. Moog's East Coast answer -- the whole idea behind the Ladder VCF -- is subtractive: start from a harmonically rich waveform and remove content with a filter. Buchla's West Coast answer -- the Wavefolder -- is the opposite: start from something simple (a Sine has no harmonics of its own to begin with) and fold it back on itself to build complexity up. Four modules, no more, so you have to pick a road: VCO -> [Ladder VCF or Wavefolder] -> VCA -> Output, with the ADSR's \"Out\" patched into both the VCA's \"CV\" and the shaping module's own \"CV\" jack (the VCF's or the Wavefolder's), Amt turned up. On the filter route, start the VCF's Cut knob low so the envelope has real room to open it. On the wavefolder route, start with a Sine wave and push the Wavefolder's own Amt knob up. Leave the VCO's \"FM\" jack empty either way -- the pitch should hold steady; only the color should move.",
+  "grantedModules": ["vco", "adsr", "vca", "vcf", "wavefolder", "output"],
+  "mode": "constrained",
+  "constrained": {
+    "seconds": 1.0,
+    "gate": { "onAt": 0, "offAt": 0.8 },
+    "maxModules": 4,
+    "features": {
+      "peakRms": { "min": 0.05 },
+      "attackMs": { "max": 20 },
+      "brightnessDropOctaves": { "min": 0.35 },
+      "pitchDriftAbsOctaves": { "max": 0.2 }
+    }
+  }
+}

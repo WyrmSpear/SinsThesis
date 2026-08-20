@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "meta": { "name": "History 1 — The Modular Lead (target)", "created": "2026-08-20T00:00:00.000Z", "author": "academy" },
+  "modules": [
+    { "id": "vco-1", "type": "vco", "slot": [0, 0], "params": { "octave": 0, "tune": 0, "shape": 0, "pulseWidth": 0.5, "fmAmount": 0 } },
+    { "id": "vcf-1", "type": "vcf", "slot": [0, 1], "params": { "cutoff": 900, "resonance": 0.45, "cutoffCvAmount": 4.5, "drive": 1 } },
+    { "id": "adsr-1", "type": "adsr", "slot": [0, 2], "params": { "attack": 0.03, "decay": 0.35, "sustain": 0.55, "release": 0.5 } },
+    { "id": "vca-1", "type": "vca", "slot": [0, 3], "params": { "level": 0, "cvAmount": 1 } },
+    { "id": "output-1", "type": "output", "slot": [0, 4], "params": {} }
+  ],
+  "cables": [
+    { "from": ["vco-1", "out"], "to": ["vcf-1", "in"] },
+    { "from": ["vcf-1", "out"], "to": ["vca-1", "in"] },
+    { "from": ["adsr-1", "out"], "to": ["vca-1", "cv"] },
+    { "from": ["adsr-1", "out"], "to": ["vcf-1", "cutoffCv"] },
+    { "from": ["vca-1", "out"], "to": ["output-1", "in"] }
+  ]
+}

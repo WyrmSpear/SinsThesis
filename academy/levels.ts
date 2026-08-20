@@ -36,6 +36,19 @@ import bassSolution04Raw from './levels/bass-04-growl.sinp?raw'
 import bassRubric05 from './levels/bass-05-finish.rubric.json'
 import bassSolution05Raw from './levels/bass-05-finish.sinp?raw'
 
+import historyRubric01 from './levels/history-01-modular-lead.rubric.json'
+import historySolution01Raw from './levels/history-01-modular-lead.sinp?raw'
+import historyRubric02 from './levels/history-02-motorik.rubric.json'
+import historySolution02Raw from './levels/history-02-motorik.sinp?raw'
+import historyRubric03 from './levels/history-03-squelch.rubric.json'
+import historySolution03Raw from './levels/history-03-squelch.sinp?raw'
+import historyRubric04 from './levels/history-04-funk-bass.rubric.json'
+import historySolution04Raw from './levels/history-04-funk-bass.sinp?raw'
+import historyRubric05 from './levels/history-05-chop.rubric.json'
+import historySolution05Raw from './levels/history-05-chop.sinp?raw'
+import historyRubric06 from './levels/history-06-east-west.rubric.json'
+import historySolution06Raw from './levels/history-06-east-west.sinp?raw'
+
 // `.sinp` is loaded with Vite's `?raw` suffix rather than a plain import,
 // so the file stays byte-identical JSON with the real `.sinp` extension --
 // the same one `rack/patch-io.ts`'s `downloadPatch` writes -- instead of
@@ -61,6 +74,13 @@ const bassSolution02 = parseSinp(bassSolution02Raw)
 const bassSolution03 = parseSinp(bassSolution03Raw)
 const bassSolution04 = parseSinp(bassSolution04Raw)
 const bassSolution05 = parseSinp(bassSolution05Raw)
+
+const historySolution01 = parseSinp(historySolution01Raw)
+const historySolution02 = parseSinp(historySolution02Raw)
+const historySolution03 = parseSinp(historySolution03Raw)
+const historySolution04 = parseSinp(historySolution04Raw)
+const historySolution05 = parseSinp(historySolution05Raw)
+const historySolution06 = parseSinp(historySolution06Raw)
 
 /**
  * The academy's level format, and why it is two files rather than one.
@@ -211,6 +231,7 @@ const RUBRICS: LevelRubric[] = [
   rubric01, rubric02, rubric03, rubric04, rubric05, rubric06, rubric07, rubric08,
   rubric09, rubric10, rubric11,
   bassRubric01, bassRubric02, bassRubric03, bassRubric04, bassRubric05,
+  historyRubric01, historyRubric02, historyRubric03, historyRubric04, historyRubric05, historyRubric06,
 ] as unknown as LevelRubric[]
 
 const SOLUTIONS: Record<string, PatchFile> = {
@@ -230,6 +251,12 @@ const SOLUTIONS: Record<string, PatchFile> = {
   'bass-03-wobble': bassSolution03,
   'bass-04-growl': bassSolution04,
   'bass-05-finish': bassSolution05,
+  'history-01-modular-lead': historySolution01,
+  'history-02-motorik': historySolution02,
+  'history-03-squelch': historySolution03,
+  'history-04-funk-bass': historySolution04,
+  'history-05-chop': historySolution05,
+  'history-06-east-west': historySolution06,
 }
 
 /** Every selectable track, in the order the track picker offers them.
@@ -255,6 +282,11 @@ export const TRACKS: AcademyTrack[] = [
     id: 'bass',
     title: 'Bass',
     blurb: 'Five levels straight to sub-bass technique -- layering, the Reese, tempo-locked wobble, drive and growl, then a module-limited build of your own.',
+  },
+  {
+    id: 'history',
+    title: 'History',
+    blurb: 'Six levels tracing the lineage of synthesis by rebuilding what mattered -- the first modular lead, a clock-locked pulse, the resonant squelch, a played funk bass, a sampled chop, and the East Coast/West Coast fork -- not a reading list. What this rack still cannot reach: a real acoustic sample library, true polyphony, and a vocoder.',
   },
 ]
 

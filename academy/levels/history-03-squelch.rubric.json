@@ -1,0 +1,18 @@
+{
+  "id": "history-03-squelch",
+  "title": "The Squelch",
+  "track": "history",
+  "brief": "Make a short, vocal, squealing note -- the resonant filter driven hard enough that it almost sings on its own. This is the Roland TB-303's signature: a 1981 bass synthesizer that flopped commercially (it was meant to simulate a bass guitarist for solo practice, and didn't sound convincing enough to sell) and was rediscovered used and cheap about a decade later by Chicago house producers, who wanted exactly the synthetic squeal that had made it a failure in the first place -- that sound became acid house. Four modules: VCO -> VCF -> VCA -> Output, ADSR's \"Out\" into the VCA's \"CV\" (the volume envelope) and into the VCF's \"CV\" too (the same envelope sweeping the cutoff). Turn the VCF's Cut knob down low and Res up near the top of its range -- most of the squeal is the resonance, pushed close to where the filter starts ringing on its own -- then give the envelope a quick Attack and a Decay that sweeps the cutoff back down as the note dies. (The real 303's other trick, a slide/accent pattern running across a whole line of notes, needs a per-step sequencer feature this rack's Sequencer doesn't have -- this level teaches the squelch itself, one note at a time, not a full acid bassline.)",
+  "grantedModules": ["vco", "vcf", "adsr", "vca", "output"],
+  "mode": "constrained",
+  "constrained": {
+    "seconds": 1.0,
+    "gate": { "onAt": 0, "offAt": 0.6 },
+    "maxModules": 4,
+    "features": {
+      "peakRms": { "min": 0.05 },
+      "attackMs": { "max": 30 },
+      "brightnessDropOctaves": { "min": 0.4 }
+    }
+  }
+}

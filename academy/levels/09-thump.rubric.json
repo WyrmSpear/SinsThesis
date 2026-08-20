@@ -1,7 +1,7 @@
 {
   "id": "09-thump",
   "title": "Percussion: The Thump",
-  "brief": "Make a convincing kick drum — three modules, no sequencer. A kick is low and round, not bright: start the VCO on a low Octave (a couple of steps down) with a Sine or Triangle Shape. A kick also isn't just a loud tone with volume fading out — its pitch actually falls as it decays too, which is the classic \"thump.\" Patch VCO → VCA → Output, then patch the ADSR's \"Out\" into the VCA's \"CV\" jack so the envelope opens and closes it. Now patch that same ADSR \"Out\" into the VCO's \"FM\" jack too, and turn the VCO's FM knob up — the same envelope that shapes the volume can also shape the pitch. Keep the Decay short so it doesn't ring on.",
+  "brief": "Make a convincing kick drum — three modules, no sequencer. A kick is low and round, not bright: start the VCO on a low Octave (a couple of steps down) with a Sine or Triangle Shape. A kick also isn't just a loud tone with volume fading out — its pitch actually falls as it decays too, which is the classic \"thump\" -- the same trick the Roland TR-808 (1980) used for its own synthetic kick. Patch VCO → VCA → Output, then patch the ADSR's \"Out\" into the VCA's \"CV\" jack so the envelope opens and closes it. Now patch that same ADSR \"Out\" into the VCO's \"FM\" jack too, and turn the VCO's FM knob up — the same envelope that shapes the volume can also shape the pitch. Keep the Decay short so it doesn't ring on.",
   "grantedModules": ["vco", "adsr", "vca", "output"],
   "mode": "constrained",
   "constrained": {

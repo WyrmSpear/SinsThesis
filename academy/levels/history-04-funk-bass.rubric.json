@@ -1,0 +1,19 @@
+{
+  "id": "history-04-funk-bass",
+  "title": "The Funk Bass",
+  "track": "history",
+  "brief": "Make a clean, played bass note whose tone opens on the attack and settles as it's held -- a filter \"wah\" under your fingers, not a fixed tone. Herbie Hancock's 1973 album Head Hunters (the track \"Chameleon\") put exactly this kind of synth-bass wah in a jazz musician's hands and argued that synthesis and improvisation weren't opposed -- a controversial move at the time, and a commercial hit anyway. Same four modules and the same envelope-reused-twice trick as the last couple of levels -- VCO -> VCF -> VCA -> Output, ADSR's \"Out\" into both the VCA's \"CV\" and the VCF's \"CV\" -- but tuned differently: keep the VCF's Res knob low (this is a clean wah, not a squeal), give the envelope a moderate Attack and enough Sustain that the note feels held and played rather than plucked and gone.",
+  "grantedModules": ["vco", "vcf", "adsr", "vca", "output"],
+  "mode": "constrained",
+  "constrained": {
+    "seconds": 1.2,
+    "gate": { "onAt": 0, "offAt": 0.9 },
+    "maxModules": 4,
+    "features": {
+      "peakRms": { "min": 0.05 },
+      "attackMs": { "max": 45 },
+      "centroidHz": { "max": 700 },
+      "brightnessDropOctaves": { "min": 0.18 }
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "meta": { "name": "History 5 — The Chop (solution)", "created": "2026-08-20T00:00:00.000Z", "author": "academy" },
+  "modules": [
+    { "id": "clock-1", "type": "clock", "slot": [0, 0], "params": { "bpm": 100, "division": 2, "pulseWidth": 0.5 } },
+    { "id": "sampler-1", "type": "sampler", "slot": [0, 1], "params": { "tune": 0, "start": 0, "end": 1, "mode": 0, "reverse": 0 } },
+    { "id": "bitcrusher-1", "type": "bitcrusher", "slot": [0, 2], "params": { "bits": 6, "rate": 6000, "bend": 0, "bitsCvAmount": 0, "rateCvAmount": 0 } },
+    { "id": "output-1", "type": "output", "slot": [0, 3], "params": {} }
+  ],
+  "cables": [
+    { "from": ["clock-1", "gate"], "to": ["sampler-1", "gate"] },
+    { "from": ["sampler-1", "out"], "to": ["bitcrusher-1", "in"] },
+    { "from": ["bitcrusher-1", "out"], "to": ["output-1", "in"] }
+  ]
+}

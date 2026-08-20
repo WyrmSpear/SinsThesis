@@ -1,0 +1,16 @@
+{
+  "id": "history-02-motorik",
+  "title": "Motorik",
+  "track": "history",
+  "brief": "Build a self-running, clock-locked bassline -- no keyboard this time, it plays itself. This is the mid-1970s Kraftwerk/Giorgio Moroder idea (Autobahn, 1974; Donna Summer's \"I Feel Love\", 1977): the sequencer isn't an accessory to a band, it *is* the band, ticking out a mechanically exact pattern no drummer or bassist would ever play so precisely. Four modules, no more: Clock -> Sequencer, then the Sequencer's \"CV\" jack into the VCO's \"1V/Oct\" jack (each step becomes a different pitch), and the VCO through the VCF into the Output. Set a handful of the Sequencer's step sliders to different heights so it actually plays a pattern rather than one repeated note -- a flat, unvarying row of steps is silent on the one thing this level checks. For an extra edge, patch the Sequencer's own \"Gate\" jack into the VCF's \"CV\" jack too: the same per-step pulse that just played a note also snaps the filter brighter on every step, without needing an envelope generator at all.",
+  "grantedModules": ["clock", "seq", "vco", "vcf", "output"],
+  "mode": "constrained",
+  "constrained": {
+    "seconds": 3.0,
+    "maxModules": 4,
+    "features": {
+      "peakRms": { "min": 0.02 },
+      "centroidMotionOctaves": { "min": 0.3 }
+    }
+  }
+}
