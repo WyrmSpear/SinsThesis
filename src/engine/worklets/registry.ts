@@ -13,6 +13,7 @@ export const WORKLET_MODULES = [
   'recorder',
   'sampler',
   'bitcrusher',
+  'binaural',
 ] as const
 
 // `import.meta.env.BASE_URL` is Vite's own answer to "where does this build

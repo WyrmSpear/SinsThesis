@@ -22,6 +22,7 @@ import { pingpongDescriptor } from './pingpong'
 import { widthDescriptor } from './width'
 import { samplerDescriptor } from './sampler'
 import { bitcrusherDescriptor } from './bitcrusher'
+import { binauralDescriptor } from './binaural'
 
 /** The Phase 1 module set, plus Phase 2's scope, the state-variable filter
  *  (the roadmap's "biggest gap" -- see docs/ROADMAP.md section 1 and
@@ -35,15 +36,18 @@ import { bitcrusherDescriptor } from './bitcrusher'
  *  jungle -- see sampler.ts's own doc comment) and the Bitcrusher (lo-fi
  *  bit-depth/sample-rate degradation -- deliberately unfiltered, see
  *  bitcrusher.ts's own doc comment for why that aliasing is a feature this
- *  codebase's usual antialiasing discipline was never meant to catch).
+ *  codebase's usual antialiasing discipline was never meant to catch), and
+ *  Binaural (a fourth stereo module -- see binaural.ts's own doc comment
+ *  for why mono in is meaningless for it and the headphones-only mechanism
+ *  it documents rather than any claim about effect on a listener).
  *  The other twenty-one modules stay mono end to end, deliberately (see
  *  ROADMAP section 1a's "do not make everything stereo" ruling); stereo
- *  appears only at Panner/Ping-Pong/Width plus output.ts's now channel-
- *  count-aware `in` jack. The UI's palette reads this and may filter it,
- *  which is how a Phase 4 level grants four modules and withholds the
- *  rest. */
+ *  appears only at Panner/Ping-Pong/Width/Binaural plus output.ts's now
+ *  channel-count-aware `in` jack. The UI's palette reads this and may
+ *  filter it, which is how a Phase 4 level grants four modules and
+ *  withholds the rest. */
 export const ALL_DESCRIPTORS = [
-  vcoDescriptor, noiseDescriptor, samplerDescriptor,
+  vcoDescriptor, noiseDescriptor, samplerDescriptor, binauralDescriptor,
   vcfDescriptor, svfDescriptor, vcaDescriptor, wavefolderDescriptor, driveDescriptor, bitcrusherDescriptor,
   adsrDescriptor, lfoDescriptor, shDescriptor,
   mixerDescriptor, multipleDescriptor, delayDescriptor, pingpongDescriptor,

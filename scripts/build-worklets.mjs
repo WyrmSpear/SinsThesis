@@ -47,6 +47,7 @@ const WORKLETS = {
   recorder: entry('../src/engine/worklets/recorder.worklet.ts'),
   sampler: entry('../src/engine/worklets/sampler.worklet.ts'),
   bitcrusher: entry('../src/engine/worklets/bitcrusher.worklet.ts'),
+  binaural: entry('../src/engine/worklets/binaural.worklet.ts'),
 }
 
 const OUT_DIR = fileURLToPath(new URL('../public/worklets', import.meta.url))
