@@ -42,6 +42,43 @@ module).
 buffer lifetime, playback that is not oscillator-shaped, and a UI for trimming
 and looping. Genuinely wanted, genuinely not a casual afternoon.
 
+
+## 1a. Stereo — the architectural one
+
+Requested directly: panning, ping-pong delay, spatialisers, thickening.
+
+**The design decision that makes this tractable.** Do not make everything
+stereo. Real Eurorack is overwhelmingly mono through the signal path, and
+stereo appears at the *destination* — a panner, a stereo delay, a width stage
+near the output. Modelling it the same way means the sixteen existing mono
+modules stay untouched, and stereo becomes a small set of new modules plus a
+stereo-aware output.
+
+What that implies, in dependency order:
+
+1. **A stereo-capable Output.** Today's is mono. Everything downstream of this
+   depends on it.
+2. **A Panner** — mono in, stereo out, with a CV input so an LFO can auto-pan.
+   Equal-power law, not linear, or the centre sags.
+3. **A Ping-Pong Delay** — mono in, stereo out, feedback crossing between
+   channels. `dsp/` has a delay already; the crossing is the new part.
+4. **A Width / spatialiser** — mid-side processing is the honest way to
+   "thicken": encode to M/S, scale S, decode. It must stay mono-compatible,
+   which is exactly what M/S guarantees and what a naive Haas-delay widener
+   does not.
+5. **Unison/detune thickening** — arguably belongs in the VCO as a voice-count
+   and spread pair rather than a separate module.
+
+**What it touches beyond new modules**, and must not be forgotten: worklets
+currently declare `outputChannelCount: [1]`; `renderGraph` renders one channel;
+the recorder captures mono and the WAV writer writes mono; the scope and
+spectrum read one channel. Each needs a decision — most can stay mono by
+summing, but that decision should be deliberate rather than discovered.
+
+**The trap to avoid:** a widener that sounds impressive in headphones and
+collapses to thin or hollow in mono. Every stereo module here needs a
+mono-compatibility check as an acceptance criterion, not an afterthought.
+
 ## 2. Sequencing, deeper
 
 A 16-step sequencer module ships. What a musician expects beyond it:
