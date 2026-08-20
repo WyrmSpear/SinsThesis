@@ -38,6 +38,7 @@ export default defineConfig({
             'tests/browser/preset-bank.test.ts',
             'tests/browser/rack-academy-bass.test.ts',
             'tests/browser/rack-academy-history.test.ts',
+            'tests/browser/rack-arcade.test.ts',
           ],
           browser: {
             enabled: true,
@@ -68,6 +69,7 @@ export default defineConfig({
             'tests/browser/preset-bank.test.ts',
             'tests/browser/rack-academy-bass.test.ts',
             'tests/browser/rack-academy-history.test.ts',
+            'tests/browser/rack-arcade.test.ts',
           ],
           // Boots a Vite dev server and a Chromium instance; slower than
           // the unit-style browser tests above.

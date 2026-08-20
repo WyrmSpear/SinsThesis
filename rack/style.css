@@ -1136,6 +1136,67 @@ body {
  * `<canvas>` has no CSS cascade of its own to hand it colors any other
  * way); everything here is just the two DOM elements around it.
  */
+/* ---- Arcade mode (ROADMAP 3a's pan-paddle prototype, rack/arcade-panel.ts)
+ * ----
+ * A toolbar-level panel, the same visual family as `.academy-panel`
+ * (surface-panel card, bordered, rounded) rather than a module panel --
+ * there is no module descriptor behind it, it's an overlay above the rack,
+ * which stays visible and patchable underneath exactly as free play left
+ * it. The canvas paints with `getComputedStyle` tokens read live, the same
+ * technique `.scope-display` uses and for the same reason: a `<canvas>`
+ * does not participate in the CSS cascade, so there is no other way to get
+ * a themed color into it.
+ */
+.arcade-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-bottom: 0.9rem;
+  padding: 0.9rem 1rem;
+  background: var(--surface-panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+}
+
+.arcade-panel-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.arcade-hud {
+  align-self: stretch;
+  font-size: var(--text-sm);
+  color: var(--text-accent);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--tracking-label);
+}
+
+.arcade-display {
+  display: block;
+  /* Fixed px, same "fixed height, scaled-by-its-own-attribute width"
+   * contract `.scope-display` documents -- this canvas isn't stretched to
+   * a panel's content width the way the scope's is, since Arcade has no
+   * fixed 3U budget to fill; it just renders at its own native size. */
+  border: 1px solid var(--panel-border);
+  border-radius: 3px;
+  box-shadow: inset 0 1px 3px var(--shadow-inset);
+  background: var(--surface-recess);
+}
+
+.arcade-restart-btn {
+  align-self: center;
+}
+
+.arcade-hint {
+  align-self: stretch;
+  font-size: var(--text-xs);
+  max-width: 32rem;
+  text-align: center;
+  margin: 0 auto;
+}
+
 .scope-panel-content { width: 100%; }
 
 .scope-readout {

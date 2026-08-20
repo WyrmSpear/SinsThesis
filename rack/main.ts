@@ -18,6 +18,7 @@ import { CableLayer } from './cables'
 import { buildKeyboardPanel } from './keyboard-panel'
 import { buildSequencerPanel } from './sequencer-panel'
 import { buildScopePanel } from './scope-panel'
+import { startArcade, type ArcadeHandle } from './arcade-panel'
 import { buildSamplerPanel } from './sampler-panel'
 import { enableReorder } from './reorder'
 import { downloadPatch, downloadWav, readPatchFile, saveAutosave, loadAutosave, debounce } from './patch-io'
@@ -112,6 +113,8 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
   const loadFileInput = $<HTMLInputElement>('load-file')
   const modeFreeplayBtn = $<HTMLButtonElement>('mode-freeplay')
   const modeAcademyBtn = $<HTMLButtonElement>('mode-academy')
+  const modeArcadeBtn = $<HTMLButtonElement>('mode-arcade')
+  const arcadePanelEl = $('arcade-panel')
 
   // ---- mutable rack state: reassigned wholesale on every patch load, per
   // src/engine/graph.ts's dispose() doc comment -- a live session swapping
@@ -132,7 +135,15 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
   // not a replacement": it is captured the moment the player *enters* the
   // academy (mountGraph having last held the free-play patch) and
   // reloaded the moment they leave. ----
-  let mode: 'freeplay' | 'academy' = 'freeplay'
+  let mode: 'freeplay' | 'academy' | 'arcade' = 'freeplay'
+  // Arcade's own live handle (rack/arcade-panel.ts) -- undefined whenever
+  // Arcade isn't the current mode, since the game's rAF loop and its
+  // parallel stereo-balance tap have no reason to exist while nothing is
+  // drawing them. Built fresh on every entry to Arcade (showArcade) and
+  // torn down on every exit (showFreePlay/showAcademy), the same
+  // "self-terminating panel" contract rack/scope-panel.ts documents for
+  // its own tick loop.
+  let arcadeHandle: ArcadeHandle | undefined
   let currentLevelId: string | undefined
   let progress: AcademyProgress = loadProgress()
   // Which selectable sequence (academy/levels.ts's TRACKS) the player is
@@ -595,10 +606,13 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
 
   function showAcademy(): void {
     if (mode !== 'academy') freePlaySnapshot = serializePatch(graph, { name: currentPatchName })
+    stopArcade()
     mode = 'academy'
     modeAcademyBtn.classList.add('mode-toggle-btn-active')
     modeFreeplayBtn.classList.remove('mode-toggle-btn-active')
+    modeArcadeBtn.classList.remove('mode-toggle-btn-active')
     academyPanel.hidden = false
+    arcadePanelEl.hidden = true
     paletteDrawer.hidden = true
     const firstOfTrack = levelsInTrack(currentTrackId)[0]
     if (currentLevelId === undefined && firstOfTrack) {
@@ -610,18 +624,59 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
   }
 
   function showFreePlay(): void {
+    const wasAcademy = mode === 'academy'
+    stopArcade()
     mode = 'freeplay'
     modeFreeplayBtn.classList.add('mode-toggle-btn-active')
     modeAcademyBtn.classList.remove('mode-toggle-btn-active')
+    modeArcadeBtn.classList.remove('mode-toggle-btn-active')
     academyPanel.hidden = true
+    arcadePanelEl.hidden = true
     clearHighlights()
     refreshPalette()
-    if (freePlaySnapshot) {
+    // Only academy swaps the mounted graph out from under free play (a
+    // level's own solution-in-progress) -- Arcade never touches `graph` at
+    // all, so leaving it has nothing to restore. Restoring on every exit
+    // regardless of where the player came from would occasionally hand
+    // them back a stale snapshot from a much earlier academy visit.
+    if (wasAcademy && freePlaySnapshot) {
       const { graph: restored } = loadPatch(ctx, freePlaySnapshot)
       mountGraph(restored)
       currentPatchName = freePlaySnapshot.meta.name
       patchNameInput.value = currentPatchName
     }
+  }
+
+  /** Arcade mode (ROADMAP 3a's pan-paddle prototype): a third top-level
+   *  mode, not an academy track, because the two are different products
+   *  by the roadmap's own account -- academy grades a patch's topology or
+   *  sound against a rubric with a Check button; arcade is continuous and
+   *  twitch-timed and has no pass/fail patch to check. Left as free-play's
+   *  own graph, untouched: "the rack does not disappear -- patching is the
+   *  controller" means whatever the player already has patched (Panner,
+   *  LFO, Output, anything) is exactly what steers the paddle, with no
+   *  separate arcade-only patch to build first. See rack/arcade-panel.ts's
+   *  header comment for what actually drives the paddle and why. */
+  function showArcade(): void {
+    mode = 'arcade'
+    modeArcadeBtn.classList.add('mode-toggle-btn-active')
+    modeFreeplayBtn.classList.remove('mode-toggle-btn-active')
+    modeAcademyBtn.classList.remove('mode-toggle-btn-active')
+    academyPanel.hidden = true
+    paletteDrawer.hidden = true
+    arcadePanelEl.hidden = false
+    clearHighlights()
+    refreshPalette() // unrestricted -- arcade is free play plus an overlay, not a granted-module level
+    arcadeHandle?.stop()
+    arcadeHandle = startArcade(arcadePanelEl, ctx, () => {
+      const outId = graph.moduleIds.find((id) => graph.getType(id) === 'output')
+      return outId ? (graph.getInstance(outId) as OutputInstance | undefined) : undefined
+    })
+  }
+
+  function stopArcade(): void {
+    arcadeHandle?.stop()
+    arcadeHandle = undefined
   }
 
   // Drag-to-reorder, wired once at boot rather than per-mount: it is
@@ -843,6 +898,10 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
   modeAcademyBtn.addEventListener('click', () => {
     if (recording) { showBanner('warn', 'Stop recording before switching modes.'); return }
     showAcademy()
+  })
+  modeArcadeBtn.addEventListener('click', () => {
+    if (recording) { showBanner('warn', 'Stop recording before switching modes.'); return }
+    showArcade()
   })
 
   saveBtn.addEventListener('click', () => {
