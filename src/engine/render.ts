@@ -51,6 +51,69 @@ export function ensureWorklets(ctx: BaseAudioContext): Promise<void> {
   return inFlight
 }
 
+export interface WorkletLoadResult {
+  ok: boolean
+  /** How many times `ensureWorklets` was called, 1-based. */
+  attempts: number
+  /** Bundles still not loaded when this gave up. Empty when `ok`. */
+  missing: string[]
+  /** The last failure, for logging. Absent when `ok`. */
+  error?: unknown
+}
+
+/**
+ * `ensureWorklets` with retries -- the fix for "no sound on first load,
+ * sound on a later attempt."
+ *
+ * A cold first load is one HTTP request per bundle on whatever network the
+ * visitor has. Any single one failing is enough to silence the whole
+ * instrument, because `segment` backs the ADSR and the rack's default patch
+ * runs its only gain path through it: `buildDefaultPatch` leaves the VCA at
+ * `level: 0` with `cvAmount: 1`, so the envelope is the sole thing that can
+ * open it, and a failed `segment` makes the ADSR a correctly-silent
+ * `buildFailedInstance` stub. Measured in a real browser: key-down RMS
+ * 0.27258 with the bundle, **0.00000** without it. A reload re-fetches and
+ * works, which is exactly what was reported.
+ *
+ * `ensureWorklets` was already built to make this recoverable -- it drops
+ * its cached rejection on failure specifically so "a caller who fixes the
+ * problem can retry," and its `WORKLET_MODULES.filter` means a retry only
+ * re-attempts bundles that are still missing, never re-registering a
+ * processor that already loaded (which would throw). Nothing ever retried.
+ * That was the whole gap.
+ *
+ * Returns a result rather than throwing so the caller can say something
+ * true about *which* bundles are gone, instead of a generic warning.
+ */
+export async function ensureWorkletsWithRetry(
+  ctx: BaseAudioContext,
+  opts: { attempts?: number; delayMs?: number } = {},
+): Promise<WorkletLoadResult> {
+  const attempts = Math.max(1, opts.attempts ?? 3)
+  const delayMs = opts.delayMs ?? 400
+  let error: unknown
+
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      await ensureWorklets(ctx)
+      return { ok: true, attempts: attempt, missing: [] }
+    } catch (err) {
+      error = err
+      if (attempt < attempts && delayMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs))
+      }
+    }
+  }
+
+  const loaded = loadedWorkletBundles(ctx)
+  return {
+    ok: false,
+    attempts,
+    missing: WORKLET_MODULES.filter((name) => !loaded.has(name)),
+    error,
+  }
+}
+
 /**
  * Render a patch offline and return the mono result.
  *

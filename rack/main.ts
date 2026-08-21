@@ -1,7 +1,7 @@
 import { PatchGraph } from '../src/engine/graph'
 import { registerAllModules } from '../src/engine/modules'
 import { getModule, listModules } from '../src/engine/registry'
-import { ensureWorklets, renderPatch, renderPatchStereo } from '../src/engine/render'
+import { ensureWorkletsWithRetry, renderPatch, renderPatchStereo } from '../src/engine/render'
 import { createCpuMeter } from '../src/engine/cpu-meter'
 import { renderCpuMeter } from './cpu-meter-panel'
 import { serializePatch, loadPatch, type PatchFile } from '../src/engine/patch'
@@ -103,26 +103,33 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
   powerBtn.textContent = 'STARTING…'
 
   const ctx = new AudioContext()
-  // Section 11's "a worklet fails to load" failure mode: `ensureWorklets`
-  // still rejects if even one of its bundles' `addModule()` call failed
-  // (render.ts's own doc comment explains why that's preserved on
-  // purpose), but a rejection here must not take the whole rack down with
-  // it -- before this fix, an uncaught throw left `powerBtn` stuck reading
-  // "STARTING…" forever, silence with no explanation, worse than the one
-  // module this is actually about. Every bundle that *did* load is
-  // already recorded (`worklets/registry.ts`'s `markWorkletLoaded`, called
-  // per-bundle as each `addModule()` resolves, independent of this
-  // combined promise's own fate) by the time this `catch` runs, so
-  // `buildDefaultPatch`/`loadPatch` below still build every module whose
-  // worklet made it -- only the specific module(s) whose bundle didn't
-  // fall back or fail loudly, each with its own visible badge
+  // Section 11's "a worklet fails to load" failure mode.
+  //
+  // A failure here must not take the whole rack down: an uncaught throw
+  // once left `powerBtn` stuck reading "STARTING…" forever, silence with no
+  // explanation, worse than the one module it was about. Every bundle that
+  // *did* load is recorded per-bundle as its own `addModule()` resolves
+  // (`worklets/registry.ts`'s `markWorkletLoaded`), independent of the
+  // combined promise's fate, so `buildDefaultPatch`/`loadPatch` below still
+  // build every module whose worklet made it -- only the ones whose bundle
+  // didn't fall back or fail loudly, each with its own panel badge
   // (rack/panel.ts). See `.superpowers/sdd/robustness-report.md`.
-  let workletLoadFailed = false
-  try {
-    await ensureWorklets(ctx)
-  } catch (err) {
-    workletLoadFailed = true
-    console.error('SinsThesis: one or more audio worklets failed to load.', err)
+  //
+  // **Retried, not attempted once** -- see `ensureWorkletsWithRetry`'s own
+  // doc comment for the measurement behind that. A cold first load is one
+  // HTTP request per bundle, and a single one failing is enough to silence
+  // the whole instrument, because the default patch's only gain path runs
+  // through an ADSR the `segment` bundle backs. That is the "no sound on
+  // first load, sound on a later attempt" report: the later attempt was a
+  // reload, which re-fetched. Retrying in place means a visitor never has
+  // to discover that workaround for themselves.
+  const workletLoad = await ensureWorkletsWithRetry(ctx)
+  if (!workletLoad.ok) {
+    console.error(
+      `SinsThesis: ${workletLoad.missing.length} audio worklet bundle(s) failed to load after ` +
+        `${workletLoad.attempts} attempts: ${workletLoad.missing.join(', ')}.`,
+      workletLoad.error,
+    )
   }
   if (ctx.state === 'suspended') await ctx.resume()
 
@@ -1309,10 +1316,22 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
   } else {
     mountGraph(buildDefaultPatch())
   }
-  if (workletLoadFailed) {
-    const note =
-      "Some audio components didn't load, so a few modules are running in a reduced mode or " +
-      'are disabled -- check each module\'s panel for details.'
+  if (!workletLoad.ok) {
+    // The old wording here was "a few modules are running in a reduced mode
+    // or are disabled", which badly understated the common case: when
+    // `segment` is among the missing bundles the instrument is *completely
+    // silent*, because the ADSR that gates the default patch's only signal
+    // path becomes an inert stub (measured: key-down RMS 0.00000 against
+    // 0.27258 healthy). A visitor told "a few modules are reduced" while
+    // hearing nothing at all has been told something untrue, and left with
+    // no idea that reloading is the fix.
+    const silencing = workletLoad.missing.includes('segment')
+    const note = silencing
+      ? 'Audio failed to load, so this rack is silent -- the envelope, LFO and sequencer ' +
+        `could not start (missing: ${workletLoad.missing.join(', ')}). Reload the page to try again.`
+      : `Some audio components didn't load (${workletLoad.missing.join(', ')}), so those modules are ` +
+        "running in a reduced mode or are disabled -- check each module's panel for details. " +
+        'Reloading the page may fix it.'
     showBanner('warn', statusBanner.hidden ? note : `${statusBanner.textContent} ${note}`)
   }
   patchNameInput.value = currentPatchName
