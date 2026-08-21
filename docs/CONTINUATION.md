@@ -1,9 +1,9 @@
 # SinsThesis — continuation
 
-**Updated:** 2026-08-20.
-**Branch:** `main` — 133 commits. Public at github.com/WyrmSpear/SinsThesis (MIT).
+**Updated:** 2026-08-21.
+**Branch:** `main` — 138 commits. Public at github.com/WyrmSpear/SinsThesis (MIT).
 **Live** at `ryanoglelmt.com/portfolio/sinsthesis/`.
-**State:** 1032 tests pass (794 node + 238 browser), `typecheck` clean, tree clean.
+**State:** 1040 tests pass (804 node + 236 browser), `typecheck` clean, tree clean.
 
 **Run it:** `npm run dev`, open the URL, POWER ON.
 
@@ -18,40 +18,66 @@
 
 ---
 
-## READ FIRST — one confirmed bug, one open question
+## READ FIRST — mobile CPU (fixed, opt-in), one unverified report
 
-**The arcade paddle only reaches the left half of the playfield.** Reported by
-the owner, diagnosed but NOT yet fixed.
+**The owner loaded the deployed app on a phone and the CPU meter read 100%.**
+Investigated, measured, and addressed — see
+`.superpowers/sdd/mobile-perf-report.md` for the full per-module and
+per-preset cost table. Short version: Node microbenchmarks confirmed Drive
+and the Wavefolder's 4x-oversampled ADAA path costs 16-19x the naive
+curve/fold (~550/~485 ns/sample vs ~31/~26 ns), the wavetable oscillator
+costs ~33 ns/sample against PolyBLEP's ~11 ns, and the CPU meter's own
+reporting cost is negligible (~0.001% of a quantum's budget, confirmed not
+just documented). None of the shipped presets stack more than one Drive or
+Wavefolder instance, so the oversampling tax alone doesn't explain a 100%
+reading on an ordinary preset — it matters most for a player-built free-play
+patch that stacks several of these modules. Shipped a `quality` param
+(Full/Fast, default Full) on both Drive and Wavefolder: Fast mode skips both
+oversampling FIRs and runs ADAA-1 alone at the native rate, ~9-13x cheaper,
+with the resulting alias floor re-measured and stated honestly in each
+module's own doc comment and enforced by tests (it's a real trade, not "free" —
+worst case for the Wavefolder's Fast mode is RELEASE-grade only in the bass
+register). See commit `e6715e4`.
 
-`buildTap` in `rack/arcade-panel.ts` connects the Output node straight into a
-`ChannelSplitterNode`. A splitter is spec'd `channelInterpretation: 'discrete'`,
-so a **mono** signal lands entirely in channel 0 and channel 1 reads silence.
-`readBalance` then computes `(r - l) / (l + r)` = −1 and the paddle pins hard
-left; a partially-stereo patch ranges roughly −1..0, which is exactly the
-"left of midline only" symptom.
+**The arcade paddle only reaching the left half of the playfield — fixed.**
+`buildTap` in `rack/arcade-panel.ts` now up-mixes mono to stereo (a
+`channelCount: 2` / `'speakers'`-interpretation gain stage) before the signal
+reaches the `ChannelSplitterNode` that reads L/R balance, mirroring
+`src/engine/modules/output.ts`'s own up-mix. Investigating turned up a
+wrinkle: Output's own gain node (the exact node the tap connects to)
+already up-mixes anything routed through the live Output module, so the
+originally diagnosed failure isn't reachable via today's normal integration
+path — confirmed by reverting just the new stage and rerunning the
+rack-level regression test, which still passed. Fixed anyway, unconditionally,
+since `buildTap` accepts any `OutputInstance`-shaped value, not specifically
+that one node, and a future refactor could silently reintroduce this with no
+coverage watching for it. `tests/browser/modules/arcade-tap.test.ts` (new)
+calls `buildTap` directly against a raw, genuinely single-channel source to
+prove the fix is load-bearing on its own, independent of Output's behavior;
+`tests/browser/rack-arcade.test.ts` adds the rack-level "mono patch reads
+centered, not pinned left" guarantee. See commit `ba9e95b`.
 
-`src/engine/modules/output.ts` already solves this for its own path — it sets
-`channelCount: 2`, `channelCountMode: 'explicit'`, `channelInterpretation:
-'speakers'` on its gain stage so mono up-mixes to both channels. The tap does
-not inherit that because it taps a different node.
+**Memory growth — measured, flat.** Real Chromium session (chrome-devtools,
+`performance.memory` sampling plus two heap snapshots), arcade mode active,
+CPU meter reporting, ~50 preset swaps churning module graphs, with and
+without a live recording. With recording OFF, heap oscillated in a tight
+band (e.g. 31.4-32.4 MB across 40 late-session preset swaps, ~80s) with no
+sustained trend — flat, no leak found in the arcade rAF loop, the CPU
+meter's 5 Hz reporting, the analyser taps, or preset/module churn. With
+recording ON, heap grew ~12.46 MB over 31s against an expected ~11.9 MB for
+31s of 48 kHz stereo Float32 PCM (`31 * 48000 * 2 * 4` bytes) — the growth is
+the recorder's own buffer, accounted for almost exactly, not an
+unexplained leak, and it stops growing the moment recording stops (also
+confirmed: heap went flat again immediately after Stop). Worst case by
+design: the Studio's 5-minute recording cap bounds this buffer at
+`300 * 48000 * 2 * 4` ≈ 115 MB — a real number worth knowing, not a leak to
+fix. This closes the open question; see
+`.superpowers/sdd/mobile-perf-report.md` for the full sample series.
 
-**Fix:** insert a 2-channel gain stage with `'speakers'` interpretation between
-the source and the splitter, so mono up-mixes before it is split. Then add a
-test that a *mono* patch reads balance 0 (centred), not −1 — the existing test
-only proved the reader returns a number for a stereo source, which is why this
-shipped.
-
-**Open: possible memory growth.** The owner raised a concern about leaks over a
-long session and it has not been measured. Nothing is known to leak, but
-several things allocate per-frame or per-buffer and have never been profiled
-across an extended run: the arcade's `requestAnimationFrame` loop, the CPU
-meter's 5 Hz reporting, `LiveRecorder`'s batched buffers, and the analyser taps
-in the scope, cable inspector and arcade. Worth a real heap profile over a long
-session before assuming it is fine.
-
-Also unverified: the owner reported **no sound on first load** on both phone
-and desktop, then sound on a later attempt. Could be the power-gesture
-requirement behaving as designed, or something real. Not reproduced.
+**Still unverified:** the owner reported **no sound on first load** on both
+phone and desktop, then sound on a later attempt. Could be the power-gesture
+requirement behaving as designed, or something real. Not reproduced, not
+investigated this pass.
 
 Read this file first. Then `docs/audio/PHASE1A-LEDGER.md` for every decision made
 and why.
@@ -148,6 +174,15 @@ contribution.
 The oscillator started at −43 dB and is now −143. That rebuild is the single
 biggest thing that happened here, and it happened because the critic prototyped
 instead of reasoning.
+
+The table above is all **Full quality (`quality` param = 0), the default and
+what every existing patch keeps.** Drive and the Wavefolder also ship an
+opt-in **Fast** mode (added for the mobile CPU finding above) that trades a
+real, measured amount of this table's alias-floor headroom for ~9-13x less
+CPU — see each module's own doc comment (`src/engine/dsp/drive.ts`,
+`src/engine/dsp/wavefolder.ts`) and `.superpowers/sdd/mobile-perf-report.md`
+for the re-measured Fast-mode floors. Never applied silently; a patch has to
+opt in.
 
 ---
 
