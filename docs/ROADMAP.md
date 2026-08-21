@@ -5,7 +5,7 @@ engine already supports. Nothing here is committed to; it exists so the
 thinking survives between sessions.
 
 Current state: thirty modules, three academy grading modes across
-twenty-two levels in three tracks, twelve themes, eleven presets, two
+twenty-two levels in three tracks, twelve themes, fifteen presets, two
 arcade minigames, MIDI hardware in with MIDI learn, recording and WAV
 export, live at `ryanoglelmt.com/portfolio/sinsthesis/`.
 

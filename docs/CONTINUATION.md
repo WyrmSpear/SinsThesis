@@ -1,7 +1,7 @@
 # SinsThesis — continuation
 
 **Updated:** 2026-08-21.
-**Branch:** `main` — 138 commits. Public at github.com/WyrmSpear/SinsThesis (MIT).
+**Branch:** `main` — 162 commits. Public at github.com/WyrmSpear/SinsThesis (MIT).
 **Live** at `ryanoglelmt.com/portfolio/sinsthesis/`.
 **State:** 1207 tests pass (906 node + 301 browser), `typecheck` clean, tree clean.
 
@@ -19,108 +19,64 @@
 
 ---
 
-## READ FIRST — mobile CPU (fixed, opt-in), first-load silence (fixed)
+## READ FIRST — nothing is currently blocking
 
-**The owner loaded the deployed app on a phone and the CPU meter read 100%.**
-Investigated, measured, and addressed — see
-`.superpowers/sdd/mobile-perf-report.md` for the full per-module and
-per-preset cost table. Short version: Node microbenchmarks confirmed Drive
-and the Wavefolder's 4x-oversampled ADAA path costs 16-19x the naive
-curve/fold (~550/~485 ns/sample vs ~31/~26 ns), the wavetable oscillator
-costs ~33 ns/sample against PolyBLEP's ~11 ns, and the CPU meter's own
-reporting cost is negligible (~0.001% of a quantum's budget, confirmed not
-just documented). None of the shipped presets stack more than one Drive or
-Wavefolder instance, so the oversampling tax alone doesn't explain a 100%
-reading on an ordinary preset — it matters most for a player-built free-play
-patch that stacks several of these modules. Shipped a `quality` param
-(Full/Fast, default Full) on both Drive and Wavefolder: Fast mode skips both
-oversampling FIRs and runs ADAA-1 alone at the native rate, ~9-13x cheaper,
-with the resulting alias floor re-measured and stated honestly in each
-module's own doc comment and enforced by tests (it's a real trade, not "free" —
-worst case for the Wavefolder's Fast mode is RELEASE-grade only in the bass
-register). See commit `e6715e4`.
+Every issue this section has carried is now closed. Two caveats survive the
+fixes and are worth knowing before you touch anything:
 
-**The arcade paddle only reaching the left half of the playfield — fixed.**
-`buildTap` in `rack/arcade-panel.ts` now up-mixes mono to stereo (a
-`channelCount: 2` / `'speakers'`-interpretation gain stage) before the signal
-reaches the `ChannelSplitterNode` that reads L/R balance, mirroring
-`src/engine/modules/output.ts`'s own up-mix. Investigating turned up a
-wrinkle: Output's own gain node (the exact node the tap connects to)
-already up-mixes anything routed through the live Output module, so the
-originally diagnosed failure isn't reachable via today's normal integration
-path — confirmed by reverting just the new stage and rerunning the
-rack-level regression test, which still passed. Fixed anyway, unconditionally,
-since `buildTap` accepts any `OutputInstance`-shaped value, not specifically
-that one node, and a future refactor could silently reintroduce this with no
-coverage watching for it. `tests/browser/modules/arcade-tap.test.ts` (new)
-calls `buildTap` directly against a raw, genuinely single-channel source to
-prove the fix is load-bearing on its own, independent of Output's behavior;
-`tests/browser/rack-arcade.test.ts` adds the rack-level "mono patch reads
-centered, not pinned left" guarantee. See commit `ba9e95b`.
+- **Slow devices do not self-heal.** The CPU meter *reports* load; the
+  Drive/Wavefolder `quality` remedy it motivated is **opt-in, Full by
+  default**. A phone measuring 100% still measures 100% until a player
+  flips those switches. "The CPU work is done" and "slow devices are fixed"
+  are different claims.
+- **The iOS unlock path is unverified.** `ctx.resume()` is awaited after the
+  worklet load. Chromium resumed cleanly even with a 10 s delay injected
+  (sticky activation), so it did not reproduce here, but iOS Safari uses
+  transient activation and may still refuse. It now fails *visibly* rather
+  than silently — that half is fixed; the underlying ordering is not.
 
-**Memory growth — measured, flat.** Real Chromium session (chrome-devtools,
-`performance.memory` sampling plus two heap snapshots), arcade mode active,
-CPU meter reporting, ~50 preset swaps churning module graphs, with and
-without a live recording. With recording OFF, heap oscillated in a tight
-band (e.g. 31.4-32.4 MB across 40 late-session preset swaps, ~80s) with no
-sustained trend — flat, no leak found in the arcade rAF loop, the CPU
-meter's 5 Hz reporting, the analyser taps, or preset/module churn. With
-recording ON, heap grew ~12.46 MB over 31s against an expected ~11.9 MB for
-31s of 48 kHz stereo Float32 PCM (`31 * 48000 * 2 * 4` bytes) — the growth is
-the recorder's own buffer, accounted for almost exactly, not an
-unexplained leak, and it stops growing the moment recording stops (also
-confirmed: heap went flat again immediately after Stop). Worst case by
-design: the Studio's 5-minute recording cap bounds this buffer at
-`300 * 48000 * 2 * 4` ≈ 115 MB — a real number worth knowing, not a leak to
-fix. This closes the open question; see
-`.superpowers/sdd/mobile-perf-report.md` for the full sample series.
+### Resolved, with the numbers worth keeping
 
-**~~Still unverified: no sound on first load.~~ REPRODUCED, ROOT-CAUSED AND
-FIXED.** It was something real, not the power gesture behaving as designed.
+**No sound on first load** (`a135336`) — reproduced and root-caused after two
+sessions unverified. The `segment` bundle backs the ADSR, and
+`buildDefaultPatch` runs the rack's only gain path through it (VCA at
+`level: 0`, `cvAmount: 1`), so a failed `segment` makes the ADSR a
+correctly-silent stub and **the whole instrument goes quiet** — measured
+key-down RMS **0.27258 with the bundle, 0.00000 without**. A cold load is 18
+HTTP requests; any one failing does it, and a reload re-fetches, which is
+exactly the reported shape. `ensureWorklets` was already built to make this
+recoverable (it drops its cached rejection so a caller can retry) — nothing
+ever retried. `ensureWorkletsWithRetry` closes it: one transient failure now
+measures 0.26770 with a healthy ADSR. The banner also stopped claiming "a few
+modules are in a reduced mode" while the rack was silent.
 
-The `segment` bundle backs the ADSR, LFO, S&H and Sequencer, and
-`buildDefaultPatch` runs the rack's only gain path through the ADSR — the
-VCA is left at `level: 0`, `cvAmount: 1`, so the envelope is the sole thing
-that can open it. When `segment` fails to load the ADSR becomes a
-`buildFailedInstance` stub, correctly silent by design, and **the entire
-instrument goes quiet.** Measured key-down RMS in a real browser: **0.27258
-with the bundle, 0.00000 without it.**
+**Mobile CPU** (`e6715e4`) — measured per module and per preset in
+`.superpowers/sdd/mobile-perf-report.md`. Drive and the Wavefolder's
+4x-oversampled ADAA path cost 16-19x the naive curve/fold (~550/~485 vs
+~31/~26 ns/sample); the wavetable oscillator ~33 ns against PolyBLEP's ~11;
+the CPU meter's own cost is negligible (~0.001% of a quantum). No shipped
+preset stacks more than one Drive or Wavefolder, so the oversampling tax
+alone never explained a 100% reading — it bites a player-built patch that
+stacks several. Fixed with an opt-in Fast mode (~9-13x cheaper) whose
+re-measured alias floor is stated in each module's own doc comment and
+enforced by tests. A real trade, not free: the Wavefolder's Fast mode is
+RELEASE-grade only in the bass register.
 
-A cold first load is eighteen separate HTTP requests on whatever network the
-visitor has. Any single one failing produces total silence — and a reload
-re-fetches and works, which is precisely "no sound on first load, then sound
-on a later attempt."
+**Memory growth** (measured, flat) — real Chromium session, arcade active,
+~50 preset swaps. Recording OFF: heap oscillated 31.4-32.4 MB across 40 late
+swaps with no trend. Recording ON: grew ~12.46 MB over 31 s against ~11.9 MB
+predicted for 31 s of 48 kHz stereo Float32 — the recorder's own buffer,
+accounted for almost exactly, flat again the moment recording stops. The
+Studio's 5-minute cap bounds it at ~115 MB by design.
 
-`ensureWorklets` was already built to make this recoverable: it drops its
-cached rejection specifically so "a caller who fixes the problem can retry,"
-and its `WORKLET_MODULES.filter` means a retry only re-attempts bundles still
-missing rather than re-registering a processor that already loaded. **Nothing
-ever retried.** `ensureWorkletsWithRetry` closes that gap; one transient
-failure now measures RMS 0.26770 with a healthy ADSR where it previously
-measured 0.00000. See commit `a135336`.
-
-The banner was also lying — "a few modules are running in a reduced mode" is
-untrue when the rack is silent, and it never told anyone that reloading was
-the fix. It now names the missing bundles and distinguishes the silencing
-case.
-
-**Two things worth carrying forward.** First, a methodology trap that cost
-real time: **Playwright's request routing cannot intercept
-`audioWorklet.addModule()` fetches.** They never appear in
-`page.on('request')`, so `page.route`-based blocking silently does nothing
-and the experiments pass meaninglessly. Patch
-`AudioWorklet.prototype.addModule` in an init script instead — the same
-technique `tests/browser/worklet-fallback.test.ts` already used.
-
-Second, the **desktop** half of the original report is not fully explained by
-this: the same cold-load failure would do it, but so would a refused
-`AudioContext` unlock. `ctx.resume()` is awaited *after* the worklet load, and
-Chromium resumed cleanly even with a 10 s delay injected (sticky activation),
-so that path did not reproduce here. It remains plausible on **iOS Safari**,
-which uses transient activation. Not fixed blind, but the silent-failure half
-was: `ctx.state` used to be read once *before* the resume and never after, so
-a refused unlock produced a fully-built, silent rack that said nothing. It is
-now re-read afterwards and surfaces its own banner.
+**Arcade paddle stuck in the left half** (`ba9e95b`) — `buildTap` now up-mixes
+mono to stereo before the `ChannelSplitterNode` that reads L/R balance.
+Investigating found the originally-diagnosed failure is not reachable through
+today's integration path, since Output's own gain node already up-mixes;
+fixed unconditionally anyway because `buildTap` accepts any
+`OutputInstance`-shaped value and a refactor could reintroduce it silently.
+`tests/browser/modules/arcade-tap.test.ts` proves the fix load-bearing
+against a genuinely mono source, independent of Output.
 
 Read this file first. Then `docs/audio/PHASE1A-LEDGER.md` for every decision made
 and why.
@@ -131,7 +87,7 @@ and why.
 
 ```bash
 cd ~/Desktop/SinsThesis
-git checkout master
+git checkout main            # the branch is main, not master
 npm install                 # if node_modules is gone
 npx playwright install chromium
 npm run build:worklets      # MUST run before browser tests
@@ -172,7 +128,7 @@ rack/         main.ts, panel.ts, ghost-panel.ts, knob.ts, slider.ts, switch.ts,
               Brimstone, Space Station, Vaporwave, Psychedelic)
 academy/      levels.ts, feedback.ts, sound-feedback.ts, constrained-feedback.ts,
               progress.ts, sinp-raw.d.ts,
-              levels/ (11 levels, each a .sinp solution/target/proof-patch + a .rubric.json)
+              levels/ (22 .sinp solution/target/proof-patches + their .rubric.json files)
 dev/          main.ts, piano.ts, controls.ts, presets.ts, scope.ts,
               thump-harness.ts (test-only, see tests/browser/startup-thump.test.ts), style.css
 index.html    the rack — npm run dev — the product's front door
@@ -587,69 +543,67 @@ both paths. Titles stay descriptive; real names live in the briefs.
 ## The effects rung — ring mod, flanger, chorus, compressor
 
 ROADMAP section 1's effects list, built out. **Reverb is now the only
-unshipped item on it.** Four modules, 26 → 30.
+unshipped item on it.** Four modules, 26 -> 30, plus four presets that each
+measure the effect they demonstrate rather than merely making sound.
 
-**Ring Modulator.** The roadmap called it the highest value-to-effort ratio
-on the list and undersold it: `GainNode.gain` is an a-rate `AudioParam` and
-a connected signal *sums into* it, so a gain node at `gain.value = 0` driven
-by a bipolar carrier is a true four-quadrant multiply in float — no worklet,
-no `dsp/` file. It also needs no alias floor, because multiplying two
-band-limited signals produces only their sum and difference where a fold or
-a saturation curve produces an infinite harmonic series. Carrier suppressed
-to **−128.0 dB**, input to **−145.1 dB**. `shape` morphs ring→AM as one
-continuous knob (`in * (shape + carrier)`) rather than a mode switch, with a
-`1/(1+shape)` trim so it isn't secretly a volume knob — verified by forcing
-the trim to 1 and watching the ratio hit 1.7315 and the test go red.
+| | Measured |
+|---|---|
+| Ring mod carrier / input suppression | −128.0 / −145.1 dB |
+| Flanger notch depth | −240 dB (float64 floor) |
+| Flanger, fractional 47.5-sample delay | −133 dB |
+| Flanger feedback tilt, ±0.8 | +19.1 / −19.1 dB |
+| Chorus LFO offsets, at two different rates | 120.0° / −120.0° both times |
+| Compressor static curve, 2:1 / 4:1 / 8:1 | the ratio law to the digit |
+| Compressor attack, −12 to 0 dB in | 63.2% at every level |
 
-**The finding worth carrying forward, from the Flanger.** It was built
-first as the obvious native `DelayNode` + LFO + feedback gain, exactly how
-`delay.ts` is built, and its feedback measured wrong. **Web Audio inserts at
-least one render quantum (128 samples, 2.667 ms at 48 kHz) into any cycle in
-the graph**, and a flanger's regeneration is a cycle — so its feedback
-resonated on a comb of period `1/(d + 0.002667)` while its own dry/wet
-notches sat at `1/(2d)`. Measured at d = 1 ms: resonance spacing **250–280
-Hz**, against 1000 Hz predicted with no quantum and **273 Hz** with one. The
-quantum wins conclusively.
+**The Ring Modulator needed no worklet, no `dsp/` file and no alias floor.**
+`GainNode.gain` is an a-rate param that *sums* connected signals, so a gain
+node at `gain.value = 0` driven by a bipolar carrier is a true four-quadrant
+multiply. Nothing needs antialiasing either: multiplying two band-limited
+signals produces only their sum and difference, where a fold or a saturation
+curve produces an infinite harmonic series. `shape` morphs ring→AM as one
+continuous knob (`in * (shape + carrier)`) with a `1/(1+shape)` trim so it
+isn't secretly a volume knob — verified load-bearing by forcing the trim to 1
+and watching the ratio hit 1.7315.
 
-So the Flanger owns its delay line in a worklet, and the numbers came right:
-notches at **−240 dB** (the float64 floor), **−133 dB** at a deliberately
-fractional 47.5-sample delay (which is what the Catmull-Rom read buys over a
-linear one), regeneration spacing **999.8 Hz**, and feedback tilt **+19.1 /
-−19.1 dB** at ±0.8 — equal and opposite, which is precisely the symmetry the
-quantum destroys. The node test names 273 Hz in a comment as the failure
-mode to watch for, so a future revert to a `DelayNode` gets caught rather
-than merely sounding worse. The native path survives as an honest
-`'degraded'` fallback whose badge says the Feedback knob does nothing there.
+**The finding worth carrying forward, from the Flanger.** Built first as the
+obvious native `DelayNode`, and its feedback measured wrong. Web Audio
+inserts at least one render quantum (128 samples, 2.667 ms) into any graph
+cycle, and a flanger's regeneration is a cycle — so its feedback resonated on
+a comb of period `1/(d + 0.002667)` while its notches sat at `1/(2d)`.
+Measured at d = 1 ms: **250–280 Hz** spacing, against 1000 predicted with no
+quantum and **273** with one.
 
-**The rule: a delay-based effect needs a worklet if and only if it has
-feedback at short delay times.** The Chorus has no feedback, so no cycle, so
-no quantum — native `DelayNode`s are correct for it, and the two modules
-landing on opposite answers is one rule applied to two graphs, not an
-inconsistency. It will matter again for reverb, which is short feedback
-paths all the way down.
+**The rule: a delay-based effect needs its own worklet delay line if and only
+if it has feedback at short delay times.** The Chorus has no feedback, so no
+cycle, so native `DelayNode`s are correct for it — the two modules landing on
+opposite answers is one rule applied to two graphs. It will matter again for
+reverb, which is short feedback paths all the way down. Full detail in trap
+11; the regression guard is in `tests/node/dsp/flanger.test.ts`.
 
-**Chorus.** Three voices at 120°, with the phase carried in `PeriodicWave`
-coefficients (`real[1] = sin p`, `imag[1] = cos p`) rather than by staggering
-three oscillators' start times — a time stagger encodes a fixed number of
-*seconds*, so it silently stops being a third of a cycle the moment the Rate
-knob moves. Measured offsets **120.0° / −120.0°**, and **still 120.0° /
-−120.0° at a different rate**, which is the assertion a staggered-start
-implementation would fail. Taps land at samples 576/960/1344 = exactly
-12/20/28 ms, each weighted 0.3333.
+**Chorus phase comes from `PeriodicWave` coefficients** (`real[1] = sin p`,
+`imag[1] = cos p`), not from staggering three oscillators' start times — a
+time stagger encodes a fixed number of *seconds* and silently stops being a
+third of a cycle the moment the Rate knob moves. The "still 120° at a
+different rate" assertion is the one a staggered implementation would fail.
 
-**Compressor.** Built rather than wrapping `DynamicsCompressorNode`, whose
-knee, detector and lookahead are unspecified in ways you cannot predict and
-therefore cannot assert, and which has neither a sidechain nor a
-gain-reduction output. Static curve lands on `threshold + (in −
-threshold)/ratio` to the digit at 2:1, 4:1 and 8:1. Attack and release are
-true time constants — 63.2% coverage after one knob-time — and, the figure
-worth keeping, **63.2% at every input level from −12 to 0 dB**: smoothing the
-detected level instead of the gain reduction is the classic error and makes
-attack time drift with how far over threshold the signal sits. The knee is
-quadratic and provably joins both straight segments at both edges. Ships
-with a sidechain key (switch-selected, since `ModuleInstance` still has no
-connect notification — same reason as the Ring Mod's carrier) and a GR jack
-carrying reduction in real dB.
+**The Compressor owns its gain law** rather than wrapping
+`DynamicsCompressorNode`, whose knee, detector and lookahead are unspecified
+in ways you cannot predict and therefore cannot assert, and which has neither
+a sidechain nor a gain-reduction output. Attack independence from input level
+is the figure worth keeping: smoothing the *detected level* instead of the
+*gain reduction* is the classic error and makes the attack knob drift with
+how far over threshold the signal sits.
+
+**The presets caught two of their own defects.** `preset-bank.test.ts` holds
+every entry to "makes sound instantly," which is necessary and not
+sufficient — a preset named for a module can pass it while that module does
+nothing. `preset-effects.test.ts` renders each twice, once with the module
+neutralised, and asserts the difference. That found Ring Bells' carrier
+sitting 0.066 from a perfect fifth (reading as a pitch, the one thing it
+exists not to be), and Jet Sweep's sweep test passing on oscillator beating
+rather than on the flanger at all — 0.3510 against 0.3573, where the frozen
+control now reads 0.0000 against 0.2045.
 
 ## Smaller things, recorded but not urgent
 
@@ -781,6 +735,15 @@ Each of these cost real time. Do not rediscover them.
     feedback paths all the way down. The regression guard is in
     `tests/node/dsp/flanger.test.ts`, which asserts the spacing reads
     1000 Hz and names 273 in a comment as the failure mode to watch for.
+12. **Playwright cannot intercept `audioWorklet.addModule()` fetches.** They
+    never appear in `page.on('request')`, so `page.route`-based blocking
+    silently does nothing — the experiment runs, the app loads normally, and
+    every assertion passes for the wrong reason. This cost a full round of
+    meaningless results while diagnosing the first-load silence. To simulate
+    a worklet that fails or is slow, patch
+    `AudioWorklet.prototype.addModule` in a `page.addInitScript`, which is
+    the technique `tests/browser/worklet-fallback.test.ts` already used at
+    the `OfflineAudioContext` level.
 
 ---
 

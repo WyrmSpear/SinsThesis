@@ -5,7 +5,7 @@ import type { CpuLoadReport, CpuMeterHandle } from '../src/engine/cpu-meter'
  * meter" failure mode (`src/engine/cpu-meter.ts`/`worklets/cpu-meter.
  * worklet.ts` do the measuring; this file only draws what it reports).
  * Lives in the toolbar, not tucked into a drawer or a module panel: with
- * twenty-six modules a player can build a patch their machine can't
+ * thirty modules a player can build a patch their machine can't
  * render, and the point of this whole failure mode is that they see *why*
  * audio is stuttering before they give up and close the tab, not after
  * they go digging for a devtools panel. The toolbar is the one piece of
