@@ -25,6 +25,7 @@ import { bitcrusherDescriptor } from './bitcrusher'
 import { binauralDescriptor } from './binaural'
 import { isochronicDescriptor } from './isochronic'
 import { freqBankDescriptor } from './freq-bank'
+import { ringDescriptor } from './ring'
 
 /** The Phase 1 module set, plus Phase 2's scope, the state-variable filter
  *  (the roadmap's "biggest gap" -- see docs/ROADMAP.md section 1 and
@@ -47,7 +48,12 @@ import { freqBankDescriptor } from './freq-bank'
  *  comment for the shaped-envelope click fix and the clock-sync it shares
  *  with lfo.ts), and the Frequency Bank (the third, a switch-selected
  *  bank of sixteen exact tuned frequencies on a native OscillatorNode --
- *  see freq-bank.ts's own doc comment for why no worklet was needed).
+ *  see freq-bank.ts's own doc comment for why no worklet was needed), and
+ *  the Ring Modulator (ROADMAP section 1's "highest value-to-effort ratio
+ *  on the list", and it was -- see ring.ts's own doc comment for why a
+ *  `GainNode` whose `gain` is driven by a bipolar carrier *is* a true
+ *  four-quadrant multiply, needing neither a worklet nor a `dsp/` file nor
+ *  an alias floor).
  *  The other twenty-one modules stay mono end to end, deliberately (see
  *  ROADMAP section 1a's "do not make everything stereo" ruling); stereo
  *  appears only at Panner/Ping-Pong/Width/Binaural plus output.ts's now
@@ -57,6 +63,7 @@ import { freqBankDescriptor } from './freq-bank'
 export const ALL_DESCRIPTORS = [
   vcoDescriptor, noiseDescriptor, samplerDescriptor, binauralDescriptor, isochronicDescriptor, freqBankDescriptor,
   vcfDescriptor, svfDescriptor, vcaDescriptor, wavefolderDescriptor, driveDescriptor, bitcrusherDescriptor,
+  ringDescriptor,
   adsrDescriptor, lfoDescriptor, shDescriptor,
   mixerDescriptor, multipleDescriptor, delayDescriptor, pingpongDescriptor,
   clockDescriptor, sequencerDescriptor, keyboardMidiDescriptor, outputDescriptor,
