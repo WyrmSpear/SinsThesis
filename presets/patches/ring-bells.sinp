@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "meta": { "name": "Ring Bells", "created": "2026-08-21T00:00:00.000Z", "author": "presets" },
+  "modules": [
+    { "id": "vco-1", "type": "vco", "slot": [0, 0], "params": { "octave": 0, "tune": 0, "shape": 3, "pulseWidth": 0.5, "fmAmount": 0 } },
+    { "id": "ring-1", "type": "ring", "slot": [0, 1], "params": { "freq": 761, "shape": 0, "mix": 1, "source": 0 } },
+    { "id": "adsr-1", "type": "adsr", "slot": [0, 2], "params": { "attack": 0.002, "decay": 1.1, "sustain": 0, "release": 0.6 } },
+    { "id": "vca-1", "type": "vca", "slot": [0, 3], "params": { "level": 0, "cvAmount": 1 } },
+    { "id": "clock-1", "type": "clock", "slot": [0, 4], "params": { "bpm": 60, "division": 1, "pulseWidth": 0.5 } },
+    { "id": "output-1", "type": "output", "slot": [0, 5], "params": { "level": 0.8 } }
+  ],
+  "cables": [
+    { "from": ["vco-1", "out"], "to": ["ring-1", "in"] },
+    { "from": ["ring-1", "out"], "to": ["vca-1", "in"] },
+    { "from": ["adsr-1", "out"], "to": ["vca-1", "cv"] },
+    { "from": ["clock-1", "gate"], "to": ["adsr-1", "gate"] },
+    { "from": ["vca-1", "out"], "to": ["output-1", "in"] }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "meta": { "name": "Jet Sweep", "created": "2026-08-21T00:00:00.000Z", "author": "presets" },
+  "modules": [
+    { "id": "vco-1", "type": "vco", "slot": [0, 0], "params": { "octave": -1, "tune": 0, "shape": 0, "pulseWidth": 0.5, "fmAmount": 0 } },
+    { "id": "vco-2", "type": "vco", "slot": [0, 1], "params": { "octave": -2, "tune": 0, "shape": 0, "pulseWidth": 0.5, "fmAmount": 0 } },
+    { "id": "flanger-1", "type": "flanger", "slot": [0, 2], "params": { "manual": 0.0006, "rate": 0.22, "depth": 1, "feedback": 0.78, "mix": 0.5 } },
+    { "id": "vcf-1", "type": "vcf", "slot": [0, 3], "params": { "cutoff": 6500, "resonance": 0.1, "cutoffCvAmount": 0, "drive": 1 } },
+    { "id": "output-1", "type": "output", "slot": [0, 4], "params": { "level": 0.6 } }
+  ],
+  "cables": [
+    { "from": ["vco-1", "out"], "to": ["flanger-1", "in"] },
+    { "from": ["vco-2", "out"], "to": ["flanger-1", "in"] },
+    { "from": ["flanger-1", "out"], "to": ["vcf-1", "in"] },
+    { "from": ["vcf-1", "out"], "to": ["output-1", "in"] }
+  ]
+}

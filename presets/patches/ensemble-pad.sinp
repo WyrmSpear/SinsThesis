@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "meta": { "name": "Ensemble Pad", "created": "2026-08-21T00:00:00.000Z", "author": "presets" },
+  "modules": [
+    { "id": "vco-1", "type": "vco", "slot": [0, 0], "params": { "octave": -1, "tune": -0.08, "shape": 0, "pulseWidth": 0.5, "fmAmount": 0 } },
+    { "id": "vco-2", "type": "vco", "slot": [0, 1], "params": { "octave": -1, "tune": 0.1, "shape": 0, "pulseWidth": 0.5, "fmAmount": 0 } },
+    { "id": "vco-3", "type": "vco", "slot": [0, 2], "params": { "octave": 0, "tune": 7, "shape": 0, "pulseWidth": 0.5, "fmAmount": 0 } },
+    { "id": "mixer-1", "type": "mixer", "slot": [0, 3], "params": { "level1": 1, "level2": 1, "level3": 0.55, "level4": 1 } },
+    { "id": "vcf-1", "type": "vcf", "slot": [0, 4], "params": { "cutoff": 2400, "resonance": 0.12, "cutoffCvAmount": 0, "drive": 1 } },
+    { "id": "chorus-1", "type": "chorus", "slot": [0, 5], "params": { "rate": 0.45, "depth": 0.7, "spread": 1, "mix": 0.55 } },
+    { "id": "output-1", "type": "output", "slot": [0, 6], "params": { "level": 0.55 } }
+  ],
+  "cables": [
+    { "from": ["vco-1", "out"], "to": ["mixer-1", "in1"] },
+    { "from": ["vco-2", "out"], "to": ["mixer-1", "in2"] },
+    { "from": ["vco-3", "out"], "to": ["mixer-1", "in3"] },
+    { "from": ["mixer-1", "out"], "to": ["vcf-1", "in"] },
+    { "from": ["vcf-1", "out"], "to": ["chorus-1", "in"] },
+    { "from": ["chorus-1", "out"], "to": ["output-1", "in"] }
+  ]
+}

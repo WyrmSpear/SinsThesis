@@ -161,6 +161,34 @@ export const PRESET_BANK: PresetEntry[] = [
     file: lazyPreset(() => import('../academy/levels/history-02-motorik.sinp?raw')),
   },
   {
+    id: 'ring-bells',
+    name: 'Ring Bells',
+    description:
+      'A sine ring-modulated by a 631 Hz carrier -- an inharmonic ratio, so the sum and difference tones that come out are not related to the note, which is what makes a bell a bell rather than a pitch. Struck on its own clock.',
+    file: lazyPreset(() => import('./patches/ring-bells.sinp?raw')),
+  },
+  {
+    id: 'jet-sweep',
+    name: 'Jet Sweep',
+    description:
+      'Two barely-detuned saws through a Flanger with the regeneration up -- the comb notches sweep, and the feedback resonates on the same comb, which is the difference between a flanger and two effects fighting.',
+    file: lazyPreset(() => import('./patches/jet-sweep.sinp?raw')),
+  },
+  {
+    id: 'ensemble-pad',
+    name: 'Ensemble Pad',
+    description:
+      'Three saws -- two detuned in unison and a fifth on top -- filtered and run through the Chorus at full spread. Three delayed copies sweeping a third of a cycle apart each, which is what thickens rather than just doubling.',
+    file: lazyPreset(() => import('./patches/ensemble-pad.sinp?raw')),
+  },
+  {
+    id: 'sidechain-pump',
+    name: 'Sidechain Pump',
+    description:
+      'A sustained bass ducked by a kick through the Compressor\'s Key jack -- the house/EDM pump. The bass never stops playing; the kick reaches in and turns it down, which is a thing you can only hear once the key is a separate signal from the input.',
+    file: lazyPreset(() => import('./patches/sidechain-pump.sinp?raw')),
+  },
+  {
     id: 'psychoacoustic-demo',
     name: 'Psychoacoustic Demo',
     description: 'Three ways to land on a specific frequency: a per-ear pair five hertz apart (headphones make the difference audible as two separate tones; a speaker just mixes the two), a sine switched on and off five times a second with softened edges, and a switch-selected 264 Hz reference tone, all summed at the Output.',

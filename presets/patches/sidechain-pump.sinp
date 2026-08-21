@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "meta": { "name": "Sidechain Pump", "created": "2026-08-21T00:00:00.000Z", "author": "presets" },
+  "modules": [
+    { "id": "vco-1", "type": "vco", "slot": [0, 0], "params": { "octave": -2, "tune": 0, "shape": 0, "pulseWidth": 0.5, "fmAmount": 0 } },
+    { "id": "vcf-1", "type": "vcf", "slot": [0, 1], "params": { "cutoff": 900, "resonance": 0.15, "cutoffCvAmount": 0, "drive": 1.4 } },
+    { "id": "compressor-1", "type": "compressor", "slot": [0, 2], "params": { "threshold": -34, "ratio": 12, "attack": 0.6, "release": 140, "knee": 4, "makeup": 8, "keySource": 1 } },
+    { "id": "vco-2", "type": "vco", "slot": [0, 3], "params": { "octave": -3, "tune": -3, "shape": 3, "pulseWidth": 0.5, "fmAmount": 2.8 } },
+    { "id": "adsr-1", "type": "adsr", "slot": [0, 4], "params": { "attack": 0.001, "decay": 0.32, "sustain": 0, "release": 0.2 } },
+    { "id": "vca-1", "type": "vca", "slot": [0, 5], "params": { "level": 0, "cvAmount": 1 } },
+    { "id": "clock-1", "type": "clock", "slot": [0, 6], "params": { "bpm": 124, "division": 1, "pulseWidth": 0.5 } },
+    { "id": "mixer-1", "type": "mixer", "slot": [0, 7], "params": { "level1": 1, "level2": 0.85, "level3": 1, "level4": 1 } },
+    { "id": "output-1", "type": "output", "slot": [0, 8], "params": { "level": 0.7 } }
+  ],
+  "cables": [
+    { "from": ["vco-1", "out"], "to": ["vcf-1", "in"] },
+    { "from": ["vcf-1", "out"], "to": ["compressor-1", "in"] },
+    { "from": ["vco-2", "out"], "to": ["vca-1", "in"] },
+    { "from": ["adsr-1", "out"], "to": ["vca-1", "cv"] },
+    { "from": ["adsr-1", "out"], "to": ["vco-2", "fm"] },
+    { "from": ["clock-1", "gate"], "to": ["adsr-1", "gate"] },
+    { "from": ["vca-1", "out"], "to": ["compressor-1", "key"] },
+    { "from": ["compressor-1", "out"], "to": ["mixer-1", "in1"] },
+    { "from": ["vca-1", "out"], "to": ["mixer-1", "in2"] },
+    { "from": ["mixer-1", "out"], "to": ["output-1", "in"] }
+  ]
+}
