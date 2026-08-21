@@ -4,7 +4,7 @@ Ideas captured from working sessions, with an honest read on cost and what the
 engine already supports. Nothing here is committed to; it exists so the
 thinking survives between sessions.
 
-Current state: twenty-six modules, three academy grading modes across
+Current state: thirty modules, three academy grading modes across
 twenty-two levels in three tracks, twelve themes, eleven presets, two
 arcade minigames, MIDI hardware in with MIDI learn, recording and WAV
 export, live at `ryanoglelmt.com/portfolio/sinsthesis/`.
@@ -37,18 +37,56 @@ Ping-Pong Delay, Width and a channel-count-aware Output all ship. The
 original call that this was architectural rather than a module was correct,
 and scoping it deliberately is what made it tractable.
 
-**Ring modulator.** Nearly free — a multiply — and sonically enormous. Highest
-value-to-effort ratio on the list.
+**~~Ring modulator.~~ SHIPPED** — `modules/ring.ts`. "Nearly free — a
+multiply — and sonically enormous. Highest value-to-effort ratio on the
+list" was right, and it was cheaper still than that: `GainNode.gain` is an
+a-rate param that *sums* connected signals, so a gain node at `gain.value =
+0` driven by a bipolar carrier is a true four-quadrant multiply with no
+worklet, no `dsp/` file and no alias floor to measure (a multiply of two
+band-limited signals creates no new harmonics). Carrier suppressed to
+−128.0 dB, input to −145.1 dB.
 
 **FM operator.** The VCO already has linear and exponential FM inputs; a
 dedicated operator with a feedback path opens DX-style territory. Still open.
 
 **Effects, in order of cost:** ~~bitcrusher and sample-rate reducer
 (trivial)~~ **SHIPPED** — one module, `modules/bitcrusher.ts`, carrying both
-a `bits` knob and a `rate` decimator with CV on each; chorus and flanger (a
-modulated delay, and `delay.ts` exists); compressor (needs envelope
-following, which `segment.ts` partly has); reverb (the big one — an FDN or
-convolution, and the only item here that is a project rather than a module).
+a `bits` knob and a `rate` decimator with CV on each; ~~chorus and flanger (a
+modulated delay, and `delay.ts` exists)~~ **SHIPPED as two modules**, see
+below; ~~compressor (needs envelope following, which `segment.ts` partly
+has)~~ **SHIPPED** — `dsp/compressor.ts`, built rather than wrapping
+`DynamicsCompressorNode` so the ratio law is assertable (2:1, 4:1 and 8:1
+all land on `threshold + (in − threshold)/ratio` to the digit, and attack
+covers 63.2% in one attack-time *independently of input level*); reverb (the
+big one — an FDN or convolution, and the only item here that is a project
+rather than a module). **Reverb is now the only unshipped item in this
+list.**
+
+### What the chorus/flanger rung actually cost, and the one finding worth keeping
+
+They shipped as **two modules, not one with a mode switch** — the switch
+would have had to rescale the delay knob by ~100x between the ranges, so one
+knob would mean two things. Same reasoning that made the SVF its own
+topology rather than a mode on the ladder.
+
+The estimate above ("a modulated delay, and `delay.ts` exists") was right
+for the Chorus and **wrong for the Flanger**, for a reason worth recording
+before anyone plans another delay-based effect here:
+
+> **Web Audio inserts at least one render quantum (128 samples, 2.667 ms at
+> 48 kHz) into any cycle in the graph.** A flanger's regeneration is a
+> cycle. So a native `DelayNode` flanger's feedback resonates on a comb of
+> period `1/(d + 0.002667)` while its own dry/wet notches sit at `1/(2d)` —
+> two unrelated combs. Measured on the native build at d = 1 ms: resonance
+> spacing 250–280 Hz, against 1000 Hz predicted with no quantum and 273 Hz
+> predicted with one.
+
+The Flanger therefore owns its delay line in a worklet; the Chorus, which
+has no feedback and so no cycle, stays on native `DelayNode`s and is
+correct. **The rule to carry forward: a delay-based effect needs a worklet
+if and only if it has feedback at short delay times.** It never mattered for
+`delay.ts` (2.667 ms on a 300 ms echo is 0.9%) and it will matter for
+reverb, whose whole structure is short feedback paths.
 
 **~~Sampler.~~ SHIPPED** — `src/engine/modules/sampler.ts`. It did change the
 engine's shape as predicted, and the cost landed where expected: a generic

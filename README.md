@@ -71,9 +71,10 @@ entry point.
 ## What's built
 
 - **The rack** (`index.html`, `npm run dev`) — the product's front door. A
-  modular rack with twenty-six module types in a palette (VCO, Noise, Sampler, ladder
-  VCF, VCA, Wavefolder, Bitcrusher, ADSR, LFO, Sample & Hold, Mixer, Multiple, Delay,
-  Clock, 16-step Sequencer, Keyboard/MIDI, Output, Scope), drag-to-patch
+  modular rack with thirty module types in a palette (VCO, Noise, Sampler, ladder
+  VCF, VCA, Wavefolder, Bitcrusher, Ring Mod, Flanger, Chorus, Compressor, ADSR,
+  LFO, Sample & Hold, Mixer, Multiple, Delay, Clock, 16-step Sequencer,
+  Keyboard/MIDI, Output, Scope), drag-to-patch
   cables, drag-to-reorder panels, twelve switchable themes, and `.sinp`
   save/load with autosave. Click a cable to see what's actually flowing on
   it — waveform, fundamental, RMS.

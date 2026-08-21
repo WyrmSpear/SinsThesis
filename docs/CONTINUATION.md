@@ -3,11 +3,11 @@
 **Updated:** 2026-08-21.
 **Branch:** `main` — 138 commits. Public at github.com/WyrmSpear/SinsThesis (MIT).
 **Live** at `ryanoglelmt.com/portfolio/sinsthesis/`.
-**State:** 1040 tests pass (804 node + 236 browser), `typecheck` clean, tree clean.
+**State:** 1169 tests pass (886 node + 283 browser), `typecheck` clean, tree clean.
 
 **Run it:** `npm run dev`, open the URL, POWER ON.
 
-- **Free play** — twenty-six module types, drag-to-patch cables, twelve themes,
+- **Free play** — thirty module types, drag-to-patch cables, twelve themes,
   `.sinp` save/load with autosave, sequencer, Sampler, Scope, stereo output.
 - **Presets** — eleven patches, lazy-loaded.
 - **Academy** — twenty-two levels across three tracks (foundations, bass,
@@ -112,10 +112,13 @@ work — it has the scope and spectrum the rack doesn't).
 src/engine/
   analysis/   fft.ts, features.ts, inspector.ts, compare.ts, rubric.ts
               measurement + the academy's three graders (topology, sound distance, feature bounds)
-  dsp/        wavetable.ts, ladder.ts, wavefolder.ts, segment.ts, polyblep.ts (unimported, kept as reference)
-  worklets/   vco, ladder, wavefolder, segment, passthrough, peak-tap (test-only)
+  dsp/        wavetable.ts, ladder.ts, wavefolder.ts, segment.ts, flanger.ts,
+              chorus.ts (geometry only -- no per-sample DSP, see its own header),
+              compressor.ts, polyblep.ts (unimported, kept as reference)
+  worklets/   vco, ladder, wavefolder, segment, flanger, compressor,
+              passthrough, peak-tap (test-only)
               + registry.ts (WORKLET_MODULES) + audioworklet-globals.d.ts
-  modules/    twenty-six descriptors + index.ts
+  modules/    thirty descriptors + index.ts
   graph.ts  patch.ts  cycle.ts  render.ts  clock.ts  midi.ts  param-smoothing.ts
   types.ts  registry.ts  version.ts
 rack/         main.ts, panel.ts, ghost-panel.ts, knob.ts, slider.ts, switch.ts,
@@ -539,6 +542,73 @@ which uses a mechanism-agnostic feature so the ladder route and the wavefolder
 route both satisfy the same bound — you learn the Moog/Buchla fork by walking
 both paths. Titles stay descriptive; real names live in the briefs.
 
+## The effects rung — ring mod, flanger, chorus, compressor
+
+ROADMAP section 1's effects list, built out. **Reverb is now the only
+unshipped item on it.** Four modules, 26 → 30.
+
+**Ring Modulator.** The roadmap called it the highest value-to-effort ratio
+on the list and undersold it: `GainNode.gain` is an a-rate `AudioParam` and
+a connected signal *sums into* it, so a gain node at `gain.value = 0` driven
+by a bipolar carrier is a true four-quadrant multiply in float — no worklet,
+no `dsp/` file. It also needs no alias floor, because multiplying two
+band-limited signals produces only their sum and difference where a fold or
+a saturation curve produces an infinite harmonic series. Carrier suppressed
+to **−128.0 dB**, input to **−145.1 dB**. `shape` morphs ring→AM as one
+continuous knob (`in * (shape + carrier)`) rather than a mode switch, with a
+`1/(1+shape)` trim so it isn't secretly a volume knob — verified by forcing
+the trim to 1 and watching the ratio hit 1.7315 and the test go red.
+
+**The finding worth carrying forward, from the Flanger.** It was built
+first as the obvious native `DelayNode` + LFO + feedback gain, exactly how
+`delay.ts` is built, and its feedback measured wrong. **Web Audio inserts at
+least one render quantum (128 samples, 2.667 ms at 48 kHz) into any cycle in
+the graph**, and a flanger's regeneration is a cycle — so its feedback
+resonated on a comb of period `1/(d + 0.002667)` while its own dry/wet
+notches sat at `1/(2d)`. Measured at d = 1 ms: resonance spacing **250–280
+Hz**, against 1000 Hz predicted with no quantum and **273 Hz** with one. The
+quantum wins conclusively.
+
+So the Flanger owns its delay line in a worklet, and the numbers came right:
+notches at **−240 dB** (the float64 floor), **−133 dB** at a deliberately
+fractional 47.5-sample delay (which is what the Catmull-Rom read buys over a
+linear one), regeneration spacing **999.8 Hz**, and feedback tilt **+19.1 /
+−19.1 dB** at ±0.8 — equal and opposite, which is precisely the symmetry the
+quantum destroys. The node test names 273 Hz in a comment as the failure
+mode to watch for, so a future revert to a `DelayNode` gets caught rather
+than merely sounding worse. The native path survives as an honest
+`'degraded'` fallback whose badge says the Feedback knob does nothing there.
+
+**The rule: a delay-based effect needs a worklet if and only if it has
+feedback at short delay times.** The Chorus has no feedback, so no cycle, so
+no quantum — native `DelayNode`s are correct for it, and the two modules
+landing on opposite answers is one rule applied to two graphs, not an
+inconsistency. It will matter again for reverb, which is short feedback
+paths all the way down.
+
+**Chorus.** Three voices at 120°, with the phase carried in `PeriodicWave`
+coefficients (`real[1] = sin p`, `imag[1] = cos p`) rather than by staggering
+three oscillators' start times — a time stagger encodes a fixed number of
+*seconds*, so it silently stops being a third of a cycle the moment the Rate
+knob moves. Measured offsets **120.0° / −120.0°**, and **still 120.0° /
+−120.0° at a different rate**, which is the assertion a staggered-start
+implementation would fail. Taps land at samples 576/960/1344 = exactly
+12/20/28 ms, each weighted 0.3333.
+
+**Compressor.** Built rather than wrapping `DynamicsCompressorNode`, whose
+knee, detector and lookahead are unspecified in ways you cannot predict and
+therefore cannot assert, and which has neither a sidechain nor a
+gain-reduction output. Static curve lands on `threshold + (in −
+threshold)/ratio` to the digit at 2:1, 4:1 and 8:1. Attack and release are
+true time constants — 63.2% coverage after one knob-time — and, the figure
+worth keeping, **63.2% at every input level from −12 to 0 dB**: smoothing the
+detected level instead of the gain reduction is the classic error and makes
+attack time drift with how far over threshold the signal sits. The knee is
+quadratic and provably joins both straight segments at both edges. Ships
+with a sidechain key (switch-selected, since `ModuleInstance` still has no
+connect notification — same reason as the Ring Mod's carrier) and a GR jack
+carrying reduction in real dB.
+
 ## Smaller things, recorded but not urgent
 
 - `handleKey` is proven only end-to-end: `tests/browser/dev-page.test.ts` and
@@ -654,6 +724,21 @@ Each of these cost real time. Do not rediscover them.
     calls microseconds apart routinely lands both edges in the same
     quantum). Full account in
     `.superpowers/sdd/themes-ten-eleven-twelve-report.md`.
+11. **Web Audio silently adds one render quantum (128 samples, 2.667 ms at
+    48 kHz) to any cycle in the graph.** Spec'd behaviour, not a Chrome
+    quirk, and it makes a native `DelayNode` unusable for any effect whose
+    feedback path is short. It cost a complete build of the Flanger to
+    find: that version's regeneration resonated at `1/(d + 0.002667)` while
+    its own dry/wet notches sat at `1/(2d)` — two unrelated combs, which is
+    not what a flanger is. Measured at d = 1 ms, resonance spacing came out
+    **250–280 Hz**, against 1000 Hz predicted with no quantum and **273 Hz**
+    with one. **The rule: a delay-based effect needs its own worklet delay
+    line if and only if it has feedback at short delay times.** It does not
+    bite `delay.ts` (2.667 ms on a 300 ms echo is 0.9%) or the Chorus (no
+    feedback, so no cycle at all), and it *will* bite reverb, which is short
+    feedback paths all the way down. The regression guard is in
+    `tests/node/dsp/flanger.test.ts`, which asserts the spacing reads
+    1000 Hz and names 273 in a comment as the failure mode to watch for.
 
 ---
 
