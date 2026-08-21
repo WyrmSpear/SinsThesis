@@ -1268,6 +1268,41 @@ body {
   background: var(--surface-panel);
   border: 1px solid var(--panel-border);
   border-radius: 6px;
+  /* "I had to shrink the fontsize/zoom to even see the mods I'm trying to
+   * manipulate" -- the game and the rack it's meant to be played while
+   * watching were fighting for the same vertical space, `index.html`
+   * stacking the arcade panel directly above `#rack-surface` in plain
+   * document flow. `position: sticky` pins the panel (and its HUD) at the
+   * top of the viewport once scrolling would otherwise carry it away, so
+   * scrolling down to reach a module still leaves the game visible above
+   * it -- the "sticky while the rack scrolls behind it" option, chosen
+   * over a side-by-side layout because it needs no DOM restructuring
+   * (`#app`'s other children -- toolbar, palette drawer -- were never
+   * built as grid siblings) and because a phone, the constraint that
+   * matters most here, has no spare horizontal room for "beside" anyway
+   * once modules already wrap at that width. `[hidden]` panels (every mode
+   * but Arcade) never reach this rule regardless -- `[hidden] { display:
+   * none !important }` above already wins -- so this only ever pins the
+   * one panel actually on screen. */
+  position: sticky;
+  top: 0;
+  z-index: 4;
+}
+
+/* `.arcade-panel` being a flex column with a capped `max-height` (the
+ * narrow-viewport rule below) only produces the intended *scrolling*
+ * overflow if its children refuse to shrink first -- a bare `overflow-y:
+ * auto` on a flex column does not stop the browser from satisfying that cap
+ * by proportionally shrinking every flex item instead (each nested flex
+ * context, the picker row and `.arcade-panel-content`'s own column alike,
+ * shrinks independently). Caught live at phone width: the game picker's own
+ * buttons rendered at roughly half their normal height, sized-down text and
+ * all, rather than the canvas simply becoming scrollable. `flex-shrink: 0`
+ * on both this container and its own children (below) opts every one of
+ * them out of that shrink, which is what actually makes `overflow-y: auto`
+ * kick in instead. */
+.arcade-panel > * {
+  flex-shrink: 0;
 }
 
 /* Wub Disruptor's own game picker (rack/main.ts's buildArcadeShell) reuses
@@ -1282,6 +1317,11 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 0.6rem;
+  flex-shrink: 0;
+}
+
+.arcade-panel-content > * {
+  flex-shrink: 0;
 }
 
 .arcade-hud {
@@ -1294,10 +1334,15 @@ body {
 
 .arcade-display {
   display: block;
-  /* Fixed px, same "fixed height, scaled-by-its-own-attribute width"
-   * contract `.scope-display` documents -- this canvas isn't stretched to
-   * a panel's content width the way the scope's is, since Arcade has no
-   * fixed 3U budget to fill; it just renders at its own native size. */
+  /* Native size (420x520 for Pan Paddle, 420x420 for Wub Disruptor, both
+   * set as canvas attributes in rack/arcade-panel.ts / rack/wub-panel.ts)
+   * up to whatever width the panel actually has -- a 420px-wide canvas
+   * previously overflowed a 390px phone outright, forcing the horizontal
+   * zoom-out the owner reported. `height: auto` uses the canvas element's
+   * own intrinsic width/height attributes to keep the scaled-down image at
+   * its correct aspect ratio, the same way an `<img>` would. */
+  max-width: 100%;
+  height: auto;
   border: 1px solid var(--panel-border);
   border-radius: 3px;
   box-shadow: inset 0 1px 3px var(--shadow-inset);
@@ -1314,6 +1359,30 @@ body {
   max-width: 32rem;
   text-align: center;
   margin: 0 auto;
+}
+
+/* Phone-width tightening for the sticky arcade panel above: the canvas
+ * already scales down with the viewport (`.arcade-display`'s own
+ * `max-width: 100%`), but at a true phone width that alone still leaves a
+ * sticky panel tall enough to eat most of the screen. Capping its own
+ * height and letting it scroll internally (`overflow-y: auto`) guarantees
+ * there is always some of the rack visible below it, whichever game is
+ * mounted and however long that game's own hint text runs -- the actual
+ * failure mode reported ("had to shrink the fontsize/zoom to even see the
+ * mods"). 700px rather than a device-specific breakpoint: wide enough to
+ * catch a phone in either orientation, narrow enough to leave every
+ * desktop and tablet layout untouched. */
+@media (max-width: 700px) {
+  .arcade-panel {
+    max-height: 46vh;
+    overflow-y: auto;
+    padding: 0.6rem 0.7rem;
+    gap: 0.4rem;
+  }
+
+  .arcade-display {
+    max-width: min(100%, 220px);
+  }
 }
 
 .scope-panel-content { width: 100%; }
