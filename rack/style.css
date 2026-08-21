@@ -900,7 +900,7 @@ body {
  * `.knob-midi-bound` below only ever add `box-shadow`/`border-color` to
  * elements whose `width`/`height` stay exactly what they already were --
  * `tests/browser/theme-geometry.test.ts` measures `.knob-dial`'s own
- * `getBoundingClientRect()` across all thirteen themes and would fail the
+ * `getBoundingClientRect()` across all twelve themes and would fail the
  * instant any of this nudged that box by even one pixel. */
 .knob-midi-badge {
   position: absolute;

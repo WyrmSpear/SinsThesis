@@ -4,9 +4,10 @@ Ideas captured from working sessions, with an honest read on cost and what the
 engine already supports. Nothing here is committed to; it exists so the
 thinking survives between sessions.
 
-Current state: sixteen modules, three academy grading modes across eleven
-levels, nine themes, recording and WAV export, live at
-`ryanoglelmt.com/portfolio/sinsthesis/`.
+Current state: twenty-six modules, three academy grading modes across
+twenty-two levels in three tracks, twelve themes, eleven presets, two
+arcade minigames, MIDI hardware in with MIDI learn, recording and WAV
+export, live at `ryanoglelmt.com/portfolio/sinsthesis/`.
 
 ---
 

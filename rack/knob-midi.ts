@@ -13,7 +13,7 @@ import type { KnobHandle } from './knob'
  * element, not a new prop on `KnobHandle` -- `knob.ts` needed no change at
  * all) and is absolutely positioned, so it adds zero footprint to the
  * dial's own box: `tests/browser/theme-geometry.test.ts` measures
- * `.knob-dial`'s `getBoundingClientRect()` across all thirteen themes and
+ * `.knob-dial`'s `getBoundingClientRect()` across all twelve themes and
  * would fail the instant a badge nudged that box by even one pixel.
  */
 

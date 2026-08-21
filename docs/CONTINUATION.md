@@ -9,10 +9,11 @@
 
 - **Free play** — twenty-six module types, drag-to-patch cables, twelve themes,
   `.sinp` save/load with autosave, sequencer, Sampler, Scope, stereo output.
-- **Presets** — thirteen patches, lazy-loaded.
+- **Presets** — eleven patches, lazy-loaded.
 - **Academy** — twenty-two levels across three tracks (foundations, bass,
   history), three grading modes.
-- **Arcade** — pan-paddle minigame. The synth is the controller.
+- **Arcade** — two minigames, Pan Paddle and Wub Disruptor. The synth is the
+  controller.
 - **Studio** — stereo recording and offline bounce, WAV export, pitch display.
 - **Dev harness** at `/harness.html`.
 

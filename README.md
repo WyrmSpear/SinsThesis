@@ -77,10 +77,13 @@ entry point.
   cables, drag-to-reorder panels, twelve switchable themes, and `.sinp`
   save/load with autosave. Click a cable to see what's actually flowing on
   it — waveform, fundamental, RMS.
-- **The academy** (inside the rack) — five build-this-patch levels that
-  teach subtractive synthesis, graded on the real patch graph rather than a
-  canned answer, with failures explained in plain language ("patch the
-  VCO's Out jack into the Filter's In jack") instead of engine identifiers.
+- **The academy** (inside the rack) — twenty-two levels across three tracks
+  (foundations, bass, history), teaching subtractive synthesis and beyond
+  through three grading modes: build-this-patch (graded on the real patch
+  graph, with failures explained in plain language — "patch the VCO's Out
+  jack into the Filter's In jack" — instead of engine identifiers),
+  match-this-sound (graded on measured audio distance), and a constrained
+  challenge (graded on a class of sounds, not one exact answer).
 - **The dev harness** (`harness.html`) — a lighter page for engine work,
   with a scope and spectrum display the rack doesn't have. Kept around
   specifically for DSP development, not for playing.
