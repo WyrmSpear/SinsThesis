@@ -903,12 +903,17 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
     presetBankDrawer.hidden = !presetBankDrawer.hidden
   })
 
-  function loadPresetFromBank(id: string): void {
+  async function loadPresetFromBank(id: string): Promise<void> {
     if (recording) { showBanner('warn', 'Stop recording before loading a preset.'); return }
     const preset = getPreset(id)
     if (!preset) return
-    const { graph: loaded, ghosts } = loadPatch(ctx, preset.file)
-    currentPatchName = preset.file.meta.name
+    // Fetched on demand -- see presets/bank.ts's own doc comment. Cheap
+    // after the first load of any given preset (the dynamic import is
+    // cached by the module loader), so reopening the same preset later in
+    // the session costs no extra network or parse work.
+    const file = await preset.file()
+    const { graph: loaded, ghosts } = loadPatch(ctx, file)
+    currentPatchName = file.meta.name
     patchNameInput.value = currentPatchName
     mountGraph(loaded)
     if (ghosts.length > 0) showBanner('warn', ghostMessage(ghosts))

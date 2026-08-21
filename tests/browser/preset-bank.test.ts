@@ -105,7 +105,8 @@ describe('patch bank', () => {
       const moduleIds = await page.evaluate(
         () => (window as unknown as { __sinsthesis: DebugHook }).__sinsthesis.graph.moduleIds,
       )
-      expect(moduleIds.length).toBe(preset.file.modules.length)
+      const file = await preset.file()
+      expect(moduleIds.length).toBe(file.modules.length)
 
       // No keypress, no click, no knob turn -- just wait, then read the
       // real audio-thread tap. Long enough to cross even the slower
@@ -135,7 +136,8 @@ describe('patch bank', () => {
     const afterLoad = await page.evaluate(
       () => (window as unknown as { __sinsthesis: DebugHook }).__sinsthesis.graph.moduleIds,
     )
-    expect(afterLoad.length).toBe(reese.file.modules.length)
+    const reeseFile = await reese.file()
+    expect(afterLoad.length).toBe(reeseFile.modules.length)
     expect(afterLoad.length).not.toBe(starterCount)
 
     await page.close()

@@ -6,6 +6,13 @@ import type { PatchFile } from '../src/engine/patch'
  * problem this file exists to close (docs/CONTINUATION.md / the task this
  * was built for: "a person opening the app has nothing to load").
  *
+ * **Lazy on purpose.** Every entry's `file` is a memoized loader
+ * (`lazyPreset`, below), not a plain object -- none of these `.sinp`s, most
+ * of all `sampler-chop`'s 141 KB of embedded audio, ships in the initial
+ * bundle for a visitor who never opens the Presets drawer. See
+ * `.superpowers/sdd/robustness-report.md` for the before/after bundle
+ * measurement this closes.
+ *
  * **One artifact, two uses.** The academy was designed so a level's
  * solution is a real, loadable `.sinp` (academy/levels.ts's own header
  * comment). Four of these five bank entries import that *exact same file*
@@ -54,20 +61,28 @@ import type { PatchFile } from '../src/engine/patch'
  * genuinely free of that problem, not a special case carved out for it.
  */
 
-import reeseRaw from '../academy/levels/bass-02-reese.sinp?raw'
-import wobbleRaw from '../academy/levels/bass-03-wobble.sinp?raw'
-import growlRaw from '../academy/levels/bass-04-growl.sinp?raw'
-import layeredSubRaw from '../academy/levels/bass-01-layers.sinp?raw'
-import sub808Raw from './patches/808-sub.sinp?raw'
-import hihatRaw from './patches/trap-hihat.sinp?raw'
-import grimeLeadRaw from './patches/grime-lead.sinp?raw'
-import pingpongLeadRaw from './patches/pingpong-lead.sinp?raw'
-import samplerChopRaw from './patches/sampler-chop.sinp?raw'
-import motorikRaw from '../academy/levels/history-02-motorik.sinp?raw'
-import psychoacousticDemoRaw from './patches/psychoacoustic-demo.sinp?raw'
-
 function parseSinp(raw: string): PatchFile {
   return JSON.parse(raw) as PatchFile
+}
+
+/**
+ * Wraps a dynamic `import('...sinp?raw')` into a memoized loader, so
+ * `PRESET_BANK` below carries no preset's bytes -- audio or plain JSON --
+ * in the initial bundle at all (this file's own header comment/the task
+ * this closes: "the sampler's embedded demo sample loads eagerly for
+ * every visitor whether or not they ever open the sampler"). A dynamic
+ * `import()` of the same specifier is itself idempotent (the module
+ * loader's own cache), so the `cached` promise here is belt-and-suspenders
+ * against re-parsing the same JSON on a second `Load` click within one
+ * session, not what makes repeated loads cheap -- that's already true
+ * without it.
+ */
+function lazyPreset(loader: () => Promise<{ default: string }>): () => Promise<PatchFile> {
+  let cached: Promise<PatchFile> | undefined
+  return () => {
+    if (!cached) cached = loader().then((mod) => parseSinp(mod.default))
+    return cached
+  }
 }
 
 export interface PresetEntry {
@@ -75,7 +90,13 @@ export interface PresetEntry {
   name: string
   /** One line, plain language: what it is and where it's from. */
   description: string
-  file: PatchFile
+  /** Fetches this preset's patch file on demand -- see `lazyPreset`'s own
+   *  doc comment for why every entry is async now, not just the one with
+   *  embedded audio: it keeps the bank to one pattern instead of a
+   *  sync/async split a caller has to branch on, and it means the other
+   *  nine entries' combined ~10 KB of JSON stops shipping to a visitor who
+   *  never opens the Presets drawer either, not just the sampler's 141 KB. */
+  file(): Promise<PatchFile>
 }
 
 export const PRESET_BANK: PresetEntry[] = [
@@ -83,67 +104,67 @@ export const PRESET_BANK: PresetEntry[] = [
     id: 'reese',
     name: 'Reese',
     description: 'Two detuned saws through a filter -- the foundation of jungle and neuro.',
-    file: parseSinp(reeseRaw),
+    file: lazyPreset(() => import('../academy/levels/bass-02-reese.sinp?raw')),
   },
   {
     id: 'wobble',
     name: 'Tempo-Locked Wobble',
     description: 'Clock into LFO into filter cutoff -- the dubstep gesture, chopping in time with the beat.',
-    file: parseSinp(wobbleRaw),
+    file: lazyPreset(() => import('../academy/levels/bass-03-wobble.sinp?raw')),
   },
   {
     id: 'growl',
     name: 'Growl',
     description: 'Drive with a modulated drive amount -- saturation moved over time, not just dialed in.',
-    file: parseSinp(growlRaw),
+    file: lazyPreset(() => import('../academy/levels/bass-04-growl.sinp?raw')),
   },
   {
     id: 'layered-sub',
     name: 'Layered Sub',
     description: 'A low sine for weight under a saw an octave up for presence -- bass built in layers.',
-    file: parseSinp(layeredSubRaw),
+    file: lazyPreset(() => import('../academy/levels/bass-01-layers.sinp?raw')),
   },
   {
     id: '808-sub',
     name: '808 Sub',
     description: 'A low sine with a fast pitch envelope, self-triggering on its own clock -- the trap/808 drop.',
-    file: parseSinp(sub808Raw),
+    file: lazyPreset(() => import('./patches/808-sub.sinp?raw')),
   },
   {
     id: 'trap-hihat',
     name: 'Trap Hi-Hat',
     description: "Noise through the filter's bandpass with a short envelope, rolling on its own clock.",
-    file: parseSinp(hihatRaw),
+    file: lazyPreset(() => import('./patches/trap-hihat.sinp?raw')),
   },
   {
     id: 'grime-lead',
     name: 'Grime Lead',
     description: 'An aggressive, mid-forward driven pulse wave -- a whining grime bassline lead.',
-    file: parseSinp(grimeLeadRaw),
+    file: lazyPreset(() => import('./patches/grime-lead.sinp?raw')),
   },
   {
     id: 'pingpong-lead',
     name: 'Ping-Pong Lead',
     description: 'Two detuned pulses through a clock-locked Ping-Pong Delay -- echoes alternate L/R in time with the beat. Headphones recommended.',
-    file: parseSinp(pingpongLeadRaw),
+    file: lazyPreset(() => import('./patches/pingpong-lead.sinp?raw')),
   },
   {
     id: 'sampler-chop',
     name: 'Sample Chop',
     description: 'A synthesized pluck, retriggered on the clock with an LFO wobbling its pitch, through a Bitcrusher for SP-1200-grade grit -- the sample-chop gesture jungle and hip-hop built a genre on. The audio is embedded in the patch itself; see sampler.ts\'s own doc comment for why.',
-    file: parseSinp(samplerChopRaw),
+    file: lazyPreset(() => import('./patches/sampler-chop.sinp?raw')),
   },
   {
     id: 'motorik',
     name: 'Motorik',
     description: 'Clock into Sequencer into a filtered VCO, no envelope at all -- the mid-1970s Kraftwerk/Moroder idea that the sequencer is the whole band, not an accessory. From the history academy track.',
-    file: parseSinp(motorikRaw),
+    file: lazyPreset(() => import('../academy/levels/history-02-motorik.sinp?raw')),
   },
   {
     id: 'psychoacoustic-demo',
     name: 'Psychoacoustic Demo',
     description: 'Three ways to land on a specific frequency: a per-ear pair five hertz apart (headphones make the difference audible as two separate tones; a speaker just mixes the two), a sine switched on and off five times a second with softened edges, and a switch-selected 264 Hz reference tone, all summed at the Output.',
-    file: parseSinp(psychoacousticDemoRaw),
+    file: lazyPreset(() => import('./patches/psychoacoustic-demo.sinp?raw')),
   },
 ]
 

@@ -83,36 +83,46 @@ describe('patch bank', () => {
 
   for (const preset of PRESET_BANK) {
     describe(preset.id, () => {
-      it('loads with no ghosts -- every module type this build actually knows', () => {
-        const { ghosts } = loadPatch(stubContext(), preset.file)
+      // `preset.file()` is a memoized async loader now (presets/bank.ts's
+      // own doc comment) -- every test below awaits it fresh; the second
+      // and later calls within this same process resolve from the dynamic
+      // `import()`'s own module-loader cache, so this costs nothing extra.
+
+      it('loads with no ghosts -- every module type this build actually knows', async () => {
+        const file = await preset.file()
+        const { ghosts } = loadPatch(stubContext(), file)
         expect(ghosts, `"${preset.id}" names an unregistered module type`).toEqual([])
       })
 
-      it('has exactly one Output module, so renderPatch can find where to listen', () => {
-        const outputs = preset.file.modules.filter((m) => m.type === 'output')
+      it('has exactly one Output module, so renderPatch can find where to listen', async () => {
+        const file = await preset.file()
+        const outputs = file.modules.filter((m) => m.type === 'output')
         expect(outputs.length).toBe(1)
       })
 
-      it('has at least one cable -- a preset with no wiring cannot make sound', () => {
-        expect(preset.file.cables.length).toBeGreaterThan(0)
+      it('has at least one cable -- a preset with no wiring cannot make sound', async () => {
+        const file = await preset.file()
+        expect(file.cables.length).toBeGreaterThan(0)
       })
 
-      it('every cable references a module the preset actually defines', () => {
-        const ids = new Set(preset.file.modules.map((m) => m.id))
-        for (const cable of preset.file.cables) {
+      it('every cable references a module the preset actually defines', async () => {
+        const file = await preset.file()
+        const ids = new Set(file.modules.map((m) => m.id))
+        for (const cable of file.cables) {
           expect(ids.has(cable.from[0]), `cable from unknown module "${cable.from[0]}"`).toBe(true)
           expect(ids.has(cable.to[0]), `cable to unknown module "${cable.to[0]}"`).toBe(true)
         }
       })
 
-      it('round-trips through serialize/load without loss', () => {
-        const { graph } = loadPatch(stubContext(), preset.file)
-        const again = serializePatch(graph, preset.file.meta)
-        expect(again.modules.map((m) => m.id).sort()).toEqual(preset.file.modules.map((m) => m.id).sort())
+      it('round-trips through serialize/load without loss', async () => {
+        const file = await preset.file()
+        const { graph } = loadPatch(stubContext(), file)
+        const again = serializePatch(graph, file.meta)
+        expect(again.modules.map((m) => m.id).sort()).toEqual(file.modules.map((m) => m.id).sort())
         expect(again.cables.slice().sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)))).toEqual(
-          preset.file.cables.slice().sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))),
+          file.cables.slice().sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))),
         )
-        for (const m of preset.file.modules) {
+        for (const m of file.modules) {
           const roundTripped = again.modules.find((mm) => mm.id === m.id)!
           expect(roundTripped.params).toEqual(m.params)
         }
