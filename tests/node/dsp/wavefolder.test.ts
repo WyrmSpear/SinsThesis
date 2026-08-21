@@ -158,6 +158,79 @@ describe('wavefolderSample: alias floor at a bright fundamental (2637 Hz)', () =
   })
 })
 
+// The mobile "Performance" mode (`oversample=false`, `docs/CONTINUATION.md`'s
+// mobile CPU finding): ADAA-1 alone, no oversampling FIR in either
+// direction. This is the same "ADAA alone" configuration the module doc
+// comment's Finding 1 already measured and rejected as insufficient on its
+// own -- shipping it as an opt-in mode does not change that math, so this
+// suite measures and reports the real floor rather than assuming it is
+// "close enough." Measured (this test's own run, same 1109/48kHz/BH
+// methodology as the full-quality table above): drive 1.5/3/8/16/20 ->
+// -50.1 / -36.3 / -22.7 / +1.6 / -0.8 dB. The 1109 Hz drive-3 number
+// (-36.3 dB) matches the module doc comment's already-published "ADAA
+// alone" figure exactly, which is the expected result: Performance mode
+// *is* that same, already-documented-as-insufficient configuration.
+//
+// Honest verdict: Performance mode is not RELEASE or ACCEPTABLE grade for
+// the wavefolder outside the bass register -- at 1109 Hz and above, even
+// drive 3 misses this project's own ACCEPTABLE bar (<=-45 dB), and at high
+// drive on a bright fundamental the alias floor goes *positive* (alias
+// energy louder than the fundamental, the same failure the original naive,
+// unfiltered fold shipped with before ADAA+oversampling fixed it -- see
+// this file's very first describe block). This mode exists for players on
+// hardware too slow for the antialiased path, not as a "nearly as good, a
+// bit faster" option, and it is documented to players as exactly that (the
+// module descriptor's "Fast" label plus `docs/CONTINUATION.md`), not
+// silently offered as equivalent.
+function performanceModeFoldedSineAt(f0: number, drive: number, symmetry = 0): Float32Array {
+  const state = createWavefolderState()
+  const total = WARMUP + ALIAS_N
+  const out = new Float32Array(total)
+  for (let i = 0; i < total; i++) {
+    const x = Math.sin((2 * Math.PI * f0 * i) / SR)
+    out[i] = wavefolderSample(state, x, drive, symmetry, SR, false)
+  }
+  return out.subarray(WARMUP)
+}
+
+describe('wavefolderSample: performance mode (oversample=false) alias floor', () => {
+  const F0 = 1109
+  it.each([
+    [1.5, -45], [3, -30], [8, -15],
+  ])('drive %s reaches at least %s dB -- worse than full quality, measured not assumed', (drive, bound) => {
+    const floor = aliasFloorDb(performanceModeFoldedSineAt(F0, drive), SR, F0)
+    expect(floor).toBeLessThanOrEqual(bound)
+  })
+
+  it('reports the full four-fundamental honesty table and confirms it is measurably worse than full quality', () => {
+    const FREQS = [131, 441, 1109, 2637]
+    const DRIVES = [1.5, 3, 8, 16, 20]
+    const table: string[] = []
+    let worstBass = -Infinity // 131 Hz only -- the one range this mode stays usable at
+    for (const f0 of FREQS) {
+      for (const drive of DRIVES) {
+        const state = createWavefolderState()
+        const total = WARMUP + ALIAS_N
+        const out = new Float32Array(total)
+        for (let i = 0; i < total; i++) {
+          const x = Math.sin((2 * Math.PI * f0 * i) / SR)
+          out[i] = wavefolderSample(state, x, drive, 0, SR, false)
+        }
+        const floor = aliasFloorDb(out.subarray(WARMUP), SR, f0)
+        table.push(`f0=${f0} drive=${drive}: ${floor.toFixed(2)} dB`)
+        if (f0 === 131) worstBass = Math.max(worstBass, floor)
+      }
+    }
+    // eslint-disable-next-line no-console
+    console.log('wavefolder performance-mode alias-floor honesty sweep:\n' + table.join('\n'))
+    // Even the best case (lowest fundamental, this mode's most forgiving
+    // corner) is clearly worse than full quality's equivalent (-66.5 dB at
+    // 131 Hz/drive 20 in the full-quality table above) but still usable --
+    // RELEASE grade at the bass register specifically.
+    expect(worstBass).toBeLessThanOrEqual(-30)
+  })
+})
+
 describe('wavefolderSample: DC blocker', () => {
   it('keeps steady-state DC below -100 dBFS at nonzero symmetry', () => {
     // A naive time-domain mean over a window holding a non-integer number

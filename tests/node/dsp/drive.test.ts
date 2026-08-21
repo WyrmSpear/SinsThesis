@@ -151,6 +151,60 @@ describe('driveSample: alias floor across the musical range (honesty sweep)', ()
   })
 })
 
+// The mobile "Performance" mode (`oversample=false`, `docs/CONTINUATION.md`'s
+// mobile CPU finding): ADAA-1 alone, no oversampling FIR in either
+// direction -- same mechanism as wavefolder.ts's own performance mode, but
+// this module's floors hold up far better: Soft is a single smooth tanh
+// curve, not a fold with a sharp per-cycle kink, so ADAA-1's local-linearity
+// assumption between samples is a much better fit even without oversampling.
+// Measured (this test's own run, same 4-fundamental/48kHz/BH methodology as
+// the honesty sweep above): worst case anywhere in the sweep is -28.8 dB
+// (2637 Hz, drive 20) -- clearly worse than full quality's -73.6 dB at the
+// same point, but never positive (alias never exceeds the fundamental,
+// unlike the wavefolder's performance mode at high drive on a bright
+// fundamental) and RELEASE-grade through most of the low-mid range even
+// without oversampling.
+describe('driveSample: performance mode (oversample=false) alias floor, soft curve', () => {
+  const F0 = 1109
+  it.each([
+    [1.5, -110], [3, -95], [8, -45], [16, -30], [20, -28],
+  ])('drive %s reaches at least %s dB -- worse than full quality, measured not assumed', (drive, bound) => {
+    const state = createDriveState()
+    const total = WARMUP + ALIAS_N
+    const out = new Float32Array(total)
+    for (let i = 0; i < total; i++) {
+      const x = Math.sin((2 * Math.PI * F0 * i) / SR)
+      out[i] = driveSample(state, x, drive, 'soft', SR, 1, SR, false)
+    }
+    const floor = aliasFloorDb(out.subarray(WARMUP), SR, F0)
+    expect(floor).toBeLessThanOrEqual(bound)
+  })
+
+  it('reports the full four-fundamental honesty table and stays clear of the wavefolder performance mode\'s positive-floor failure', () => {
+    const FREQS = [131, 441, 1109, 2637]
+    const DRIVES = [1.5, 3, 8, 16, 20]
+    const table: string[] = []
+    let worst = -Infinity
+    for (const f0 of FREQS) {
+      for (const drive of DRIVES) {
+        const state = createDriveState()
+        const total = WARMUP + ALIAS_N
+        const out = new Float32Array(total)
+        for (let i = 0; i < total; i++) {
+          const x = Math.sin((2 * Math.PI * f0 * i) / SR)
+          out[i] = driveSample(state, x, drive, 'soft', SR, 1, SR, false)
+        }
+        const floor = aliasFloorDb(out.subarray(WARMUP), SR, f0)
+        table.push(`f0=${f0} drive=${drive}: ${floor.toFixed(2)} dB`)
+        worst = Math.max(worst, floor)
+      }
+    }
+    // eslint-disable-next-line no-console
+    console.log('drive performance-mode alias-floor honesty sweep:\n' + table.join('\n'))
+    expect(worst).toBeLessThanOrEqual(-25)
+  })
+})
+
 // The quality bar: asymmetric clipping generates DC -- verify it actually
 // does (without correction), and that the module's own DC blocker removes
 // it, the same "ladder needed a blocker for exactly this reason" pattern

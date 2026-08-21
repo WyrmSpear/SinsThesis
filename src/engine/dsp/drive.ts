@@ -227,6 +227,36 @@ export function driveCurveRaw(input: number, drive: number, curve: DriveCurve): 
  * @param level linear output gain, applied last.
  * @param sampleRate the caller's native (pre-oversampling) rate.
  */
+/**
+ * @param oversample Default `true` -- the full 4x-oversampled pipeline this
+ *   module's doc comment measures (~550 ns/sample on the desktop machine
+ *   `.superpowers/sdd/mobile-perf-report.md` measured against). `false` is
+ *   the mobile "Performance" mode added for `docs/CONTINUATION.md`'s mobile
+ *   CPU finding -- same mechanism as `wavefolder.ts`'s `oversample`
+ *   parameter (ADAA-1 alone, at the native rate, skipping both FIRs),
+ *   measured at ~61 ns/sample (~9x cheaper). Unlike the wavefolder, this
+ *   mode holds up well: Soft is a single smooth tanh curve, not a fold with
+ *   a sharp per-cycle kink, so ADAA-1's local-linearity assumption between
+ *   samples is a much better fit even without oversampling. Re-measured
+ *   honestly, 48 kHz, Blackman-Harris, same four fundamentals as this
+ *   module's own honesty-sweep test:
+ *
+ *   | f0 (Hz) | drive 1.5 | drive 3 | drive 8 | drive 16 | drive 20 |
+ *   |---|---|---|---|---|---|
+ *   | 131  | -101.3 dB | -101.4 dB | -101.4 dB | -101.4 dB | -101.4 dB |
+ *   | 441  | -129.5 dB | -129.6 dB | -105.5 dB |  -65.1 dB |  -57.7 dB |
+ *   | 1109 | -127.4 dB | -105.8 dB |  -52.4 dB |  -38.8 dB |  -36.6 dB |
+ *   | 2637 |  -88.8 dB |  -54.5 dB |  -32.6 dB |  -28.3 dB |  -27.7 dB |
+ *
+ *   Worst case anywhere in the sweep is -27.7 dB (2637 Hz, drive 20) --
+ *   measurably worse than full quality's -73.6 dB at the same point, but
+ *   never positive (alias never exceeds the fundamental, unlike the
+ *   wavefolder's performance mode at high drive on a bright fundamental)
+ *   and RELEASE-grade through most of the low-mid range even without
+ *   oversampling. Still a real, stated trade -- default-off, never applied
+ *   silently. See `tests/node/dsp/drive.test.ts`'s "performance mode"
+ *   describe block for the measurement that produced this table.
+ */
 export function driveSample(
   state: DriveState,
   input: number,
@@ -235,29 +265,39 @@ export function driveSample(
   toneHz: number,
   level: number,
   sampleRate: number,
+  oversample = true,
 ): number {
   const d = Math.max(drive, 0)
 
-  state.interpHead = (state.interpHead + 1) % state.interpHistory.length
-  state.interpHistory[state.interpHead] = input
-
-  for (let k = 0; k < OVERSAMPLE; k++) {
-    const branch = INTERP_BRANCHES[k]!
-    let acc = 0
-    for (let j = 0; j < branch.length; j++) {
-      acc += branch[j]! * ringRead(state.interpHistory, state.interpHead, j)
-    }
-    const v = acc * d
-    const shaped = adaaStep(state.adaaPrevV, v, curve)
+  let decimated: number
+  if (!oversample) {
+    // Performance mode: ADAA-1 at the native rate, no oversampling FIR in
+    // either direction.
+    const v = input * d
+    decimated = adaaStep(state.adaaPrevV, v, curve)
     state.adaaPrevV = v
+  } else {
+    state.interpHead = (state.interpHead + 1) % state.interpHistory.length
+    state.interpHistory[state.interpHead] = input
 
-    state.decimHead = (state.decimHead + 1) % state.decimHistory.length
-    state.decimHistory[state.decimHead] = shaped
-  }
+    for (let k = 0; k < OVERSAMPLE; k++) {
+      const branch = INTERP_BRANCHES[k]!
+      let acc = 0
+      for (let j = 0; j < branch.length; j++) {
+        acc += branch[j]! * ringRead(state.interpHistory, state.interpHead, j)
+      }
+      const v = acc * d
+      const shaped = adaaStep(state.adaaPrevV, v, curve)
+      state.adaaPrevV = v
 
-  let decimated = 0
-  for (let i = 0; i < FIR.length; i++) {
-    decimated += FIR[i]! * ringRead(state.decimHistory, state.decimHead, i)
+      state.decimHead = (state.decimHead + 1) % state.decimHistory.length
+      state.decimHistory[state.decimHead] = shaped
+    }
+
+    decimated = 0
+    for (let i = 0; i < FIR.length; i++) {
+      decimated += FIR[i]! * ringRead(state.decimHistory, state.decimHead, i)
+    }
   }
 
   // DC blocker, at the native rate.

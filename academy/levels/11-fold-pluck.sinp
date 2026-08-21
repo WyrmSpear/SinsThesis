@@ -3,7 +3,7 @@
   "meta": { "name": "Level 11 — No Filter (proof patch)", "created": "2026-08-19T00:00:00.000Z", "author": "academy" },
   "modules": [
     { "id": "vco-1", "type": "vco", "slot": [0, 0], "params": { "octave": -2, "tune": 0, "shape": 3 } },
-    { "id": "wavefolder-1", "type": "wavefolder", "slot": [0, 1], "params": { "drive": 1, "symmetry": 0, "foldCvAmount": 4 } },
+    { "id": "wavefolder-1", "type": "wavefolder", "slot": [0, 1], "params": { "drive": 1, "symmetry": 0, "foldCvAmount": 4, "quality": 0 } },
     { "id": "adsr-1", "type": "adsr", "slot": [0, 2], "params": { "attack": 0.003, "decay": 0.15, "sustain": 0, "release": 0.05 } },
     { "id": "vca-1", "type": "vca", "slot": [0, 3], "params": { "level": 0, "cvAmount": 1 } },
     { "id": "output-1", "type": "output", "slot": [0, 4], "params": {} }

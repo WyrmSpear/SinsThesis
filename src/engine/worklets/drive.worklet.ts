@@ -22,6 +22,10 @@ class DriveProcessor extends AudioWorkletProcessor {
       { name: 'tone', defaultValue: 18000, minValue: 200, maxValue: 18000, automationRate: 'a-rate' },
       { name: 'level', defaultValue: 1, minValue: 0, maxValue: 2, automationRate: 'a-rate' },
       { name: 'driveCvAmount', defaultValue: 0, minValue: 0, maxValue: 10, automationRate: 'a-rate' },
+      // 0 = Full (4x oversampled), 1 = Performance (native-rate ADAA-1
+      // only) -- see dsp/drive.ts's `oversample` parameter doc comment.
+      // Discrete, k-rate, same convention as `curve`.
+      { name: 'quality', defaultValue: 0, minValue: 0, maxValue: 1, automationRate: 'k-rate' },
     ]
   }
 
@@ -40,6 +44,7 @@ class DriveProcessor extends AudioWorkletProcessor {
     const levelParam = params.level!
     const cvAmountParam = params.driveCvAmount!
     const curve = CURVES[Math.round(params.curve![0]!)] ?? 'soft'
+    const oversample = Math.round(params.quality![0]!) === 0
 
     for (let i = 0; i < out.length; i++) {
       // a-rate params arrive as length 1 (constant this block) or length
@@ -50,7 +55,7 @@ class DriveProcessor extends AudioWorkletProcessor {
       const tone = toneParam.length > 1 ? toneParam[i]! : toneParam[0]!
       const level = levelParam.length > 1 ? levelParam[i]! : levelParam[0]!
       const drive = Math.max(driveAt + (cv?.[i] ?? 0) * cvAmountAt, 0.1)
-      out[i] = driveSample(this.state, audio?.[i] ?? 0, drive, curve, tone, level, sampleRate)
+      out[i] = driveSample(this.state, audio?.[i] ?? 0, drive, curve, tone, level, sampleRate, oversample)
     }
     return true
   }

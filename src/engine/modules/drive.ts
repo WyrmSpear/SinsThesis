@@ -104,6 +104,23 @@ export const driveDescriptor: ModuleDescriptor = {
     // envelope sweeps to animate a growl, so it gets a CV input like every
     // other modulatable amount in this codebase.
     { id: 'driveCvAmount', label: 'Amt', min: 0, max: 10, default: 0, curve: 'lin', unit: '' },
+    {
+      id: 'quality',
+      label: 'Quality',
+      min: 0,
+      max: 1,
+      default: 0,
+      curve: 'lin',
+      unit: '',
+      // Default 0 ("Full") is the existing, measured 4x-oversampled path --
+      // every patch that predates this param keeps its current sound. 1
+      // ("Fast") drops to native-rate ADAA-1 only: a real, honestly-labeled
+      // alias-floor trade for players on slower hardware -- see
+      // dsp/drive.ts's `oversample` doc comment and tests/node/dsp/
+      // drive.test.ts's "performance mode" block for the re-measured
+      // numbers. docs/CONTINUATION.md records why this exists.
+      labels: ['Full', 'Fast'],
+    },
   ],
   layout: [
     { kind: 'knob', ref: 'drive', x: 0, y: 0 },
@@ -111,6 +128,7 @@ export const driveDescriptor: ModuleDescriptor = {
     { kind: 'knob', ref: 'tone', x: 0, y: 1 },
     { kind: 'knob', ref: 'level', x: 1, y: 1 },
     { kind: 'knob', ref: 'driveCvAmount', x: 0, y: 2 },
+    { kind: 'knob', ref: 'quality', x: 1, y: 2 },
     { kind: 'jack', ref: 'in', x: 0, y: 3 },
     { kind: 'jack', ref: 'driveCv', x: 1, y: 3 },
     { kind: 'jack', ref: 'out', x: 0, y: 4 },
@@ -137,7 +155,7 @@ export const driveDescriptor: ModuleDescriptor = {
       setParam(id, value, atTime) {
         const param = node.parameters.get(id)
         if (!param) return
-        if (id === 'curve') param.value = value
+        if (id === 'curve' || id === 'quality') param.value = value
         else scheduleParam(param, value, ctx, atTime)
       },
       dispose() {

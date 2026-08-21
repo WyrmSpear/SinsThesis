@@ -320,6 +320,40 @@ function ringRead(buf: Float64Array, head: number, j: number): number {
  * @param sampleRate the caller's (pre-oversampling) rate -- only the DC
  *   blocker's pole depends on it; the oversampling FIR is a fixed ratio
  *   design, independent of the absolute rate.
+ * @param oversample Default `true` -- the full 4x-oversampled pipeline this
+ *   module's doc comment measures (~485 ns/sample on the desktop machine
+ *   `.superpowers/sdd/mobile-perf-report.md` measured against, Node
+ *   v22/V8, not the worklet's own JIT tier -- a relative figure, not an
+ *   absolute one). `false` is the mobile "Performance" mode added for
+ *   `docs/CONTINUATION.md`'s mobile CPU finding: it skips both the
+ *   interpolation and decimation FIRs -- ~254 of this function's ~280
+ *   multiply-adds per sample -- and runs ADAA-1 alone, directly at the
+ *   native rate, measured at ~37 ns/sample (~13x cheaper). This is exactly
+ *   the "ADAA alone" configuration this file's own doc comment already
+ *   measured and rejected as insufficient on its own ("a real but modest
+ *   4-8 dB... nowhere near enough"); shipping it as an opt-in mode does not
+ *   change that math. Re-measured honestly for this mode, 48 kHz,
+ *   Blackman-Harris, same four fundamentals as the header table:
+ *
+ *   | f0 (Hz) | drive 1.5 | drive 3 | drive 8 | drive 16 | drive 20 |
+ *   |---|---|---|---|---|---|
+ *   | 131  | -85.1 dB | -72.5 dB | -47.5 dB | -39.4 dB | -34.9 dB |
+ *   | 441  | -66.9 dB | -53.4 dB | -30.8 dB | -20.3 dB | -23.2 dB |
+ *   | 1109 | -50.1 dB | -36.3 dB | -22.7 dB |  +1.6 dB |  -0.8 dB |
+ *   | 2637 | -37.3 dB | -28.5 dB |  -0.7 dB |  -3.2 dB |  -6.1 dB |
+ *
+ *   Honest verdict: this mode is RELEASE-grade only in the bass register
+ *   (131 Hz) and only up to moderate drive; at 1109 Hz and above it misses
+ *   even this project's ACCEPTABLE bar (<=-45 dB) starting at drive 3, and
+ *   at high drive on a bright fundamental the floor goes *positive* --
+ *   alias energy louder than the fundamental, the same failure mode the
+ *   original unfiltered fold shipped with before ADAA+oversampling fixed
+ *   it. This is not "full quality, a bit faster" -- it is a genuine,
+ *   honestly-labeled trade for hardware too slow for the antialiased path
+ *   (the module descriptor's knob is literally labeled "Fast", not
+ *   "Lower"), default-off, and never applied silently. See
+ *   `tests/node/dsp/wavefolder.test.ts`'s "performance mode" describe
+ *   block for the measurement that produced this table.
  */
 export function wavefolderSample(
   state: WavefolderState,
@@ -327,8 +361,22 @@ export function wavefolderSample(
   drive: number,
   symmetry: number,
   sampleRate: number,
+  oversample = true,
 ): number {
   const d = Math.max(drive, 0)
+
+  if (!oversample) {
+    // Performance mode: ADAA-1 at the native rate, no oversampling FIR in
+    // either direction -- see this function's own doc comment for why this
+    // is a real, measured quality trade, not a free lunch.
+    const v = input * d + symmetry
+    const folded = adaaFold(state, v)
+    const R = dcBlockerPole(DC_BLOCKER_HZ, sampleRate)
+    const dcOut = folded - state.dcX + R * state.dcY
+    state.dcX = folded
+    state.dcY = dcOut
+    return dcOut
+  }
 
   // 1. Push the raw input into interpolation history and produce the R
   // oversampled input samples via polyphase interpolation.

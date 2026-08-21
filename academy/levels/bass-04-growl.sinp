@@ -3,7 +3,7 @@
   "meta": { "name": "Growl", "created": "2026-08-19T00:00:00.000Z", "author": "academy" },
   "modules": [
     { "id": "vco-1", "type": "vco", "slot": [0, 0], "params": { "octave": -2, "tune": 0, "shape": 0, "pulseWidth": 0.5, "fmAmount": 0 } },
-    { "id": "drive-1", "type": "drive", "slot": [0, 1], "params": { "drive": 3, "curve": 0, "tone": 5500, "level": 1, "driveCvAmount": 5 } },
+    { "id": "drive-1", "type": "drive", "slot": [0, 1], "params": { "drive": 3, "curve": 0, "tone": 5500, "level": 1, "driveCvAmount": 5, "quality": 0 } },
     { "id": "lfo-1", "type": "lfo", "slot": [0, 2], "params": { "rate": 3.5, "shape": 2, "depth": 1, "division": 0 } },
     { "id": "output-1", "type": "output", "slot": [0, 3], "params": { "level": 0.75 } }
   ],

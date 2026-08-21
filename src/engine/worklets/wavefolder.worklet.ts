@@ -15,6 +15,12 @@ class WavefolderProcessor extends AudioWorkletProcessor {
       { name: 'drive', defaultValue: 1, minValue: 0.1, maxValue: 20, automationRate: 'k-rate' },
       { name: 'symmetry', defaultValue: 0, minValue: -1, maxValue: 1, automationRate: 'k-rate' },
       { name: 'foldCvAmount', defaultValue: 0, minValue: 0, maxValue: 10, automationRate: 'k-rate' },
+      // 0 = Full (4x oversampled, the header table's figures), 1 =
+      // Performance (native-rate ADAA-1 only -- see dsp/wavefolder.ts's
+      // `oversample` parameter doc comment for the measured cost). Discrete,
+      // like the drive module's own `curve` -- a value between the two is
+      // meaningless.
+      { name: 'quality', defaultValue: 0, minValue: 0, maxValue: 1, automationRate: 'k-rate' },
     ]
   }
 
@@ -31,10 +37,11 @@ class WavefolderProcessor extends AudioWorkletProcessor {
     const drive = params.drive![0]!
     const symmetry = params.symmetry![0]!
     const cvAmount = params.foldCvAmount![0]!
+    const oversample = Math.round(params.quality![0]!) === 0
 
     for (let i = 0; i < out.length; i++) {
       const d = Math.max(drive + (cv?.[i] ?? 0) * cvAmount, 0.1)
-      out[i] = wavefolderSample(this.state, audio?.[i] ?? 0, d, symmetry, sampleRate)
+      out[i] = wavefolderSample(this.state, audio?.[i] ?? 0, d, symmetry, sampleRate, oversample)
     }
     return true
   }
