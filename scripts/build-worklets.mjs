@@ -47,6 +47,7 @@ const WORKLETS = {
   recorder: entry('../src/engine/worklets/recorder.worklet.ts'),
   sampler: entry('../src/engine/worklets/sampler.worklet.ts'),
   bitcrusher: entry('../src/engine/worklets/bitcrusher.worklet.ts'),
+  flanger: entry('../src/engine/worklets/flanger.worklet.ts'),
   binaural: entry('../src/engine/worklets/binaural.worklet.ts'),
   isochronic: entry('../src/engine/worklets/isochronic.worklet.ts'),
   'cpu-meter': entry('../src/engine/worklets/cpu-meter.worklet.ts'),

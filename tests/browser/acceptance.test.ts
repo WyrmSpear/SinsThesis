@@ -22,8 +22,11 @@ describe('Phase 1 acceptance', () => {
     // Delay, Width), the Sampler, the Bitcrusher (see each module's own
     // doc comment), and Binaural, Isochronic and the Frequency Bank -- the
     // three psychoacoustic tone-generation modules (see each module's own
-    // doc comment).
-    expect(ALL_DESCRIPTORS.length).toBe(26)
+    // doc comment) -- plus ROADMAP section 1's effects rung: the Ring
+    // Modulator and the Flanger (see each module's own doc comment, and
+    // dsp/flanger.ts for why the flanger owns its delay line instead of
+    // using a DelayNode).
+    expect(ALL_DESCRIPTORS.length).toBe(28)
   })
 
   it('renders the classic voice: VCO into VCF into VCA into Output', async () => {
