@@ -195,6 +195,52 @@ describe('rack arcade (pan paddle)', () => {
     await page.close()
   }, 20000)
 
+  // Regression test for the bug the previous test's own Panner-routed setup
+  // could never catch: `buildTap` used to connect the Output node straight
+  // into a `ChannelSplitterNode`, which is spec'd `channelInterpretation:
+  // 'discrete'` -- a *mono* signal lands entirely in channel 0, channel 1
+  // reads silence, and `readBalance` computes (0-l)/(0+l) = -1, pinning the
+  // paddle hard left regardless of the patch. A VCO wired directly into
+  // Output with no stereo module anywhere in the chain -- no Panner, no
+  // Ping-Pong, no Width -- is exactly the shape that exposed it, and it's
+  // also the shape every other module in this codebase produces by default
+  // (ROADMAP 1a: the other twenty-one modules stay mono end to end). Fixed
+  // in rack/arcade-panel.ts's `buildTap` by up-mixing before the splitter,
+  // the same way src/engine/modules/output.ts already up-mixes its own
+  // internal gain stage.
+  it('a mono patch (no stereo module anywhere) reads a centered balance, not hard left', async () => {
+    const page: Page = await browser.newPage()
+    const consoleErrors: string[] = []
+    page.on('console', (msg) => { if (msg.type() === 'error') consoleErrors.push(msg.text()) })
+    page.on('pageerror', (err) => consoleErrors.push(String(err)))
+
+    await powerOn(page)
+    await addModule(page, 'vco')
+    const vcoId = await firstIdOfType(page, 'vco')
+    const outputId = await firstIdOfType(page, 'output')
+
+    // Straight into Output -- no Panner, no Width, no Ping-Pong -- a
+    // continuously-droning mono tone, additively alongside the starter
+    // patch's own (silent, ungated) VCA cable, same convention as the
+    // Panner test above.
+    await dragJackToJack(page, `jack-${vcoId}-out`, `jack-${outputId}-in`)
+
+    await page.getByTestId('mode-arcade').click()
+    await page.getByTestId('arcade-display').waitFor({ state: 'visible' })
+    // Let the balance tap and a few rAF frames settle.
+    await page.waitForTimeout(300)
+    const x = await paddleX(page)
+
+    // Same 420px-wide-playfield centered band the Panner test above checks
+    // at pan=0. Before the fix this read pinned hard left (well under 150,
+    // usually near 0) because the splitter only ever saw channel 0.
+    expect(x).toBeGreaterThan(150)
+    expect(x).toBeLessThan(270)
+
+    expect(consoleErrors, `console errors: ${consoleErrors.join('\n')}`).toEqual([])
+    await page.close()
+  }, 20000)
+
   it('a real falling block registers a catch when the paddle sweeps under it', async () => {
     const page: Page = await browser.newPage()
     const consoleErrors: string[] = []

@@ -70,8 +70,18 @@ const CANVAS_HEIGHT = 520
  *  pass costs nothing worth measuring on the main thread. */
 const BALANCE_FFT_SIZE = 256
 
-interface Tap {
+// `buildTap`/`readBalance`/`disposeTap`/`Tap` are exported (only, and
+// specifically, for `tests/browser/modules/arcade-tap.test.ts`) so the
+// mono-up-mix fix below can be exercised directly against a deliberately
+// raw, single-channel source node -- bypassing `src/engine/modules/
+// output.ts`'s own up-mix, which already protects the normal integration
+// path today and would otherwise mask a regression in this file's own fix
+// (see that test file's header comment for the full reasoning). Nothing
+// else in this codebase imports these; the panel itself only calls
+// `startArcade` below.
+export interface Tap {
   readonly instance: OutputInstance
+  readonly upmix: GainNode
   readonly splitter: ChannelSplitterNode
   readonly analyserL: AnalyserNode
   readonly analyserR: AnalyserNode
@@ -79,9 +89,47 @@ interface Tap {
   readonly bufR: Float32Array<ArrayBuffer>
 }
 
-function buildTap(ctx: AudioContext, instance: OutputInstance): Tap | undefined {
+/**
+ * `ChannelSplitterNode` is spec'd `channelInterpretation: 'discrete'`, so a
+ * *mono* source connected straight into it lands entirely in channel 0 --
+ * channel 1 reads silence, `readBalance` computes (0-l)/(0+l) = -1, and the
+ * paddle pins hard left no matter what the patch is doing (reported by the
+ * owner, see `docs/CONTINUATION.md`).
+ *
+ * `instance.outputs.get('out')` -- the source this tap connects to -- is
+ * `src/engine/modules/output.ts`'s own internal gain node, which already
+ * sets `channelCount: 2` / `channelCountMode: 'explicit'` /
+ * `channelInterpretation: 'speakers'` on itself, so in today's normal
+ * integration path (a patch wired all the way to a real Output module) that
+ * node's *own* up-mix already protects this tap transitively -- verified
+ * directly: reverting this function's `upmix` stage and rerunning
+ * `tests/browser/rack-arcade.test.ts`'s "mono patch" regression test still
+ * passes. What it does NOT protect against, and what actually motivates
+ * keeping this stage here rather than treating Output's fix as sufficient:
+ * `buildTap` takes any `OutputInstance`-shaped `instance`, not specifically
+ * *the* live Output module's internal node -- a future refactor of
+ * output.ts, a different `OutputInstance` shape, or this tap ever pointing
+ * upstream of that up-mix would silently reintroduce exactly this failure
+ * with zero test coverage, since the normal path currently masks it. Fixed
+ * locally and unconditionally instead of relying on an upstream module's
+ * implementation detail: a unity gain stage with the same three properties,
+ * inserted between the source and the splitter, up-mixes a mono signal to
+ * both channels *before* the splitter ever sees it -- so a mono source
+ * reads balance 0 (centred) regardless of whether it arrived already
+ * up-mixed, and a genuinely stereo source reaches the splitter unchanged (2
+ * in / 2 computed is already an identity). `tests/browser/modules/
+ * arcade-tap.test.ts` exercises this function directly against a
+ * deliberately raw, single-channel source (bypassing Output entirely) to
+ * prove the stage itself is load-bearing, not just redundant with
+ * output.ts's own fix.
+ */
+export function buildTap(ctx: AudioContext, instance: OutputInstance): Tap | undefined {
   const source = instance.outputs.get('out')
   if (!source) return undefined
+  const upmix = ctx.createGain()
+  upmix.channelCount = 2
+  upmix.channelCountMode = 'explicit'
+  upmix.channelInterpretation = 'speakers'
   const splitter = ctx.createChannelSplitter(2)
   const analyserL = ctx.createAnalyser()
   const analyserR = ctx.createAnalyser()
@@ -91,11 +139,13 @@ function buildTap(ctx: AudioContext, instance: OutputInstance): Tap | undefined 
   // routes to ctx.destination elsewhere. Never inserted between the source
   // and its existing destination, so it cannot add latency or alter the
   // signal a listener hears -- see this file's header comment.
-  source.connect(splitter)
+  source.connect(upmix)
+  upmix.connect(splitter)
   splitter.connect(analyserL, 0)
   splitter.connect(analyserR, 1)
   return {
     instance,
+    upmix,
     splitter,
     analyserL,
     analyserR,
@@ -104,7 +154,8 @@ function buildTap(ctx: AudioContext, instance: OutputInstance): Tap | undefined 
   }
 }
 
-function disposeTap(tap: Tap): void {
+export function disposeTap(tap: Tap): void {
+  tap.upmix.disconnect()
   tap.splitter.disconnect()
   tap.analyserL.disconnect()
   tap.analyserR.disconnect()
@@ -114,7 +165,7 @@ function disposeTap(tap: Tap): void {
  *  RMS. Silence (nothing patched, or the patch is resting between notes)
  *  reads as 0 -- centered -- rather than chasing whatever the noise floor
  *  happens to lean toward. */
-function readBalance(tap: Tap): number {
+export function readBalance(tap: Tap): number {
   tap.analyserL.getFloatTimeDomainData(tap.bufL)
   tap.analyserR.getFloatTimeDomainData(tap.bufR)
   const l = rms(tap.bufL)
