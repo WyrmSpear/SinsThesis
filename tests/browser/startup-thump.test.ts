@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { createServer, type ViteDevServer } from 'vite'
+import type { ViteDevServer } from 'vite'
+import { createIsolatedServer, closeIsolatedServer } from './support/e2e-server'
 import { chromium, type Browser, type Page } from 'playwright'
 import { fileURLToPath } from 'node:url'
 
@@ -47,7 +48,7 @@ let browser: Browser
 let baseUrl: string
 
 beforeAll(async () => {
-  server = await createServer({ root, configFile: false, server: { port: 0 } })
+  server = await createIsolatedServer(root)
   await server.listen()
   const address = server.httpServer?.address()
   if (!address || typeof address === 'string') throw new Error('dev server did not report a port')
@@ -58,7 +59,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await browser?.close()
-  await server?.close()
+  await closeIsolatedServer(server)
 })
 
 interface ThumpResult {
@@ -68,6 +69,12 @@ interface ThumpResult {
   durationMs: number
   totalSamples: number
   sampleRate: number
+  diag?: {
+    chunkCount: number
+    gaps: { concatIndex: number; missing: number }[]
+    peakNeighborhood: number[]
+    peakFrame: number | null
+  }
 }
 
 /** Runs one boot repro in a fresh page and returns the measured result.
@@ -117,6 +124,22 @@ describe('power-on thump', () => {
         `startup-thump: peak=${result.peakDb.toFixed(1)} dBFS @ sample ${result.peakSampleIndex}, ` +
           `loud until sample ${result.lastLoudSampleIndex} (${result.durationMs.toFixed(1)} ms), ` +
           `${result.totalSamples} samples captured @ ${result.sampleRate} Hz`,
+      )
+      // Capture detail cheaply on every run so a recurrence is diagnosable
+      // from the log alone. A single -20.8 dBFS sample was seen once here,
+      // at an exact 128-sample render-quantum boundary, and never
+      // reproduced across 20 further instrumented full-suite runs (all
+      // -240.0). If it comes back, `gaps` distinguishes a genuine transient
+      // from a reassembly artefact: the tap posts one message per quantum
+      // and drops none normally, so a non-empty `gaps` means blocks went
+      // missing and the concatenated buffer spliced two non-adjacent
+      // quanta together -- which manufactures exactly such a discontinuity.
+      console.log(
+        `startup-thump chunks=${result.diag?.chunkCount} ` +
+          `gaps=${JSON.stringify(result.diag?.gaps)} peakFrame=${result.diag?.peakFrame}` +
+          (result.diag?.peakNeighborhood.length
+            ? ` around-peak=${JSON.stringify(result.diag.peakNeighborhood)}`
+            : ''),
       )
 
       // -40 dBFS is comfortably below the measured pre-fix range (-8.3 to

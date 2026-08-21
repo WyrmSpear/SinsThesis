@@ -36,6 +36,16 @@ export interface ThumpResult {
   durationMs: number
   totalSamples: number
   sampleRate: number
+  /** Reassembly diagnostics. The tap posts one message per render quantum;
+   *  the fields below make a dropped message visible instead of letting the
+   *  naive concatenation below splice two non-adjacent quanta into a fake
+   *  discontinuity. See the consuming test for why this is kept. */
+  diag?: {
+    chunkCount: number
+    gaps: { concatIndex: number; missing: number }[]
+    peakNeighborhood: number[]
+    peakFrame: number | null
+  }
 }
 
 const SILENCE_THRESHOLD = 0.001 // -60 dBFS, same floor tests/browser/dev-page.test.ts uses
@@ -126,7 +136,34 @@ async function runThumpBoot(captureMs = 300): Promise<ThumpResult> {
     if (abs > SILENCE_THRESHOLD) lastLoudSampleIndex = n
   }
 
+  const gaps: { concatIndex: number; missing: number }[] = []
+  for (let k = 1; k < chunks.length; k++) {
+    const expected = chunks[k - 1]!.frame + chunks[k - 1]!.samples.length
+    if (chunks[k]!.frame !== expected)
+      gaps.push({ concatIndex: k * 128, missing: chunks[k]!.frame - expected })
+  }
+  let peakFrame: number | null = null
+  if (peakSampleIndex >= 0) {
+    let acc = 0
+    for (const c of chunks) {
+      if (peakSampleIndex < acc + c.samples.length) {
+        peakFrame = c.frame + (peakSampleIndex - acc)
+        break
+      }
+      acc += c.samples.length
+    }
+  }
+
   return {
+    diag: {
+      chunkCount: chunks.length,
+      gaps,
+      peakNeighborhood:
+        peakSampleIndex < 0
+          ? []
+          : Array.from(samples.slice(Math.max(0, peakSampleIndex - 3), peakSampleIndex + 4)),
+      peakFrame,
+    },
     peakDb: dbfs(peak),
     peakSampleIndex,
     lastLoudSampleIndex,
