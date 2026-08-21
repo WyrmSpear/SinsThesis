@@ -14,37 +14,54 @@ export, live at `ryanoglelmt.com/portfolio/sinsthesis/`.
 ## 1. More modules — where the real gaps are
 
 The inventory looks fuller than it is. Ranked by what unlocks the most patches
-per unit of work:
+per unit of work.
 
-**State-variable filter — the biggest gap.** There is exactly one filter type,
-a lowpass ladder. No highpass, no bandpass, no notch. An SVF gives all three
-from one module and roughly doubles what is patchable. The ladder's ZDF/TPT
-machinery in `dsp/ladder.ts` is most of the maths already.
+**Read the status markers before planning off this section.** Most of the
+original list has since been built, and an audit on 2026-08-21 found four
+entries here still describing shipped work as a gap — including the two the
+section called the *biggest* gaps. Each is kept, marked, rather than deleted,
+because the reasoning about why it mattered is the point of this file.
 
-**Stereo and panning — the second biggest.** The engine is mono end to end.
-Every `ModuleInstance` output is a single channel. Stereo is the difference
-between a patch that sounds like a demo and one that sounds like a record, but
-it touches the module contract, so it is an architectural change, not a module.
-Worth scoping deliberately.
+**~~State-variable filter — the biggest gap.~~ SHIPPED** —
+`src/engine/modules/svf.ts`, and it did roughly double what is patchable as
+predicted. Built as a second *topology* rather than a mode switch on the
+ladder; it deliberately does not self-oscillate. Original note: there was
+exactly one filter type, a lowpass ladder, with no highpass, bandpass or
+notch, and the ladder's ZDF/TPT machinery in `dsp/ladder.ts` was already most
+of the maths.
+
+**~~Stereo and panning — the second biggest.~~ SHIPPED** — see section 1a
+below, whose dependency-ordered list is items 1–4 done and item 5 (unison /
+detune) still open. The engine is no longer mono end to end: Panner,
+Ping-Pong Delay, Width and a channel-count-aware Output all ship. The
+original call that this was architectural rather than a module was correct,
+and scoping it deliberately is what made it tractable.
 
 **Ring modulator.** Nearly free — a multiply — and sonically enormous. Highest
 value-to-effort ratio on the list.
 
 **FM operator.** The VCO already has linear and exponential FM inputs; a
-dedicated operator with a feedback path opens DX-style territory.
+dedicated operator with a feedback path opens DX-style territory. Still open.
 
-**Effects, in order of cost:** bitcrusher and sample-rate reducer (trivial),
-chorus and flanger (a modulated delay, and `delay.ts` exists), compressor
-(needs envelope following, which `segment.ts` partly has), reverb (the big one
-— an FDN or convolution, and the only item here that is a project rather than a
-module).
+**Effects, in order of cost:** ~~bitcrusher and sample-rate reducer
+(trivial)~~ **SHIPPED** — one module, `modules/bitcrusher.ts`, carrying both
+a `bits` knob and a `rate` decimator with CV on each; chorus and flanger (a
+modulated delay, and `delay.ts` exists); compressor (needs envelope
+following, which `segment.ts` partly has); reverb (the big one — an FDN or
+convolution, and the only item here that is a project rather than a module).
 
-**Sampler.** Changes the engine's shape rather than extending it: file loading,
-buffer lifetime, playback that is not oscillator-shaped, and a UI for trimming
-and looping. Genuinely wanted, genuinely not a casual afternoon.
+**~~Sampler.~~ SHIPPED** — `src/engine/modules/sampler.ts`. It did change the
+engine's shape as predicted, and the cost landed where expected: a generic
+`serializeState`/`restoreState` hook on `ModuleInstance`, and a 141 KB demo
+preset that is nearly all base64 audio.
 
 
 ## 1a. Stereo — the architectural one
+
+**Status: items 1–4 SHIPPED, item 5 open.** The design below survived contact
+intact — the sixteen mono modules did stay untouched, and every stereo module
+got its mono-compatibility acceptance test. Kept in full because the
+reasoning is what made it work, and because item 5 is still live.
 
 Requested directly: panning, ping-pong delay, spatialisers, thickening.
 
@@ -165,9 +182,13 @@ ships, and a chiptune voice is a preset plus a theme rather than new DSP. An
 ASCII or low-RAM visual mode also suits the test-equipment look the app already
 has, and costs almost nothing to render.
 
-**What the arcade would need that does not exist:** a game loop and a scoring
-model. Everything else — real-time pitch, features, stereo, tempo lock — is
-already built and measured.
+**~~What the arcade would need that does not exist:~~ BOTH NOW EXIST.** The
+game loop and the scoring model were built with Pan Paddle and reused by Wub
+Disruptor, so items 1 and 2 of the build order above are SHIPPED and items
+3–5 (siren sync, note matching, screensaver) inherit working infrastructure
+rather than starting from nothing. Everything else — real-time pitch,
+features, stereo, tempo lock — was already built and measured, as this note
+originally said.
 
 
 ## 3b. Frequency-steered maze games
@@ -249,10 +270,22 @@ doing after those.
 
 ## 4. Known gaps, already recorded elsewhere
 
-- The two spec'd failure modes never implemented: a native fallback with a
-  visible badge when a worklet fails to load, and a CPU-overload meter. Both
-  matter more now the project is public and loading on unknown hardware.
+- **~~The two spec'd failure modes never implemented~~ — BOTH SHIPPED.** The
+  native fallback with a visible badge landed as
+  `src/engine/modules/worklet-fallback.ts` plus the badge `rack/panel.ts`
+  draws from `ModuleInstance.fallback`, and the CPU-overload meter as
+  `worklets/cpu-meter.worklet.ts` plus `rack/cpu-meter-panel.ts`. They did
+  matter more once the project went public, exactly as this line predicted.
+  **One caveat worth keeping:** the meter *reports* load, and the Drive /
+  Wavefolder `quality` remedy it motivated is **opt-in with Full as the
+  default**. Nothing degrades automatically, so a device that reads 100%
+  still reads 100% until a player flips those switches by hand. That is a
+  deliberate choice — the trade is real and measured, not free — but it means
+  "the CPU work is done" and "slow devices are fixed" are different claims.
 - `LiveRecorder.stop()` drops up to one 512-sample batch (3–8 ms) at the tail.
-  Bounded, documented, needs an async flush protocol to fix.
+  Bounded, documented, needs an async flush protocol to fix. **Still true** —
+  `finish()` disconnects and flattens synchronously, so any batch still in
+  flight on the worklet's message port is lost.
 - Deployment to the site is a manual build-and-commit. Automating it needs a
-  deploy key so a GitHub Action can push the built output.
+  deploy key so a GitHub Action can push the built output. **Still true** —
+  there is no `.github/workflows/`.

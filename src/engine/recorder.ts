@@ -60,10 +60,15 @@ export interface RecordingResult {
 export interface LiveRecorderOptions {
   /** Hard ceiling on recording length, chosen to make memory use bounded
    *  and *visible* rather than letting an operator who forgets a running
-   *  transport grow an unbounded `Float32Array` until the tab dies. Mono
-   *  float32 at 48 kHz is ~192 KB/s, so the default (300 s = 5 minutes)
-   *  caps a single recording at ~57.6 MB -- generous for "capture a
-   *  performance" while still being a number a browser tab shrugs off. */
+   *  transport grow an unbounded `Float32Array` until the tab dies.
+   *  **Stereo** float32 at 48 kHz is ~384 KB/s (`48000 * 2 * 4` bytes --
+   *  this recorder keeps `chunksL` and `chunksR`, so both channels count),
+   *  which puts the default 300 s = 5 minutes at ~115 MB. Generous for
+   *  "capture a performance" while still being a number a browser tab
+   *  shrugs off, and it matches the live heap growth measured in
+   *  `.superpowers/sdd/mobile-perf-report.md` (~12.46 MB over 31 s against
+   *  ~11.9 MB predicted) -- that measurement is what caught this comment
+   *  claiming the pre-stereo mono figure of ~57.6 MB. */
   maxSeconds?: number
   /** Called once, from inside a worklet-message handler, if `maxSeconds` is
    *  reached before an explicit `stop()` -- the caller's only way to learn

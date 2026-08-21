@@ -563,10 +563,16 @@ both paths. Titles stay descriptive; real names live in the briefs.
 - Noise module: exactly-periodic 2 s loop, and `color` is a binary
   20 kHz/1200 Hz switch behind a continuous-looking knob. It snaps at the
   midpoint.
-- Spec section 11's "worklet fails to load → native approximation + badge"
-  and "CPU overload → load meter" failure modes were never built.
-  `ensureWorklets()` just rethrows; nothing counts render-quantum overruns.
-  Found during this documentation audit, not fixed by it.
+- ~~Spec section 11's "worklet fails to load → native approximation + badge"
+  and "CPU overload → load meter" failure modes were never built.~~
+  **Both shipped since** — `modules/worklet-fallback.ts` and the badge
+  `rack/panel.ts` draws from `ModuleInstance.fallback` (commit `f9073c3`),
+  and `worklets/cpu-meter.worklet.ts` + `rack/cpu-meter-panel.ts` (commit
+  `f3c44b0`). This bullet outlived its own fix by a day and was caught by the
+  2026-08-21 stale-rung audit, not by anything failing. The caveat that
+  matters: the meter reports load and the Drive/Wavefolder `quality` remedy
+  is opt-in at Full by default, so nothing degrades automatically on a slow
+  device — see ROADMAP section 4.
 
 ---
 
