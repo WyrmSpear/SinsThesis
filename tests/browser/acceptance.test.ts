@@ -27,7 +27,7 @@ describe('Phase 1 acceptance', () => {
     // comment, and dsp/flanger.ts for why the Flanger owns its delay line
     // while the Chorus is free to use native DelayNodes -- the same
     // render-quantum-in-a-cycle rule, applied to two different graphs).
-    expect(ALL_DESCRIPTORS.length).toBe(29)
+    expect(ALL_DESCRIPTORS.length).toBe(30)
   })
 
   it('renders the classic voice: VCO into VCF into VCA into Output', async () => {

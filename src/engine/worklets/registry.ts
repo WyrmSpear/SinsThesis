@@ -14,6 +14,7 @@ export const WORKLET_MODULES = [
   'sampler',
   'bitcrusher',
   'flanger',
+  'compressor',
   'binaural',
   'isochronic',
   'cpu-meter',

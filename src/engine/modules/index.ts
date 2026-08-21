@@ -28,6 +28,7 @@ import { freqBankDescriptor } from './freq-bank'
 import { ringDescriptor } from './ring'
 import { flangerDescriptor } from './flanger'
 import { chorusDescriptor } from './chorus'
+import { compressorDescriptor } from './compressor'
 
 /** The Phase 1 module set, plus Phase 2's scope, the state-variable filter
  *  (the roadmap's "biggest gap" -- see docs/ROADMAP.md section 1 and
@@ -65,7 +66,7 @@ import { chorusDescriptor } from './chorus'
 export const ALL_DESCRIPTORS = [
   vcoDescriptor, noiseDescriptor, samplerDescriptor, binauralDescriptor, isochronicDescriptor, freqBankDescriptor,
   vcfDescriptor, svfDescriptor, vcaDescriptor, wavefolderDescriptor, driveDescriptor, bitcrusherDescriptor,
-  ringDescriptor, flangerDescriptor, chorusDescriptor,
+  ringDescriptor, flangerDescriptor, chorusDescriptor, compressorDescriptor,
   adsrDescriptor, lfoDescriptor, shDescriptor,
   mixerDescriptor, multipleDescriptor, delayDescriptor, pingpongDescriptor,
   clockDescriptor, sequencerDescriptor, keyboardMidiDescriptor, outputDescriptor,
