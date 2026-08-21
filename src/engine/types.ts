@@ -94,6 +94,35 @@ export interface ModuleInstance {
    * "save undefined" -- `patch.ts` omits the field entirely in that case.
    */
   serializeState?(): unknown
+  /**
+   * Present only when this instance is not running the module's real
+   * worklet DSP -- absent (not `undefined`-valued, actually omitted) is
+   * the overwhelmingly common case and means "running normally." Set by a
+   * descriptor's own `create()` when `worklets/registry.ts`'s
+   * `workletAvailable()` read `false` for the processor this module needs
+   * (see `docs/superpowers/specs/2026-08-18-sinsthesis-phase1-design.md`
+   * section 11's "worklet fails to load" failure mode, and
+   * `.superpowers/sdd/robustness-report.md` for which modules land in
+   * which bucket and why):
+   *
+   * - `'degraded'` -- a native Web Audio node stands in for the worklet.
+   *   It is a genuinely different signal path (an `OscillatorNode`
+   *   aliasing where a wavetable wouldn't, a `BiquadFilterNode` in place
+   *   of a four-pole ladder, ...), not a hidden compromise -- `reason`
+   *   says what changed in a sentence a player can act on.
+   * - `'failed'` -- no honest native equivalent exists for this module
+   *   (the segment-based envelope/LFO/S&H/sequencer family, and the
+   *   bitcrusher's deliberately-unfiltered aliasing) or none was built;
+   *   this instance is a silent structural stub -- its ports exist so
+   *   cabling and patch save/load don't break, but no signal passes
+   *   through it -- rather than a fabricated approximation that would
+   *   behave differently in a way nothing tells the player about.
+   *
+   * `rack/panel.ts` reads this to draw the badge every module -- degraded
+   * or failed -- must show rather than failing silently; nothing in
+   * `src/engine/**` itself renders anything from it.
+   */
+  fallback?: { level: 'degraded' | 'failed'; reason: string }
   /** Called after `setParam` has applied every saved param, with exactly
    *  what this instance's own `serializeState` last returned (or, loading
    *  a file saved by a different build, whatever shape *that* build's

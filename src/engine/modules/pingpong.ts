@@ -1,6 +1,7 @@
 import type { ModuleDescriptor, ModuleInstance } from '../types'
 import { scheduleParam } from '../param-smoothing'
 import { DIVISION_LABELS } from '../dsp/clock-sync'
+import { tryCreateWorkletNode, buildFailedInstance } from './worklet-fallback'
 
 const MAX_DELAY_SECONDS = 2
 
@@ -66,11 +67,29 @@ export const pingpongDescriptor: ModuleDescriptor = {
     { kind: 'jack', ref: 'out', x: 1, y: 3 },
   ],
   create(ctx): ModuleInstance {
-    const node = new AudioWorkletNode(ctx, 'pingpong', {
+    const node = tryCreateWorkletNode(ctx, 'pingpong', {
       numberOfInputs: 3,
       numberOfOutputs: 1,
       outputChannelCount: [2],
     })
+    // Not in this pass's genuine-fallback set (see
+    // `.superpowers/sdd/robustness-report.md`) -- a plain `DelayNode` pair
+    // could approximate the cross-feedback topology, but this module's own
+    // doc comment already treats getting that topology *exactly* right as
+    // the hard, deliberate part of its design (dsp/pingpong.ts); a rushed
+    // approximation risked exactly the "sounds impressive, secretly wrong"
+    // failure mode this codebase's own audits keep finding by measurement,
+    // not by reasoning. Fails loudly instead: the delay is silent, the
+    // dry signal it would have mixed with is gone too, and the badge says
+    // so -- worse for a Ping-Pong-heavy patch than a partial native delay
+    // would be, and honest about that trade-off rather than hiding it.
+    if (!node) {
+      return buildFailedInstance(
+        ctx,
+        pingpongDescriptor.ports,
+        "The Ping-Pong Delay worklet didn't load, so this module passes no signal. No native fallback was built for its cross-feedback topology.",
+      )
+    }
     const audioIn = ctx.createGain()
     const timeCvIn = ctx.createGain()
     const syncIn = ctx.createGain()

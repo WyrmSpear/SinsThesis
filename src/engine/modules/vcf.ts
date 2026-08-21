@@ -1,5 +1,72 @@
 import type { ModuleDescriptor, ModuleInstance } from '../types'
 import { scheduleParam } from '../param-smoothing'
+import { tryCreateWorkletNode } from './worklet-fallback'
+
+/**
+ * Native fallback for when `ladder.js` didn't load. `BiquadFilterNode`'s
+ * `'lowpass'` type is a real fallback -- see `types.ts`'s `fallback` doc
+ * comment's honesty rule -- but a genuinely different one from the real
+ * four-pole ladder: two-pole (−12 dB/oct, not the ladder's four-pole
+ * −24 dB/oct passing through the same −18-to−68 dB/oct curve `dsp/
+ * ladder.ts` measures), no self-oscillation at any resonance, and no
+ * transistor-style saturation on the resonant loop -- the badge says so
+ * rather than pretending this is the same filter. `cutoffCv` still tracks
+ * genuinely exponentially: `BiquadFilterNode.detune` is cents, same as
+ * `OscillatorNode.detune` (see vco.ts's own fallback doc comment for the
+ * mechanism), so scaling the CV input by `cutoffCvAmount * 1200` and
+ * summing it into `detune` reproduces real octave-per-volt tracking
+ * through nothing but `AudioParam` summing. `drive` becomes a plain
+ * pre-filter gain into a fixed `tanh`-shaped `WaveShaperNode` -- audibly
+ * "more drive = more grit," not a calibrated match for the ladder's own
+ * measured alias floor.
+ */
+function buildLadderFallback(ctx: BaseAudioContext): ModuleInstance {
+  const preGain = ctx.createGain()
+  const shaper = ctx.createWaveShaper()
+  const curve = new Float32Array(1024)
+  for (let i = 0; i < curve.length; i++) {
+    const x = (i / (curve.length - 1)) * 2 - 1
+    curve[i] = Math.tanh(x)
+  }
+  shaper.curve = curve
+  const filter = ctx.createBiquadFilter()
+  filter.type = 'lowpass'
+  filter.frequency.value = 1000
+  filter.Q.value = 0.7
+
+  preGain.connect(shaper)
+  shaper.connect(filter)
+
+  const cvFront = ctx.createGain()
+  const cvDepth = ctx.createGain()
+  cvDepth.gain.value = 0
+  cvFront.connect(cvDepth)
+  cvDepth.connect(filter.detune)
+
+  return {
+    inputs: new Map<string, AudioNode | AudioParam>([['in', preGain], ['cutoffCv', cvFront]]),
+    outputs: new Map([['out', filter as AudioNode]]),
+    fallback: {
+      level: 'degraded',
+      reason:
+        "The ladder filter worklet didn't load, so this is a native two-pole lowpass instead. " +
+        'No self-oscillation and a shallower slope than the real four-pole ladder.',
+    },
+    setParam(id, value, atTime) {
+      if (id === 'cutoff') scheduleParam(filter.frequency, value, ctx, atTime)
+      else if (id === 'resonance') scheduleParam(filter.Q, 0.7 + value * 20, ctx, atTime)
+      else if (id === 'cutoffCvAmount') cvDepth.gain.value = value * 1200
+      else if (id === 'drive') preGain.gain.value = value
+    },
+    dispose() {
+      preGain.disconnect()
+      shaper.disconnect()
+      filter.disconnect()
+      cvFront.disconnect()
+      cvDepth.disconnect()
+    },
+  }
+}
 
 /** This module's four-pole lowpass topology traces to Robert Moog's
  *  transistor-ladder filter, filed October 10, 1966 and granted as US
@@ -56,11 +123,12 @@ export const vcfDescriptor: ModuleDescriptor = {
     { kind: 'jack', ref: 'out', x: 0, y: 4 },
   ],
   create(ctx): ModuleInstance {
-    const node = new AudioWorkletNode(ctx, 'ladder', {
+    const node = tryCreateWorkletNode(ctx, 'ladder', {
       numberOfInputs: 2,
       numberOfOutputs: 1,
       outputChannelCount: [1],
     })
+    if (!node) return buildLadderFallback(ctx)
     const audioIn = ctx.createGain()
     const cvIn = ctx.createGain()
     audioIn.connect(node, 0, 0)

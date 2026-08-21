@@ -1,6 +1,7 @@
 import type { ModuleDescriptor, ModuleInstance } from '../types'
 import { scheduleParam } from '../param-smoothing'
 import { DIVISION_LABELS } from '../dsp/clock-sync'
+import { tryCreateWorkletNode, buildFailedInstance } from './worklet-fallback'
 
 export const lfoDescriptor: ModuleDescriptor = {
   type: 'lfo',
@@ -61,11 +62,25 @@ export const lfoDescriptor: ModuleDescriptor = {
     { kind: 'jack', ref: 'out', x: 1, y: 3 },
   ],
   create(ctx): ModuleInstance {
-    const node = new AudioWorkletNode(ctx, 'lfo', {
+    const node = tryCreateWorkletNode(ctx, 'lfo', {
       numberOfInputs: 1,
       numberOfOutputs: 1,
       outputChannelCount: [1],
     })
+    // Same "no honest native equivalent" reasoning as adsr.ts. A plain
+    // `OscillatorNode` could draw Saw/Tri/Sine, but not this module's
+    // Pulse shape, its clock-locked `division` (dsp/clock-sync.ts), or its
+    // sync-resets-phase behavior -- a partial LFO that silently drops
+    // clock-sync on the one preset that leans on it (Tempo-Locked Wobble)
+    // is exactly the "behaves differently in a way nothing tells the
+    // player about" case this fails loudly instead of risking.
+    if (!node) {
+      return buildFailedInstance(
+        ctx,
+        lfoDescriptor.ports,
+        "The LFO worklet didn't load, so this module outputs no signal. No native fallback exists for its clock-synced shapes.",
+      )
+    }
     const syncIn = ctx.createGain()
     syncIn.connect(node, 0, 0)
 

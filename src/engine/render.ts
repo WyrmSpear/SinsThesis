@@ -1,25 +1,51 @@
 import { PatchGraph } from './graph'
-import { WORKLET_MODULES, workletUrl } from './worklets/registry'
+import { WORKLET_MODULES, workletUrl, markWorkletLoaded, loadedWorkletBundles } from './worklets/registry'
 import { loadPatch, type PatchFile } from './patch'
 
 const loading = new WeakMap<BaseAudioContext, Promise<void>>()
 
-/** Load every worklet into a context. Safe to call repeatedly and concurrently:
- *  overlapping callers share one in-flight load rather than racing to register
- *  the same processor twice. */
+/**
+ * Load every worklet bundle into a context. Safe to call repeatedly and
+ * concurrently: overlapping callers share one in-flight load rather than
+ * racing to register the same processor twice.
+ *
+ * **Honest at the plumbing level, on purpose.** Every individual
+ * `addModule()` call is tracked as it resolves (`markWorkletLoaded`,
+ * `worklets/registry.ts`), independent of whatever the *combined* promise
+ * below ends up doing -- so if, say, `bitcrusher.js` 404s while the other
+ * fourteen bundles load fine, `workletAvailable(ctx, 'bitcrusher')` reads
+ * `false` and every other bundle reads `true` the moment this settles,
+ * even though this function itself still rejects. That rejection is
+ * preserved deliberately (not swallowed into a partial-success resolve):
+ * it is the one signal a caller has that something didn't load, and
+ * dropping the cached promise on it is what lets a caller who fixes the
+ * problem (a flaky connection recovering) retry and actually pick up the
+ * bundle that failed -- `WORKLET_MODULES.filter` below only re-attempts
+ * whatever `loadedWorkletBundles` doesn't already have, so a retry never
+ * re-fetches (or double-`registerProcessor`s) a bundle that already made
+ * it. What was missing before this file changed is not here -- it's the
+ * module-level response to a `false` reading, which each worklet-backed
+ * descriptor's own `create()` now supplies (native fallback, or an honest
+ * failure state) -- see `docs/CONTINUATION.md`'s recorded gap and
+ * `.superpowers/sdd/robustness-report.md`.
+ */
 export function ensureWorklets(ctx: BaseAudioContext): Promise<void> {
   let inFlight = loading.get(ctx)
   if (!inFlight) {
-    inFlight = Promise.all(
-      WORKLET_MODULES.map((name) => ctx.audioWorklet.addModule(workletUrl(name))),
-    )
-      .then(() => undefined)
-      .catch((err: unknown) => {
+    const already = loadedWorkletBundles(ctx)
+    inFlight = Promise.allSettled(
+      WORKLET_MODULES.filter((name) => !already.has(name)).map((name) =>
+        ctx.audioWorklet.addModule(workletUrl(name)).then(() => markWorkletLoaded(ctx, name)),
+      ),
+    ).then((results) => {
+      const failed = results.find((r): r is PromiseRejectedResult => r.status === 'rejected')
+      if (failed) {
         // A failed load must not poison the context for good: drop the cached
         // rejection so the next caller gets a fresh attempt.
         loading.delete(ctx)
-        throw err
-      })
+        throw failed.reason as unknown
+      }
+    })
     loading.set(ctx, inFlight)
   }
   return inFlight

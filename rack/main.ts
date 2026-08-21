@@ -95,7 +95,27 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
   powerBtn.textContent = 'STARTING…'
 
   const ctx = new AudioContext()
-  await ensureWorklets(ctx)
+  // Section 11's "a worklet fails to load" failure mode: `ensureWorklets`
+  // still rejects if even one of its bundles' `addModule()` call failed
+  // (render.ts's own doc comment explains why that's preserved on
+  // purpose), but a rejection here must not take the whole rack down with
+  // it -- before this fix, an uncaught throw left `powerBtn` stuck reading
+  // "STARTING…" forever, silence with no explanation, worse than the one
+  // module this is actually about. Every bundle that *did* load is
+  // already recorded (`worklets/registry.ts`'s `markWorkletLoaded`, called
+  // per-bundle as each `addModule()` resolves, independent of this
+  // combined promise's own fate) by the time this `catch` runs, so
+  // `buildDefaultPatch`/`loadPatch` below still build every module whose
+  // worklet made it -- only the specific module(s) whose bundle didn't
+  // fall back or fail loudly, each with its own visible badge
+  // (rack/panel.ts). See `.superpowers/sdd/robustness-report.md`.
+  let workletLoadFailed = false
+  try {
+    await ensureWorklets(ctx)
+  } catch (err) {
+    workletLoadFailed = true
+    console.error('SinsThesis: one or more audio worklets failed to load.', err)
+  }
   if (ctx.state === 'suspended') await ctx.resume()
 
   const rackEl = $('rack-modules')
@@ -955,6 +975,12 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
     }
   } else {
     mountGraph(buildDefaultPatch())
+  }
+  if (workletLoadFailed) {
+    const note =
+      "Some audio components didn't load, so a few modules are running in a reduced mode or " +
+      'are disabled -- check each module\'s panel for details.'
+    showBanner('warn', statusBanner.hidden ? note : `${statusBanner.textContent} ${note}`)
   }
   patchNameInput.value = currentPatchName
   renderStudio()

@@ -146,6 +146,47 @@ body {
   color: var(--knob-indicator);
 }
 
+/* ---- CPU load meter (Section 11: "CPU overload -> load meter") ----
+ * Lives directly in the toolbar -- see rack/cpu-meter-panel.ts's own doc
+ * comment for why "before they are confused, not buried" means toolbar,
+ * not a drawer. `margin-left: auto` pins it to the toolbar's right edge,
+ * away from the buttons a player is actively clicking, while `flex-wrap`
+ * on `.toolbar` still lets it drop to its own line on a narrow window
+ * rather than overlapping anything.
+ */
+.cpu-meter {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+  font-size: var(--text-2xs);
+  color: var(--text-dim);
+}
+
+.cpu-meter-track {
+  width: 70px;
+  height: 8px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--surface-recess);
+  border: 1px solid var(--panel-border);
+}
+
+.cpu-meter-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--knob-indicator);
+  transition: width 120ms linear;
+}
+
+.cpu-meter-fill-hot { background: var(--text-warn); }
+.cpu-meter-fill-over { background: var(--lamp-warn); }
+
+.cpu-meter-readout {
+  white-space: nowrap;
+  letter-spacing: var(--tracking-label);
+}
+
 /* ---- free play / academy mode toggle ---- */
 .mode-toggle {
   display: flex;
@@ -950,6 +991,40 @@ body {
   text-align: center;
   padding: 0.2rem;
 }
+
+/* ---- worklet fallback badge (Section 11: "a worklet fails to load") ----
+ * Same two-tier color convention the rest of the rack already uses for
+ * "notice this" vs. "this is broken": `--text-warn` for a degraded module
+ * still making sound on a different signal path, `--lamp-warn` (already
+ * `.status-banner-error`'s own color) for a module that produced no
+ * fallback and is silent. Appended after the grid, same placement and the
+ * same "may push past the fixed 3U panel height in this one non-default
+ * state" trade-off `.custom-panel-missing` above already accepts -- this
+ * only ever renders when a module's own `create()` actually fell back
+ * (see rack/panel.ts), never for an ordinary module, so it cannot affect
+ * `tests/browser/theme-geometry.test.ts`'s pixel-identical measurements,
+ * which never simulate a worklet failure. */
+.module-fallback-badge {
+  margin-top: 0.5rem;
+  font-size: var(--text-2xs);
+  letter-spacing: var(--tracking-label);
+  line-height: 1.35;
+  border-radius: 3px;
+  padding: 0.3rem 0.4rem;
+}
+
+.module-fallback-degraded {
+  color: var(--text-warn);
+  border: 1px dashed var(--text-warn);
+}
+
+.module-fallback-failed {
+  color: var(--lamp-warn);
+  border: 1px solid var(--lamp-warn);
+}
+
+.module-panel-fallback-degraded { border-color: var(--text-warn); }
+.module-panel-fallback-failed { border-color: var(--lamp-warn); }
 
 /* ---- custom-panel escape hatch ---- */
 .custom-panel-content { margin-top: 0.6rem; }

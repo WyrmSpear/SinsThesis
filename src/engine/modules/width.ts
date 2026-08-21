@@ -1,5 +1,6 @@
 import type { ModuleDescriptor, ModuleInstance } from '../types'
 import { scheduleParam } from '../param-smoothing'
+import { tryCreateWorkletNode, buildFailedInstance } from './worklet-fallback'
 
 /**
  * Stereo in, stereo out -- a mid-side spatialiser, ROADMAP section 1a's
@@ -48,11 +49,27 @@ export const widthDescriptor: ModuleDescriptor = {
     input.channelCountMode = 'explicit'
     input.channelInterpretation = 'speakers'
 
-    const node = new AudioWorkletNode(ctx, 'width', {
+    const node = tryCreateWorkletNode(ctx, 'width', {
       numberOfInputs: 1,
       numberOfOutputs: 1,
       outputChannelCount: [2],
     })
+    // Not in this pass's genuine-fallback set -- see
+    // `.superpowers/sdd/robustness-report.md`. Mid-side widening is
+    // actually exact linear algebra (mid +/- side, scaled) that native
+    // `ChannelSplitterNode`/`ChannelMergerNode`/`GainNode`s could
+    // reproduce losslessly, unlike this file's other approximated
+    // fallbacks -- left as a real follow-up rather than attempted under
+    // this pass's time budget; failing loudly here is conservative, not a
+    // claim that no honest fallback is possible.
+    if (!node) {
+      input.disconnect()
+      return buildFailedInstance(
+        ctx,
+        widthDescriptor.ports,
+        "The Width worklet didn't load, so this module passes no signal. A native fallback wasn't built for it in this pass.",
+      )
+    }
     input.connect(node)
 
     return {

@@ -289,6 +289,27 @@ export function buildPanel(
 
   panel.append(header, grid)
 
+  // Section 11's "worklet fails to load" failure mode: a module whose
+  // `create()` (src/engine/modules/*.ts) fell back to a native node, or
+  // gave up and returned a silent stub, sets `ModuleInstance.fallback`
+  // (types.ts) rather than pretending nothing happened. This is the one
+  // place that state becomes visible -- a badge, not a console log a
+  // player never opens -- so "silence with no explanation" (the failure
+  // this exists to fix) cannot happen even if every other layer stays
+  // silent. Reads through `graph.getInstance`, not a prop threaded in,
+  // because a ghost (`instance === null`) never reaches `buildPanel` at
+  // all (`ghost-panel.ts` renders those), so `fallback` is only ever
+  // asked of a module that really has a live instance to ask.
+  const fallback = graph.getInstance(moduleId)?.fallback
+  if (fallback) {
+    panel.classList.add(`module-panel-fallback-${fallback.level}`)
+    const badge = document.createElement('div')
+    badge.className = `module-fallback-badge module-fallback-${fallback.level}`
+    badge.dataset['testid'] = `fallback-badge-${moduleId}`
+    badge.textContent = (fallback.level === 'degraded' ? 'REDUCED MODE — ' : 'NOT RUNNING — ') + fallback.reason
+    panel.append(badge)
+  }
+
   if (descriptor.customPanel) {
     const builder = opts.customPanels?.[descriptor.customPanel]
     if (builder) {

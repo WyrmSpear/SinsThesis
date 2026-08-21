@@ -1,5 +1,94 @@
 import type { ModuleDescriptor, ModuleInstance } from '../types'
 import { scheduleParam } from '../param-smoothing'
+import { tryCreateWorkletNode } from './worklet-fallback'
+
+const SVF_FALLBACK_TYPES: Record<'lp' | 'bp' | 'hp' | 'notch', BiquadFilterType> = {
+  lp: 'lowpass',
+  bp: 'bandpass',
+  hp: 'highpass',
+  notch: 'notch',
+}
+
+/**
+ * Native fallback for when `svf.js` didn't load. Four `BiquadFilterNode`s
+ * in parallel, one per `BiquadFilterType` that matches this module's own
+ * four simultaneous outputs, is a genuinely real fallback for "simultaneous
+ * lp/bp/hp/notch from one cutoff" -- see vcf.ts's own fallback doc comment
+ * for why `BiquadFilterNode` earns that word rather than being a token
+ * gesture, and `types.ts`'s `fallback` doc comment for the honesty rule
+ * this follows. What's genuinely different, and said in the badge: two-pole
+ * (−12 dB/oct) rather than this module's real two-pole-but-differently-
+ * voiced Oberheim-style topology (`dsp/svf.ts`'s own doc comment), and each
+ * output is its own independent filter rather than four taps on one shared
+ * state -- audibly close for a steady cutoff, not identical under fast
+ * modulation. `cutoffCv` still tracks genuinely exponentially through
+ * `detune` (cents), the same mechanism vco.ts's and vcf.ts's own fallbacks
+ * use, applied to all four filters in lockstep so they stay in tune with
+ * each other.
+ */
+function buildSvfFallback(ctx: BaseAudioContext): ModuleInstance {
+  const input = ctx.createGain()
+  const cvFront = ctx.createGain()
+  const cvDepths: GainNode[] = []
+  const filters = new Map<'lp' | 'bp' | 'hp' | 'notch', BiquadFilterNode>()
+  const outs = new Map<'lp' | 'bp' | 'hp' | 'notch', GainNode>()
+
+  for (const key of Object.keys(SVF_FALLBACK_TYPES) as (keyof typeof SVF_FALLBACK_TYPES)[]) {
+    const filter = ctx.createBiquadFilter()
+    filter.type = SVF_FALLBACK_TYPES[key]
+    filter.frequency.value = 1000
+    filter.Q.value = 0.7
+    input.connect(filter)
+
+    const cvDepth = ctx.createGain()
+    cvDepth.gain.value = 0
+    cvFront.connect(cvDepth)
+    cvDepth.connect(filter.detune)
+    cvDepths.push(cvDepth)
+
+    // R29's own reasoning applies here too: front every output with its
+    // own GainNode so this module's four simultaneous outputs stay
+    // distinct nodes a cable can address independently.
+    const out = ctx.createGain()
+    filter.connect(out)
+
+    filters.set(key, filter)
+    outs.set(key, out)
+  }
+
+  return {
+    inputs: new Map<string, AudioNode | AudioParam>([['in', input], ['cutoffCv', cvFront]]),
+    outputs: new Map<string, AudioNode>([
+      ['lp', outs.get('lp')!],
+      ['bp', outs.get('bp')!],
+      ['hp', outs.get('hp')!],
+      ['notch', outs.get('notch')!],
+    ]),
+    fallback: {
+      level: 'degraded',
+      reason:
+        "The state-variable filter worklet didn't load, so this is four independent native " +
+        'two-pole filters instead. Close for a steady cutoff, not identical under fast modulation.',
+    },
+    setParam(id, value, atTime) {
+      if (id === 'cutoff') {
+        for (const filter of filters.values()) scheduleParam(filter.frequency, value, ctx, atTime)
+      } else if (id === 'resonance') {
+        const q = 0.7 + value * 20
+        for (const filter of filters.values()) scheduleParam(filter.Q, q, ctx, atTime)
+      } else if (id === 'cutoffCvAmount') {
+        for (const depth of cvDepths) depth.gain.value = value * 1200
+      }
+    },
+    dispose() {
+      input.disconnect()
+      cvFront.disconnect()
+      for (const depth of cvDepths) depth.disconnect()
+      for (const filter of filters.values()) filter.disconnect()
+      for (const out of outs.values()) out.disconnect()
+    },
+  }
+}
 
 /** The simultaneous lowpass/bandpass/highpass/notch outputs below are Tom
  *  Oberheim's state-variable topology, introduced in his SEM (1974) as the
@@ -50,11 +139,12 @@ export const svfDescriptor: ModuleDescriptor = {
     { kind: 'jack', ref: 'notch', x: 1, y: 4 },
   ],
   create(ctx): ModuleInstance {
-    const node = new AudioWorkletNode(ctx, 'svf', {
+    const node = tryCreateWorkletNode(ctx, 'svf', {
       numberOfInputs: 2,
       numberOfOutputs: 4,
       outputChannelCount: [1, 1, 1, 1],
     })
+    if (!node) return buildSvfFallback(ctx)
     const audioIn = ctx.createGain()
     const cvIn = ctx.createGain()
     audioIn.connect(node, 0, 0)

@@ -1,5 +1,6 @@
 import type { ModuleDescriptor, ModuleInstance } from '../types'
 import { scheduleParam } from '../param-smoothing'
+import { tryCreateWorkletNode, buildFailedInstance } from './worklet-fallback'
 
 /**
  * Bit-depth and sample-rate reduction -- the Speak & Spell/SP-1200/early-
@@ -54,11 +55,26 @@ export const bitcrusherDescriptor: ModuleDescriptor = {
     { kind: 'jack', ref: 'out', x: 1, y: 4 },
   ],
   create(ctx): ModuleInstance {
-    const node = new AudioWorkletNode(ctx, 'bitcrusher', {
+    const node = tryCreateWorkletNode(ctx, 'bitcrusher', {
       numberOfInputs: 3,
       numberOfOutputs: 1,
       outputChannelCount: [1],
     })
+    // No honest native equivalent, and deliberately not attempted: this
+    // module's whole reason to exist is its specific, deliberately
+    // unfiltered aliasing (see this file's own doc comment and `dsp/
+    // bitcrusher.ts`'s), and no built-in WebAudio node reproduces true
+    // bit-depth/sample-rate decimation -- a `WaveShaperNode` quantizes
+    // amplitude but cannot hold samples across time the way a
+    // sample-and-hold-style rate reduction needs. Fails loudly rather than
+    // shipping a different-sounding "lo-fi-ish" substitute with no warning.
+    if (!node) {
+      return buildFailedInstance(
+        ctx,
+        bitcrusherDescriptor.ports,
+        "The Bitcrusher worklet didn't load, so this module is silent. No native fallback exists for bit/rate decimation.",
+      )
+    }
     const fronts = ['in', 'bitsCv', 'rateCv'].map((_, index) => {
       const gain = ctx.createGain()
       gain.connect(node, 0, index)

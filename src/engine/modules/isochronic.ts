@@ -1,6 +1,7 @@
 import type { ModuleDescriptor, ModuleInstance } from '../types'
 import { scheduleParam } from '../param-smoothing'
 import { DIVISION_LABELS } from '../dsp/clock-sync'
+import { tryCreateWorkletNode, buildFailedInstance } from './worklet-fallback'
 
 /**
  * A sine carrier, amplitude-gated at a precise rate. This is the
@@ -74,11 +75,26 @@ export const isochronicDescriptor: ModuleDescriptor = {
     { kind: 'jack', ref: 'out', x: 1, y: 3 },
   ],
   create(ctx): ModuleInstance {
-    const node = new AudioWorkletNode(ctx, 'isochronic', {
+    const node = tryCreateWorkletNode(ctx, 'isochronic', {
       numberOfInputs: 1,
       numberOfOutputs: 1,
       outputChannelCount: [1],
     })
+    // Not in this pass's genuine-fallback set -- see
+    // `.superpowers/sdd/robustness-report.md`. A native `OscillatorNode`
+    // gated by a `GainNode` could approximate the carrier/gate mechanism,
+    // but this module's own doc comment measures its click-free edges
+    // (0.0027 against 1.0000 for a hard gate) as the entire reason it
+    // isn't a bare square-wave AM -- a fallback that reintroduced that
+    // click would be exactly the "faking a bad approximation" this
+    // project's failure-mode brief warns against. Fails loudly instead.
+    if (!node) {
+      return buildFailedInstance(
+        ctx,
+        isochronicDescriptor.ports,
+        "The Isochronic worklet didn't load, so this module is silent. A native fallback wasn't built for it in this pass.",
+      )
+    }
     const syncIn = ctx.createGain()
     syncIn.connect(node, 0, 0)
 

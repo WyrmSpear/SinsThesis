@@ -1,5 +1,102 @@
 import type { ModuleDescriptor, ModuleInstance } from '../types'
 import { scheduleParam } from '../param-smoothing'
+import { tryCreateWorkletNode } from './worklet-fallback'
+
+const FALLBACK_SHAPES: OscillatorType[] = ['sawtooth', 'square', 'triangle', 'sine']
+
+/**
+ * Native fallback for when `vco.js` didn't load (see
+ * `worklet-fallback.ts`'s own doc comment and
+ * `.superpowers/sdd/robustness-report.md`). An `OscillatorNode` is a real
+ * fallback, not a token gesture: three of the four shapes it draws are
+ * the genuine article (no aliasing shortcuts, no wavetable this project's
+ * own worklet exists to avoid), and pitch tracking is genuinely
+ * exponential, not a linear approximation -- `detune` is defined in cents
+ * (`freq = base * 2^(detune/1200)`), so scaling a "1V/oct" CV input by
+ * 1200 and feeding it straight into `detune` reproduces real 1V/octave
+ * tracking through nothing but WebAudio's own `AudioParam` summing, the
+ * same additive-front convention every worklet module in this codebase
+ * already uses for its own input ports.
+ *
+ * What's honestly lost, and said so in the badge: `OscillatorNode` has no
+ * pulse-width control (`'square'` is a fixed 50% duty cycle, so `Pulse`
+ * plays but `pulseWidth` does nothing) and no hard-sync input (`sync` is
+ * accepted -- the port has to exist for cabling and `.sinp` round-trips to
+ * keep working -- but wired to nothing, same as this project's real VCO
+ * worklet's own documented sync limitation, see `docs/CONTINUATION.md`'s
+ * "hard sync... is unsolved in both architectures studied").
+ */
+function buildVcoFallback(ctx: BaseAudioContext): ModuleInstance {
+  const osc = ctx.createOscillator()
+  osc.frequency.value = 440
+  osc.type = 'sawtooth'
+  osc.start()
+
+  // 1200 cents/volt -- see this function's own doc comment for why this
+  // is genuine 1V/oct tracking, not an approximation of it.
+  const pitchFront = ctx.createGain()
+  pitchFront.gain.value = 1200
+  pitchFront.connect(osc.detune)
+
+  // fmAmount (a knob, 0-4) scales how many cents of `detune` swing one
+  // full-scale volt on the `fm` input produces -- 1200 cents (one octave)
+  // per unit, an arbitrary but documented convention for this fallback
+  // only; the real worklet's own FM scaling is unrelated and unmatched
+  // here on purpose (see the badge reason: this is a different signal
+  // path, not a hidden imitation of the original one).
+  const fmFront = ctx.createGain()
+  const fmDepth = ctx.createGain()
+  fmDepth.gain.value = 0
+  fmFront.connect(fmDepth)
+  fmDepth.connect(osc.detune)
+
+  // No hard sync in this mode -- see doc comment. The port stays present
+  // and harmlessly unconnected so cabling and `.sinp` round-trips work.
+  const syncFront = ctx.createGain()
+
+  let tune = 0
+  let octave = 0
+  const applyBaseDetune = (atTime?: number): void => {
+    scheduleParam(osc.detune, tune * 100 + octave * 1200, ctx, atTime)
+  }
+
+  return {
+    inputs: new Map<string, AudioNode | AudioParam>([
+      ['pitch', pitchFront],
+      ['fm', fmFront],
+      ['sync', syncFront],
+    ]),
+    outputs: new Map([['out', osc as AudioNode]]),
+    fallback: {
+      level: 'degraded',
+      reason:
+        "The VCO worklet didn't load, so this is a native oscillator instead. " +
+        'Pulse width and hard sync have no effect in this mode; Pulse plays as a fixed 50% square.',
+    },
+    setParam(id, value, atTime) {
+      if (id === 'tune') {
+        tune = value
+        applyBaseDetune(atTime)
+      } else if (id === 'octave') {
+        octave = value
+        applyBaseDetune(atTime)
+      } else if (id === 'shape') {
+        osc.type = FALLBACK_SHAPES[Math.round(value)] ?? 'sawtooth'
+      } else if (id === 'fmAmount') {
+        fmDepth.gain.value = value * 1200
+      }
+      // pulseWidth: accepted, no effect -- see this instance's own `fallback.reason`.
+    },
+    dispose() {
+      osc.stop()
+      osc.disconnect()
+      pitchFront.disconnect()
+      fmFront.disconnect()
+      fmDepth.disconnect()
+      syncFront.disconnect()
+    },
+  }
+}
 
 /**
  * Every input port is fronted by its own GainNode, so the graph connects with
@@ -51,11 +148,12 @@ export const vcoDescriptor: ModuleDescriptor = {
     { kind: 'jack', ref: 'out', x: 1, y: 4 },
   ],
   create(ctx): ModuleInstance {
-    const node = new AudioWorkletNode(ctx, 'vco', {
+    const node = tryCreateWorkletNode(ctx, 'vco', {
       numberOfInputs: 3,
       numberOfOutputs: 1,
       outputChannelCount: [1],
     })
+    if (!node) return buildVcoFallback(ctx)
 
     const fronts = ['pitch', 'fm', 'sync'].map((_, index) => {
       const gain = ctx.createGain()

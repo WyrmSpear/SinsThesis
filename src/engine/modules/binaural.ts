@@ -1,5 +1,6 @@
 import type { ModuleDescriptor, ModuleInstance } from '../types'
 import { scheduleParam } from '../param-smoothing'
+import { tryCreateWorkletNode, buildFailedInstance } from './worklet-fallback'
 
 /**
  * Two sine oscillators, one hard-panned to each ear, offset by a settable
@@ -89,11 +90,26 @@ export const binauralDescriptor: ModuleDescriptor = {
     { kind: 'jack', ref: 'out', x: 1, y: 3 },
   ],
   create(ctx): ModuleInstance {
-    const node = new AudioWorkletNode(ctx, 'binaural', {
+    const node = tryCreateWorkletNode(ctx, 'binaural', {
       numberOfInputs: 1,
       numberOfOutputs: 1,
       outputChannelCount: [2],
     })
+    // Not in this pass's genuine-fallback set -- see
+    // `.superpowers/sdd/robustness-report.md`. Two hard-panned
+    // `OscillatorNode`s could approximate the carrier +/- beat/2 split,
+    // but this module's own doc comment already treats the exact,
+    // phase-accurate `beat` derivation (`dsp/binaural.ts`) as
+    // load-bearing for sub-hertz precision; a rushed approximation risked
+    // getting exactly the number this module exists to be precise about
+    // wrong. Fails loudly instead.
+    if (!node) {
+      return buildFailedInstance(
+        ctx,
+        binauralDescriptor.ports,
+        "The Binaural worklet didn't load, so this module is silent. A native fallback wasn't built for it in this pass.",
+      )
+    }
     const beatCvFront = ctx.createGain()
     beatCvFront.connect(node, 0, 0)
 

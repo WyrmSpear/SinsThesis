@@ -1,5 +1,69 @@
 import type { ModuleDescriptor, ModuleInstance } from '../types'
 import { scheduleParam } from '../param-smoothing'
+import { tryCreateWorkletNode } from './worklet-fallback'
+
+/**
+ * Native fallback for when `drive.js` didn't load. `WaveShaperNode` is a
+ * real fallback for saturation -- see `types.ts`'s `fallback` doc
+ * comment's honesty rule -- built from two fixed curves matching this
+ * module's own Soft/Hard switch (a `tanh` curve for Soft, a hard clip for
+ * Hard, the same two characters `dsp/drive.ts`'s own doc comment
+ * describes), driven by a pre-gain scaled by `drive` and followed by a
+ * real `BiquadFilterNode` lowpass for `tone`. What's honestly different,
+ * in the badge: no antialiasing at all -- `dsp/drive.ts`'s worklet
+ * measures a −74 to −95 dB alias floor across drive and waveform; a static
+ * `WaveShaperNode` curve has none of that, so this aliases audibly at
+ * moderate-to-high drive on bright material, the same class of gap the
+ * wavefolder fallback documents for the same underlying reason.
+ */
+function buildDriveFallback(ctx: BaseAudioContext): ModuleInstance {
+  const SOFT_CURVE = new Float32Array(1024)
+  const HARD_CURVE = new Float32Array(1024)
+  for (let i = 0; i < SOFT_CURVE.length; i++) {
+    const x = (i / (SOFT_CURVE.length - 1)) * 2 - 1
+    SOFT_CURVE[i] = Math.tanh(x * 2)
+    HARD_CURVE[i] = Math.max(-0.8, Math.min(0.8, x * 3))
+  }
+
+  const preGain = ctx.createGain()
+  const shaper = ctx.createWaveShaper()
+  shaper.curve = SOFT_CURVE
+  const tone = ctx.createBiquadFilter()
+  tone.type = 'lowpass'
+  tone.frequency.value = 18000
+  const outGain = ctx.createGain()
+  preGain.connect(shaper)
+  shaper.connect(tone)
+  tone.connect(outGain)
+
+  const cvFront = ctx.createGain()
+  cvFront.connect(preGain.gain)
+
+  return {
+    inputs: new Map<string, AudioNode | AudioParam>([['in', preGain], ['driveCv', cvFront]]),
+    outputs: new Map([['out', outGain as AudioNode]]),
+    fallback: {
+      level: 'degraded',
+      reason:
+        "The drive worklet didn't load, so this is a native waveshaper instead. " +
+        'Unlike the real module, this has no antialiasing and can sound harsh at higher drive.',
+    },
+    setParam(id, value, atTime) {
+      if (id === 'drive') scheduleParam(preGain.gain, value, ctx, atTime)
+      else if (id === 'curve') shaper.curve = value >= 0.5 ? HARD_CURVE : SOFT_CURVE
+      else if (id === 'tone') scheduleParam(tone.frequency, value, ctx, atTime)
+      else if (id === 'level') scheduleParam(outGain.gain, value, ctx, atTime)
+      else if (id === 'driveCvAmount') cvFront.gain.value = value
+    },
+    dispose() {
+      preGain.disconnect()
+      shaper.disconnect()
+      tone.disconnect()
+      outGain.disconnect()
+      cvFront.disconnect()
+    },
+  }
+}
 
 export const driveDescriptor: ModuleDescriptor = {
   type: 'drive',
@@ -52,11 +116,12 @@ export const driveDescriptor: ModuleDescriptor = {
     { kind: 'jack', ref: 'out', x: 0, y: 4 },
   ],
   create(ctx): ModuleInstance {
-    const node = new AudioWorkletNode(ctx, 'drive', {
+    const node = tryCreateWorkletNode(ctx, 'drive', {
       numberOfInputs: 2,
       numberOfOutputs: 1,
       outputChannelCount: [1],
     })
+    if (!node) return buildDriveFallback(ctx)
     const audioIn = ctx.createGain()
     const cvIn = ctx.createGain()
     audioIn.connect(node, 0, 0)

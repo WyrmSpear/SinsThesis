@@ -5,6 +5,7 @@ import {
 } from '../dsp/sampler'
 import { encodeWav, decodeWav } from '../wav'
 import { bytesToBase64, base64ToBytes } from '../base64'
+import { tryCreateWorkletNode } from './worklet-fallback'
 
 /** Number of columns `getWaveform()` downsamples to for the panel's canvas
  *  -- fixed and generous enough for any panel width the rack draws this
@@ -113,6 +114,181 @@ export interface SamplerInstance extends ModuleInstance {
  * own long-standing design (explicit Save/Load is the durable path there),
  * not a new gap this module introduces.
  */
+/**
+ * Native fallback for when `sampler.js` didn't load. `AudioBufferSourceNode`
+ * covers the core case -- see `types.ts`'s `fallback` doc comment's honesty
+ * rule -- decoding the same embedded audio, playing it back at a real
+ * pitch-shifted rate (`playbackRate`, exact and click-free for the
+ * one-shot/loop case, unlike the real worklet's mipmapped cubic
+ * interpolation but a genuine resample nonetheless), honoring start/end
+ * trim, loop mode, and reverse (a real reversed copy of the buffer, built
+ * once, not skipped).
+ *
+ * **What's honestly not here, and said in the badge:** gate-triggered
+ * retriggering. The real module retriggers a fresh playback every time
+ * `gate` rises, sample-accurately, because it runs inside the audio
+ * thread's own per-sample loop; reacting to an arbitrary CV signal's rising
+ * edge from the main thread has no sample-accurate answer without a
+ * worklet, and a laggy, best-effort approximation (polling on an animation
+ * frame) would behave differently under exactly the conditions this file's
+ * own doc comment warns against faking. So this fallback instead plays the
+ * loaded sample through once (or loops, in Loop mode) the moment it's
+ * loaded or restored, and start/end/tune/reverse are read fresh at *that*
+ * moment -- changing them afterward reshapes the next load, not audio
+ * already playing. A patch built around gate-triggered chops (the
+ * `sampler-chop` preset's own Clock-driven retrigger) will sound different
+ * in this mode; the badge says so rather than a player discovering it by
+ * ear with no explanation.
+ */
+function buildSamplerFallback(ctx: BaseAudioContext): SamplerInstance {
+  const pitchFront = ctx.createGain() // accepted for cabling; no effect -- see doc comment.
+  const gateFront = ctx.createGain() // accepted for cabling; no effect -- see doc comment.
+  const outGain = ctx.createGain()
+
+  let forwardBuffer: AudioBuffer | undefined
+  let reverseBuffer: AudioBuffer | undefined
+  let currentFileName = ''
+  let currentWaveform: SamplerWaveform | undefined
+  let currentMono: Float32Array | undefined
+  let currentSourceSampleRate = ctx.sampleRate
+  let tune = 0
+  let start = 0
+  let end = 1
+  let mode = 0
+  let reverse = 0
+  let activeSource: AudioBufferSourceNode | undefined
+
+  function stopActive(): void {
+    if (!activeSource) return
+    try {
+      activeSource.stop()
+    } catch {
+      // Already stopped (a one-shot that finished on its own) -- fine.
+    }
+    activeSource.disconnect()
+    activeSource = undefined
+  }
+
+  function reversedCopyOf(buffer: AudioBuffer): AudioBuffer {
+    const reversed = ctx.createBuffer(buffer.numberOfChannels, buffer.length, buffer.sampleRate)
+    for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+      const src = buffer.getChannelData(ch)
+      const dst = reversed.getChannelData(ch)
+      for (let i = 0; i < src.length; i++) dst[i] = src[src.length - 1 - i]!
+    }
+    return reversed
+  }
+
+  function triggerPlayback(): void {
+    stopActive()
+    const buffer = reverse >= 0.5 ? reverseBuffer : forwardBuffer
+    if (!buffer || buffer.length === 0) return
+    const src = ctx.createBufferSource()
+    src.buffer = buffer
+    src.playbackRate.value = 2 ** (tune / 12)
+    const dur = buffer.duration
+    const lo = Math.max(0, Math.min(1, Math.min(start, end))) * dur
+    const hi = Math.max(0, Math.min(1, Math.max(start, end))) * dur
+    if (mode >= 0.5) {
+      src.loop = true
+      src.loopStart = lo
+      src.loopEnd = Math.max(lo + 0.001, hi)
+      src.connect(outGain)
+      src.start(ctx.currentTime, lo)
+    } else {
+      src.connect(outGain)
+      src.start(ctx.currentTime, lo, Math.max(0.001, hi - lo))
+    }
+    activeSource = src
+  }
+
+  function loadMono(mono: Float32Array, sampleRate: number, fileName: string): void {
+    currentMono = mono
+    currentSourceSampleRate = sampleRate
+    currentFileName = fileName
+    currentWaveform = {
+      ...computeWaveformPeaks(mono, WAVEFORM_BUCKETS),
+      fileName,
+      durationSeconds: mono.length / sampleRate,
+    }
+    const buffer = ctx.createBuffer(1, Math.max(1, mono.length), sampleRate)
+    // A fresh, plain-ArrayBuffer-backed copy -- same reasoning as
+    // rack/main.ts's `playTarget`'s own identical cast: `mono` is typed
+    // against the more general `ArrayBufferLike`, which `copyToChannel`
+    // (correctly) won't accept a `SharedArrayBuffer`-backed view as.
+    buffer.copyToChannel(new Float32Array(mono), 0)
+    forwardBuffer = buffer
+    reverseBuffer = reversedCopyOf(buffer)
+    triggerPlayback()
+  }
+
+  return {
+    inputs: new Map<string, AudioNode | AudioParam>([['pitch', pitchFront], ['gate', gateFront]]),
+    outputs: new Map([['out', outGain as AudioNode]]),
+    fallback: {
+      level: 'degraded',
+      reason:
+        "The sampler worklet didn't load, so this is a native sample player instead. " +
+        "The Gate jack doesn't retrigger playback in this mode -- the loaded sample plays " +
+        'through once (or loops, in Loop mode) as soon as it loads.',
+    },
+    setParam(id, value) {
+      if (id === 'tune') tune = value
+      else if (id === 'start') start = value
+      else if (id === 'end') end = value
+      else if (id === 'mode') mode = value
+      else if (id === 'reverse') reverse = value
+    },
+    loadBuffer(channels, sampleRate, fileName) {
+      loadMono(downmixToMono(channels), sampleRate, fileName)
+    },
+    clearBuffer() {
+      stopActive()
+      forwardBuffer = undefined
+      reverseBuffer = undefined
+      currentMono = undefined
+      currentFileName = ''
+      currentWaveform = undefined
+    },
+    getWaveform() {
+      return currentWaveform
+    },
+    serializeState() {
+      if (!currentMono) return undefined
+      const peak = (() => {
+        let p = 0
+        for (let i = 0; i < currentMono!.length; i++) p = Math.max(p, Math.abs(currentMono![i]!))
+        return p
+      })()
+      const gain = peak > 1 ? peak : 1
+      const toEncode = gain === 1 ? currentMono : currentMono.map((v) => v / gain)
+      const wavBytes = new Uint8Array(encodeWav([toEncode], currentSourceSampleRate, 'pcm16'))
+      const state: { fileName: string; wavBase64: string; gain?: number } = {
+        fileName: currentFileName,
+        wavBase64: bytesToBase64(wavBytes),
+      }
+      if (gain > 1) state.gain = gain
+      return state
+    },
+    restoreState(data) {
+      if (!data || typeof data !== 'object') return
+      const { fileName, wavBase64, gain } = data as { fileName?: unknown; wavBase64?: unknown; gain?: unknown }
+      if (typeof wavBase64 !== 'string') return
+      const wav = decodeWav(base64ToBytes(wavBase64).buffer as ArrayBuffer)
+      const restoreGain = typeof gain === 'number' && Number.isFinite(gain) && gain > 1 ? gain : 1
+      const mono = downmixToMono(wav.channels)
+      const scaled = restoreGain === 1 ? mono : mono.map((v) => v * restoreGain)
+      loadMono(scaled, wav.sampleRate, typeof fileName === 'string' ? fileName : '')
+    },
+    dispose() {
+      stopActive()
+      pitchFront.disconnect()
+      gateFront.disconnect()
+      outGain.disconnect()
+    },
+  }
+}
+
 export const samplerDescriptor: ModuleDescriptor = {
   type: 'sampler',
   name: 'Sampler',
@@ -153,11 +329,12 @@ export const samplerDescriptor: ModuleDescriptor = {
     { kind: 'jack', ref: 'out', x: 2, y: 1 },
   ],
   create(ctx): SamplerInstance {
-    const node = new AudioWorkletNode(ctx, 'sampler', {
+    const node = tryCreateWorkletNode(ctx, 'sampler', {
       numberOfInputs: 2,
       numberOfOutputs: 1,
       outputChannelCount: [1],
     })
+    if (!node) return buildSamplerFallback(ctx)
     const fronts = ['pitch', 'gate'].map((_, index) => {
       const gain = ctx.createGain()
       gain.connect(node, 0, index)
@@ -201,7 +378,11 @@ function scaledBy(mono: Float32Array, factor: number): Float32Array {
 }
 
 function postBuffer(buf: SamplerBuffer): void {
-      node.port.postMessage({
+      // Non-null: this nested function is only ever invoked from within
+      // this same `create()` call, after the `if (!node) return
+      // buildSamplerFallback(ctx)` guard above already ran -- TS just
+      // doesn't carry that narrowing across a nested function boundary.
+      node!.port.postMessage({
         type: 'load', mips: buf.mips, sourceSampleRate: buf.sourceSampleRate, frames: buf.frames,
       })
     }

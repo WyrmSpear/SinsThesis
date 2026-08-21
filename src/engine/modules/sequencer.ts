@@ -1,5 +1,6 @@
 import type { ModuleDescriptor, ModuleInstance } from '../types'
 import { scheduleParam } from '../param-smoothing'
+import { tryCreateWorkletNode, buildFailedInstance } from './worklet-fallback'
 
 const STEP_PARAMS = Array.from({ length: 16 }, (_, i) => ({
   id: `step${i + 1}`,
@@ -82,11 +83,27 @@ export const sequencerDescriptor: ModuleDescriptor = {
     { kind: 'jack', ref: 'gate', x: 3, y: 3 },
   ],
   create(ctx): SequencerInstance {
-    const node = new AudioWorkletNode(ctx, 'sequencer', {
+    const node = tryCreateWorkletNode(ctx, 'sequencer', {
       numberOfInputs: 2,
       numberOfOutputs: 2,
       outputChannelCount: [1, 1],
     })
+    // Same "no honest native equivalent" reasoning as adsr.ts: a sequencer's
+    // step-advance logic is exactly `segment.worklet.ts`'s per-sample state
+    // machine, with nothing in WebAudio's native node set that reproduces
+    // "hold this CV/gate pair for one step, advance on a clock edge."
+    if (!node) {
+      return {
+        ...buildFailedInstance(
+          ctx,
+          sequencerDescriptor.ports,
+          "The sequencer worklet didn't load, so this module is silent. No native fallback exists for step sequencing.",
+        ),
+        onStep: () => () => {
+          // No playhead to subscribe to -- this instance never advances.
+        },
+      }
+    }
     const cvOut = ctx.createGain()
     const gateOut = ctx.createGain()
     node.connect(cvOut, 0)

@@ -1,4 +1,5 @@
 import type { ModuleDescriptor, ModuleInstance } from '../types'
+import { tryCreateWorkletNode, buildFailedInstance } from './worklet-fallback'
 
 export const shDescriptor: ModuleDescriptor = {
   type: 'sh',
@@ -19,11 +20,21 @@ export const shDescriptor: ModuleDescriptor = {
     { kind: 'jack', ref: 'out', x: 0, y: 2 },
   ],
   create(ctx): ModuleInstance {
-    const node = new AudioWorkletNode(ctx, 'sample-hold', {
+    const node = tryCreateWorkletNode(ctx, 'sample-hold', {
       numberOfInputs: 2,
       numberOfOutputs: 1,
       outputChannelCount: [1],
     })
+    // Same "no honest native equivalent" reasoning as adsr.ts: holding a CV
+    // value exactly at a trigger edge until the next one is per-sample
+    // state, and nothing in WebAudio's native node set reproduces it.
+    if (!node) {
+      return buildFailedInstance(
+        ctx,
+        shDescriptor.ports,
+        "The Sample & Hold worklet didn't load, so this module outputs no signal. No native fallback exists for it.",
+      )
+    }
 
     const fronts = ['in', 'trigger'].map((_, index) => {
       const gain = ctx.createGain()

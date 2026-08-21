@@ -1,5 +1,78 @@
 import type { ModuleDescriptor, ModuleInstance } from '../types'
 import { scheduleParam } from '../param-smoothing'
+import { tryCreateWorkletNode } from './worklet-fallback'
+
+const FALLBACK_CURVE_LENGTH = 1024
+
+/**
+ * Native fallback for when `wavefolder.js` didn't load. A `WaveShaperNode`
+ * is a real fallback for folding, not a token gesture -- see `types.ts`'s
+ * `fallback` doc comment's honesty rule -- but a genuinely simpler one:
+ * the curve is a fixed `sin(x * drive * pi/2)`, rebuilt whenever `drive`
+ * or `symmetry` changes (a knob turn, not an audio-rate event, so
+ * regenerating a 1024-sample `Float32Array` costs microseconds, not
+ * something a player would ever notice), which folds more times as
+ * `drive` climbs the same way the real ADAA-antialiased fold does, but
+ * with none of `dsp/wavefolder.ts`'s antialiasing -- a `WaveShaperNode`'s
+ * static-curve lookup aliases hard at any real drive, audibly so above
+ * roughly drive 3-4. That is said plainly in the badge, not discovered by
+ * a player's ears with no explanation, matching this project's own
+ * measured-not-assumed standard for the real module (see `docs/
+ * CONTINUATION.md`'s wavefolder alias-floor table).
+ */
+function buildWavefolderFallback(ctx: BaseAudioContext): ModuleInstance {
+  // Unity by default -- `drive` shapes the fold via the curve itself
+  // (`rebuildCurve` below), not by scaling the signal into it; this node's
+  // only job is being a summing point `foldCv` can add onto.
+  const inputMix = ctx.createGain()
+  const shaper = ctx.createWaveShaper()
+  const outGain = ctx.createGain()
+  inputMix.connect(shaper)
+  shaper.connect(outGain)
+
+  let drive = 1
+  let symmetry = 0
+  const rebuildCurve = (): void => {
+    const curve = new Float32Array(FALLBACK_CURVE_LENGTH)
+    for (let i = 0; i < curve.length; i++) {
+      const x = (i / (curve.length - 1)) * 2 - 1
+      curve[i] = Math.sin((x + symmetry * 0.3) * drive * (Math.PI / 2))
+    }
+    shaper.curve = curve
+  }
+  rebuildCurve()
+
+  const cvFront = ctx.createGain()
+  cvFront.connect(inputMix.gain)
+
+  return {
+    inputs: new Map<string, AudioNode | AudioParam>([['in', inputMix], ['foldCv', cvFront]]),
+    outputs: new Map([['out', outGain as AudioNode]]),
+    fallback: {
+      level: 'degraded',
+      reason:
+        "The wavefolder worklet didn't load, so this is a native waveshaper fold instead. " +
+        'It aliases audibly above roughly drive 3-4, well before the real module does.',
+    },
+    setParam(id, value) {
+      if (id === 'drive') {
+        drive = value
+        rebuildCurve()
+      } else if (id === 'symmetry') {
+        symmetry = value
+        rebuildCurve()
+      } else if (id === 'foldCvAmount') {
+        cvFront.gain.value = value
+      }
+    },
+    dispose() {
+      inputMix.disconnect()
+      shaper.disconnect()
+      outGain.disconnect()
+      cvFront.disconnect()
+    },
+  }
+}
 
 /** Wavefolding -- reflecting a signal back down instead of clipping or
  *  filtering it -- is the signature "West Coast" idea, tracing to Don
@@ -39,11 +112,12 @@ export const wavefolderDescriptor: ModuleDescriptor = {
     { kind: 'jack', ref: 'out', x: 0, y: 4 },
   ],
   create(ctx): ModuleInstance {
-    const node = new AudioWorkletNode(ctx, 'wavefolder', {
+    const node = tryCreateWorkletNode(ctx, 'wavefolder', {
       numberOfInputs: 2,
       numberOfOutputs: 1,
       outputChannelCount: [1],
     })
+    if (!node) return buildWavefolderFallback(ctx)
     const audioIn = ctx.createGain()
     const cvIn = ctx.createGain()
     audioIn.connect(node, 0, 0)

@@ -1,5 +1,6 @@
 import type { ModuleDescriptor, ModuleInstance } from '../types'
 import { scheduleParam } from '../param-smoothing'
+import { tryCreateWorkletNode, buildFailedInstance } from './worklet-fallback'
 
 export const adsrDescriptor: ModuleDescriptor = {
   type: 'adsr',
@@ -35,11 +36,27 @@ export const adsrDescriptor: ModuleDescriptor = {
     { kind: 'jack', ref: 'out', x: 1, y: 3 },
   ],
   create(ctx): ModuleInstance {
-    const node = new AudioWorkletNode(ctx, 'adsr', {
+    const node = tryCreateWorkletNode(ctx, 'adsr', {
       numberOfInputs: 1,
       numberOfOutputs: 1,
       outputChannelCount: [1],
     })
+    // No honest native equivalent: an envelope's attack/decay/release
+    // shape and its exact retrigger behavior are exactly the per-sample
+    // state machine `segment.worklet.ts` implements -- there is no
+    // built-in WebAudio node that reproduces it, and approximating an
+    // envelope generator with, say, a mistimed `setTargetAtTime` chain
+    // would be the "wrong envelope is more confusing than a clear error"
+    // case this project's own failure-mode brief warns against. Fails
+    // loudly instead: silent output, an honest badge, everything else in
+    // the patch keeps running. See `types.ts`'s `fallback` doc comment.
+    if (!node) {
+      return buildFailedInstance(
+        ctx,
+        adsrDescriptor.ports,
+        "The ADSR worklet didn't load, so this module is silent. No native fallback exists for an envelope generator.",
+      )
+    }
     const gateIn = ctx.createGain()
     gateIn.connect(node, 0, 0)
 
