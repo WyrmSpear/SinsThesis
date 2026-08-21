@@ -96,6 +96,62 @@ describe('patch format', () => {
 })
 
 /**
+ * MIDI bindings: the same "absent means none, present only when non-empty"
+ * convention `state` already established above, proven the same way --
+ * omission for the ordinary case, round trip when present, and (the point
+ * of this whole section) an existing file written before MIDI learn
+ * existed loads without throwing and reports no bindings at all.
+ */
+describe('patch format: MIDI bindings', () => {
+  beforeEach(() => {
+    clearRegistry()
+    registerModule(stubDescriptor('vco'))
+    registerModule(stubDescriptor('vcf'))
+  })
+
+  it('omits midiBindings entirely when there are none', () => {
+    const file = serializePatch(buildPatch(), { name: 'Test' })
+    expect(file).not.toHaveProperty('midiBindings')
+    expect(JSON.stringify(file)).not.toContain('midiBindings')
+  })
+
+  it('serializes bindings when given some', () => {
+    const file = serializePatch(buildPatch(), { name: 'Test' }, [{ controller: 74, moduleId: 'osc', paramId: 'level' }])
+    expect(file.midiBindings).toEqual([{ controller: 74, moduleId: 'osc', paramId: 'level' }])
+  })
+
+  it('round-trips bindings through load -> serialize unchanged', () => {
+    const bindings = [{ controller: 1, moduleId: 'osc', paramId: 'level' }]
+    const original = serializePatch(buildPatch(), { name: 'Round' }, bindings)
+    const { graph, midiBindings } = loadPatch(stubContext(), original)
+    expect(midiBindings).toEqual(bindings)
+    const again = serializePatch(graph, { name: 'Round', created: original.meta.created }, midiBindings)
+    expect(again).toEqual(original)
+  })
+
+  it('an old-format file with no midiBindings field loads cleanly and reports an empty list', () => {
+    const oldFormatFile: PatchFile = {
+      version: 1,
+      meta: { name: 'Pre-MIDI', created: '2026-01-01T00:00:00.000Z', author: '' },
+      modules: [{ id: 'osc', type: 'vco', slot: [0, 0], params: { level: 0.5 } }],
+      cables: [],
+    }
+    expect(oldFormatFile).not.toHaveProperty('midiBindings')
+    const { graph, ghosts, midiBindings } = loadPatch(stubContext(), oldFormatFile)
+    expect(ghosts).toEqual([])
+    expect(midiBindings).toEqual([])
+    expect(graph.getParams('osc')['level']).toBe(0.5)
+  })
+
+  it('mutating the file after serialization does not leak back into the graph\'s bindings', () => {
+    const bindings = [{ controller: 1, moduleId: 'osc', paramId: 'level' }]
+    const file = serializePatch(buildPatch(), {}, bindings)
+    bindings.push({ controller: 2, moduleId: 'osc', paramId: 'level' })
+    expect(file.midiBindings).toHaveLength(1)
+  })
+})
+
+/**
  * The generic `state` channel `ModuleInstance.serializeState`/
  * `restoreState` (types.ts) added for the Sampler -- see that module's own
  * doc comment for why embedding audio needed a second, non-numeric

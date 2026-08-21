@@ -188,7 +188,10 @@ export const keyboardMidiDescriptor: ModuleDescriptor = {
       } else if (e.kind === 'noteOff') {
         untrigger(`midi:${e.note}`)
       }
-      // CC messages are not yet routed to a destination; ignored for now.
+      // CC messages are never this module's concern: `rack/main.ts` routes
+      // them straight to `src/engine/midi-learn.ts`'s `MidiLearnController`
+      // instead of forwarding them here, since a CC binds to *any* param on
+      // *any* module, not specifically to a Keyboard instance's own knobs.
     }
 
     function handleKey(code: string, down: boolean): void {

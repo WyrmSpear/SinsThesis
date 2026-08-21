@@ -1,5 +1,6 @@
 import { PatchGraph } from './graph'
 import { getModule } from './registry'
+import type { MidiBinding } from './midi-learn'
 
 export const PATCH_VERSION = 1
 
@@ -27,13 +28,24 @@ export interface PatchFile {
   meta: { name: string; created: string; author: string }
   modules: PatchModuleEntry[]
   cables: PatchCableEntry[]
+  /** CC-to-parameter bindings created via MIDI learn -- the mapping math
+   *  and binding table live engine-side (`midi-learn.ts`'s own header
+   *  comment explains why a binding travels with the patch rather than
+   *  living in the player's own `localStorage` "rig" settings). Optional
+   *  and omitted entirely when there are none, mirroring
+   *  `PatchModuleEntry.state`'s convention just below -- an existing
+   *  `.sinp` with no MIDI bindings, or one written by a build before MIDI
+   *  learn existed, round-trips byte-identical to what this function
+   *  produced before this field existed. */
+  midiBindings?: MidiBinding[]
 }
 
 export function serializePatch(
   graph: PatchGraph,
   meta: Partial<PatchFile['meta']> = {},
+  midiBindings: readonly MidiBinding[] = [],
 ): PatchFile {
-  return {
+  const file: PatchFile = {
     version: PATCH_VERSION,
     meta: {
       name: meta.name ?? 'Untitled',
@@ -62,6 +74,8 @@ export function serializePatch(
       to: [c.to[0], c.to[1]] as [string, string],
     })),
   }
+  if (midiBindings.length > 0) file.midiBindings = midiBindings.map((b) => ({ ...b }))
+  return file
 }
 
 /**
@@ -75,7 +89,7 @@ export function serializePatch(
 export function loadPatch(
   ctx: BaseAudioContext,
   file: PatchFile,
-): { graph: PatchGraph; ghosts: string[] } {
+): { graph: PatchGraph; ghosts: string[]; midiBindings: MidiBinding[] } {
   if (file.version !== PATCH_VERSION) {
     throw new Error(
       `loadPatch: this build reads patch version ${PATCH_VERSION}, ` +
@@ -124,5 +138,9 @@ export function loadPatch(
     graph.connect(cable.from, cable.to)
   }
 
-  return { graph, ghosts }
+  // `?? []`, not a throw or a required field: an old-format `.sinp` (every
+  // preset and academy level authored before MIDI learn existed) simply
+  // has no bindings, the same "absent means none" convention `state`
+  // already established above.
+  return { graph, ghosts, midiBindings: (file.midiBindings ?? []).map((b) => ({ ...b })) }
 }
