@@ -131,7 +131,38 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
       workletLoad.error,
     )
   }
-  if (ctx.state === 'suspended') await ctx.resume()
+  // `resume()` is awaited *after* the worklet load above, which on a cold
+  // first load can be seconds of network. Chrome and Firefox are fine with
+  // that -- their autoplay gate uses sticky activation, which persists for
+  // the page's lifetime once the visitor has clicked, and a 10 s delay
+  // injected before this line still resumed cleanly when measured. iOS
+  // Safari is the one to worry about: it has historically required the
+  // unlock to happen inside the gesture's own transient activation, which
+  // an await this long can outlive.
+  //
+  // That path could not be reproduced here (no Safari in this test
+  // environment), so it is not being "fixed" blind. What is fixed is that
+  // it used to fail *silently*: `ctx.state` was read once, before the
+  // resume, and never checked afterwards, so a refused unlock produced a
+  // fully-built rack that simply made no sound and said nothing about why.
+  // `resume()` can also reject outright, which would have thrown out of
+  // `start()` and left the power button stuck on "STARTING…".
+  let audioBlocked = false
+  if (ctx.state === 'suspended') {
+    try {
+      await ctx.resume()
+    } catch (err) {
+      console.error('SinsThesis: AudioContext.resume() was refused.', err)
+    }
+    // Deliberately re-read rather than trusting resume() resolving: a
+    // context can come back still suspended without reporting an error.
+    // The cast defeats control-flow narrowing, not a type check -- TS has
+    // pinned `ctx.state` to the literal `'suspended'` from the condition
+    // above and cannot see that an awaited `resume()` is exactly what
+    // changes it, so without this the correct comparison reads as an
+    // impossible one.
+    audioBlocked = (ctx.state as AudioContextState) !== 'running'
+  }
 
   const rackEl = $('rack-modules')
   const paletteDrawer = $('palette-drawer')
@@ -1315,6 +1346,17 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
     }
   } else {
     mountGraph(buildDefaultPatch())
+  }
+  if (audioBlocked) {
+    // Distinct from the worklet case below: everything loaded and the graph
+    // is real, the browser simply will not let the context run. Silence
+    // either way, so it gets the same prominence rather than only a
+    // console line nobody on a phone will ever see.
+    showBanner(
+      'warn',
+      'The browser did not allow audio to start, so this rack is silent. Reload the page and press ' +
+        'POWER ON again -- on iOS, keep the tab in the foreground and check the ringer switch is not on silent.',
+    )
   }
   if (!workletLoad.ok) {
     // The old wording here was "a few modules are running in a reduced mode

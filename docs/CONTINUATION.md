@@ -3,13 +3,13 @@
 **Updated:** 2026-08-21.
 **Branch:** `main` — 138 commits. Public at github.com/WyrmSpear/SinsThesis (MIT).
 **Live** at `ryanoglelmt.com/portfolio/sinsthesis/`.
-**State:** 1169 tests pass (886 node + 283 browser), `typecheck` clean, tree clean.
+**State:** 1207 tests pass (906 node + 301 browser), `typecheck` clean, tree clean.
 
 **Run it:** `npm run dev`, open the URL, POWER ON.
 
 - **Free play** — thirty module types, drag-to-patch cables, twelve themes,
   `.sinp` save/load with autosave, sequencer, Sampler, Scope, stereo output.
-- **Presets** — eleven patches, lazy-loaded.
+- **Presets** — fifteen patches, lazy-loaded.
 - **Academy** — twenty-two levels across three tracks (foundations, bass,
   history), three grading modes.
 - **Arcade** — two minigames, Pan Paddle and Wub Disruptor. The synth is the
@@ -19,7 +19,7 @@
 
 ---
 
-## READ FIRST — mobile CPU (fixed, opt-in), one unverified report
+## READ FIRST — mobile CPU (fixed, opt-in), first-load silence (fixed)
 
 **The owner loaded the deployed app on a phone and the CPU meter read 100%.**
 Investigated, measured, and addressed — see
@@ -75,10 +75,52 @@ design: the Studio's 5-minute recording cap bounds this buffer at
 fix. This closes the open question; see
 `.superpowers/sdd/mobile-perf-report.md` for the full sample series.
 
-**Still unverified:** the owner reported **no sound on first load** on both
-phone and desktop, then sound on a later attempt. Could be the power-gesture
-requirement behaving as designed, or something real. Not reproduced, not
-investigated this pass.
+**~~Still unverified: no sound on first load.~~ REPRODUCED, ROOT-CAUSED AND
+FIXED.** It was something real, not the power gesture behaving as designed.
+
+The `segment` bundle backs the ADSR, LFO, S&H and Sequencer, and
+`buildDefaultPatch` runs the rack's only gain path through the ADSR — the
+VCA is left at `level: 0`, `cvAmount: 1`, so the envelope is the sole thing
+that can open it. When `segment` fails to load the ADSR becomes a
+`buildFailedInstance` stub, correctly silent by design, and **the entire
+instrument goes quiet.** Measured key-down RMS in a real browser: **0.27258
+with the bundle, 0.00000 without it.**
+
+A cold first load is eighteen separate HTTP requests on whatever network the
+visitor has. Any single one failing produces total silence — and a reload
+re-fetches and works, which is precisely "no sound on first load, then sound
+on a later attempt."
+
+`ensureWorklets` was already built to make this recoverable: it drops its
+cached rejection specifically so "a caller who fixes the problem can retry,"
+and its `WORKLET_MODULES.filter` means a retry only re-attempts bundles still
+missing rather than re-registering a processor that already loaded. **Nothing
+ever retried.** `ensureWorkletsWithRetry` closes that gap; one transient
+failure now measures RMS 0.26770 with a healthy ADSR where it previously
+measured 0.00000. See commit `a135336`.
+
+The banner was also lying — "a few modules are running in a reduced mode" is
+untrue when the rack is silent, and it never told anyone that reloading was
+the fix. It now names the missing bundles and distinguishes the silencing
+case.
+
+**Two things worth carrying forward.** First, a methodology trap that cost
+real time: **Playwright's request routing cannot intercept
+`audioWorklet.addModule()` fetches.** They never appear in
+`page.on('request')`, so `page.route`-based blocking silently does nothing
+and the experiments pass meaninglessly. Patch
+`AudioWorklet.prototype.addModule` in an init script instead — the same
+technique `tests/browser/worklet-fallback.test.ts` already used.
+
+Second, the **desktop** half of the original report is not fully explained by
+this: the same cold-load failure would do it, but so would a refused
+`AudioContext` unlock. `ctx.resume()` is awaited *after* the worklet load, and
+Chromium resumed cleanly even with a 10 s delay injected (sticky activation),
+so that path did not reproduce here. It remains plausible on **iOS Safari**,
+which uses transient activation. Not fixed blind, but the silent-failure half
+was: `ctx.state` used to be read once *before* the resume and never after, so
+a refused unlock produced a fully-built, silent rack that said nothing. It is
+now re-read afterwards and surfaces its own banner.
 
 Read this file first. Then `docs/audio/PHASE1A-LEDGER.md` for every decision made
 and why.
