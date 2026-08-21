@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { createServer, type ViteDevServer } from 'vite'
+import type { ViteDevServer } from 'vite'
+import { createIsolatedServer, closeIsolatedServer } from './support/e2e-server'
 import { chromium, type Browser, type Page } from 'playwright'
 import { fileURLToPath } from 'node:url'
 import { PRESET_BANK } from '../../presets/bank'
@@ -28,7 +29,7 @@ let browser: Browser
 let baseUrl: string
 
 beforeAll(async () => {
-  server = await createServer({ root, configFile: false, server: { port: 0 } })
+  server = await createIsolatedServer(root)
   await server.listen()
   const address = server.httpServer?.address()
   if (!address || typeof address === 'string') throw new Error('dev server did not report a port')
@@ -39,7 +40,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await browser?.close()
-  await server?.close()
+  await closeIsolatedServer(server)
 })
 
 interface DebugHook {
