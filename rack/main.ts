@@ -21,6 +21,7 @@ import { buildKeyboardPanel } from './keyboard-panel'
 import { buildSequencerPanel } from './sequencer-panel'
 import { buildScopePanel } from './scope-panel'
 import { startArcade, type ArcadeHandle } from './arcade-panel'
+import { startWub } from './wub-panel'
 import { buildSamplerPanel } from './sampler-panel'
 import { enableReorder } from './reorder'
 import { downloadPatch, downloadWav, readPatchFile, saveAutosave, loadAutosave, debounce } from './patch-io'
@@ -176,6 +177,13 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
   // "self-terminating panel" contract rack/scope-panel.ts documents for
   // its own tick loop.
   let arcadeHandle: ArcadeHandle | undefined
+  // Which of ROADMAP 3a's two shipped arcade games is mounted -- 'paddle'
+  // (rack/arcade-panel.ts) or 'wub' (rack/wub-panel.ts). Picked by a small
+  // in-panel toggle (see showArcade below), remembered across mode
+  // switches within the session the same way `currentTrackId` remembers
+  // the academy's last-viewed track, but deliberately not persisted --
+  // Arcade has no saved-progress concept to hang it on.
+  let arcadeGame: 'paddle' | 'wub' = 'paddle'
   let currentLevelId: string | undefined
   let progress: AcademyProgress = loadProgress()
   // Which selectable sequence (academy/levels.ts's TRACKS) the player is
@@ -689,6 +697,75 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
    *  LFO, Output, anything) is exactly what steers the paddle, with no
    *  separate arcade-only patch to build first. See rack/arcade-panel.ts's
    *  header comment for what actually drives the paddle and why. */
+  /** Reads the output getter both arcade games take -- pulled out since
+   *  showArcade needs to hand the identical closure to whichever of the
+   *  two it mounts. */
+  function currentOutputInstance(): OutputInstance | undefined {
+    const outId = graph.moduleIds.find((id) => graph.getType(id) === 'output')
+    return outId ? (graph.getInstance(outId) as OutputInstance | undefined) : undefined
+  }
+
+  /** Mounts whichever game `arcadeGame` currently names into the picker's
+   *  own slot element, tearing down whatever was running before -- called
+   *  on every entry to Arcade and every picker click, never on a mode this
+   *  file doesn't own. */
+  function mountArcadeGame(slot: HTMLElement): void {
+    arcadeHandle?.stop()
+    arcadeHandle = arcadeGame === 'wub' ? startWub(slot, ctx, currentOutputInstance) : startArcade(slot, ctx, currentOutputInstance)
+  }
+
+  /** The picker itself: two `.mode-toggle-btn`s (the same vocabulary the
+   *  top-level Free Play/Academy/Arcade toggle already uses -- zero new
+   *  CSS) above a slot div the selected game's own `startX` clears and
+   *  rebuilds on every mount, exactly the way `arcadePanelEl` itself
+   *  already gets rebuilt on every entry to Arcade. Built once per entry
+   *  to Arcade rather than persisted across exits, matching every other
+   *  panel in this file's own "rebuild the whole thing declaratively"
+   *  convention (see arcadePanelEl's own doc comment). */
+  function buildArcadeShell(): HTMLElement {
+    arcadePanelEl.innerHTML = ''
+    const picker = document.createElement('div')
+    picker.className = 'mode-toggle arcade-game-picker'
+
+    const paddleBtn = document.createElement('button')
+    paddleBtn.type = 'button'
+    paddleBtn.className = 'mode-toggle-btn'
+    paddleBtn.textContent = 'Pan Paddle'
+    paddleBtn.dataset['testid'] = 'wub-game-paddle'
+
+    const wubBtn = document.createElement('button')
+    wubBtn.type = 'button'
+    wubBtn.className = 'mode-toggle-btn'
+    wubBtn.textContent = 'Wub Disruptor'
+    wubBtn.dataset['testid'] = 'wub-game-wub'
+
+    const slot = document.createElement('div')
+    slot.dataset['testid'] = 'arcade-game-slot'
+
+    function refreshActive(): void {
+      paddleBtn.classList.toggle('mode-toggle-btn-active', arcadeGame === 'paddle')
+      wubBtn.classList.toggle('mode-toggle-btn-active', arcadeGame === 'wub')
+    }
+    refreshActive()
+
+    paddleBtn.addEventListener('click', () => {
+      if (arcadeGame === 'paddle') return
+      arcadeGame = 'paddle'
+      refreshActive()
+      mountArcadeGame(slot)
+    })
+    wubBtn.addEventListener('click', () => {
+      if (arcadeGame === 'wub') return
+      arcadeGame = 'wub'
+      refreshActive()
+      mountArcadeGame(slot)
+    })
+
+    picker.append(paddleBtn, wubBtn)
+    arcadePanelEl.append(picker, slot)
+    return slot
+  }
+
   function showArcade(): void {
     mode = 'arcade'
     modeArcadeBtn.classList.add('mode-toggle-btn-active')
@@ -699,11 +776,8 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
     arcadePanelEl.hidden = false
     clearHighlights()
     refreshPalette() // unrestricted -- arcade is free play plus an overlay, not a granted-module level
-    arcadeHandle?.stop()
-    arcadeHandle = startArcade(arcadePanelEl, ctx, () => {
-      const outId = graph.moduleIds.find((id) => graph.getType(id) === 'output')
-      return outId ? (graph.getInstance(outId) as OutputInstance | undefined) : undefined
-    })
+    const slot = buildArcadeShell()
+    mountArcadeGame(slot)
   }
 
   function stopArcade(): void {

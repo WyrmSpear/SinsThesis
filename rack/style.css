@@ -1233,6 +1233,13 @@ body {
   border-radius: 6px;
 }
 
+/* Wub Disruptor's own game picker (rack/main.ts's buildArcadeShell) reuses
+ * .mode-toggle/.mode-toggle-btn verbatim -- this rule is layout-only
+ * (centering it above the game slot), no new color tokens. */
+.arcade-game-picker {
+  align-self: center;
+}
+
 .arcade-panel-content {
   display: flex;
   flex-direction: column;
