@@ -168,6 +168,38 @@ has, and costs almost nothing to render.
 model. Everything else — real-time pitch, features, stereo, tempo lock — is
 already built and measured.
 
+
+## 3b. Frequency-steered maze games
+
+A further idea from the owner, prompted by two real bodies of research: work on
+insects made to turn left or right under specific-frequency stimulation, and
+studies on frequency-based non-invasive stimulation guiding blindfolded
+subjects. The proposal: a maze, Pac-Man, Snake or Centipede where **the hero's
+orientation changes according to the frequencies the player injects.**
+
+**Why this is a good fit mechanically.** The pan-paddle proved a continuous
+control maps well. Direction is different — it wants *discrete* commands from a
+*continuous* instrument, which is a genuinely different and more interesting
+mapping problem. Candidates worth prototyping:
+
+- Frequency bands as directions — a note in one octave turns left, another
+  turns right. The Frequency Bank module already produces exact tuned pitches,
+  and the YIN tracker resolves pitch to sub-cent accuracy from 65 Hz to 8 kHz.
+- Interval relationships rather than absolute pitch, which would teach
+  something musical rather than rote.
+- Rate of change — a rising sweep versus a falling one — which suits the
+  30 ms analysis window better than discrete note onsets do.
+
+**The latency constraint still governs.** Pitch needs an analysis window, so a
+maze game must be turn-based, grid-stepped, or slow enough that ~30 ms of
+detection lag is invisible. Snake and Pac-Man are grid-stepped by nature and
+therefore fit; Centipede is twitch and fits worse unless the player's input
+steers something with momentum rather than issuing instant commands.
+
+**On framing.** The inspiration is real research, but the game is a game. It
+should not imply the app does anything to a player neurologically — the same
+line already drawn for the psychoacoustic modules, and for the same reason.
+
 ## 4. Known gaps, already recorded elsewhere
 
 - The two spec'd failure modes never implemented: a native fallback with a

@@ -1,24 +1,57 @@
 # SinsThesis — continuation
 
 **Updated:** 2026-08-20.
-**Branch:** `main` — 127 commits. Public at github.com/WyrmSpear/SinsThesis (MIT).
+**Branch:** `main` — 133 commits. Public at github.com/WyrmSpear/SinsThesis (MIT).
 **Live** at `ryanoglelmt.com/portfolio/sinsthesis/`.
-**State:** 1007 tests pass (782 node + 225 browser), `typecheck` clean, tree clean.
+**State:** 1032 tests pass (794 node + 238 browser), `typecheck` clean, tree clean.
 
 **Run it:** `npm run dev`, open the URL, POWER ON.
 
-- **Free play** — a modular rack. Twenty-six module types, drag-to-patch cables,
-  drag-to-reorder, twelve themes, `.sinp` save/load with autosave, a programmable
-  16-step sequencer, a Sampler, a Scope, and a stereo output stage.
-- **Presets** — thirteen patches loadable from the toolbar, each playable the
-  instant it loads.
+- **Free play** — twenty-six module types, drag-to-patch cables, twelve themes,
+  `.sinp` save/load with autosave, sequencer, Sampler, Scope, stereo output.
+- **Presets** — thirteen patches, lazy-loaded.
 - **Academy** — twenty-two levels across three tracks (foundations, bass,
-  history). Three grading modes: build-this-patch (graph topology),
-  match-this-sound (perceptual distance), constrained challenge (feature rubric
-  with a module limit).
-- **Studio** — live recording and offline bounce, both stereo, exported as WAV,
-  with a pitch display reading frequency, note and cents.
-- **Dev harness** at `/harness.html` — scope and spectrum for engine work.
+  history), three grading modes.
+- **Arcade** — pan-paddle minigame. The synth is the controller.
+- **Studio** — stereo recording and offline bounce, WAV export, pitch display.
+- **Dev harness** at `/harness.html`.
+
+---
+
+## READ FIRST — one confirmed bug, one open question
+
+**The arcade paddle only reaches the left half of the playfield.** Reported by
+the owner, diagnosed but NOT yet fixed.
+
+`buildTap` in `rack/arcade-panel.ts` connects the Output node straight into a
+`ChannelSplitterNode`. A splitter is spec'd `channelInterpretation: 'discrete'`,
+so a **mono** signal lands entirely in channel 0 and channel 1 reads silence.
+`readBalance` then computes `(r - l) / (l + r)` = −1 and the paddle pins hard
+left; a partially-stereo patch ranges roughly −1..0, which is exactly the
+"left of midline only" symptom.
+
+`src/engine/modules/output.ts` already solves this for its own path — it sets
+`channelCount: 2`, `channelCountMode: 'explicit'`, `channelInterpretation:
+'speakers'` on its gain stage so mono up-mixes to both channels. The tap does
+not inherit that because it taps a different node.
+
+**Fix:** insert a 2-channel gain stage with `'speakers'` interpretation between
+the source and the splitter, so mono up-mixes before it is split. Then add a
+test that a *mono* patch reads balance 0 (centred), not −1 — the existing test
+only proved the reader returns a number for a stereo source, which is why this
+shipped.
+
+**Open: possible memory growth.** The owner raised a concern about leaks over a
+long session and it has not been measured. Nothing is known to leak, but
+several things allocate per-frame or per-buffer and have never been profiled
+across an extended run: the arcade's `requestAnimationFrame` loop, the CPU
+meter's 5 Hz reporting, `LiveRecorder`'s batched buffers, and the analyser taps
+in the scope, cable inspector and arcade. Worth a real heap profile over a long
+session before assuming it is fine.
+
+Also unverified: the owner reported **no sound on first load** on both phone
+and desktop, then sound on a later attempt. Could be the power-gesture
+requirement behaving as designed, or something real. Not reproduced.
 
 Read this file first. Then `docs/audio/PHASE1A-LEDGER.md` for every decision made
 and why.
