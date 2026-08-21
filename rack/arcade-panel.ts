@@ -1,6 +1,7 @@
 import type { OutputInstance } from '../src/engine/modules/output'
 import { rms } from '../src/engine/analysis/features'
 import { createGame, stepGame, defaultConfig, type GameState } from '../arcade/game'
+import { createArcadeAudio, type ArcadeAudio } from './arcade-audio'
 
 /**
  * Pan Paddle -- ROADMAP 3a's first arcade prototype: a paddle steered by
@@ -288,6 +289,24 @@ export function startArcade(
   restartBtn.type = 'button'
   restartBtn.dataset['testid'] = 'arcade-restart'
 
+  const audio = createArcadeAudio(ctx)
+  const muteBtn = document.createElement('button')
+  muteBtn.className = 'arcade-mute-btn toolbar-btn'
+  muteBtn.type = 'button'
+  muteBtn.dataset['testid'] = 'arcade-mute'
+  const syncMuteLabel = (): void => {
+    muteBtn.textContent = audio.getMuted() ? 'Sound: off' : 'Sound: on'
+  }
+  syncMuteLabel()
+  muteBtn.addEventListener('click', () => {
+    audio.setMuted(!audio.getMuted())
+    syncMuteLabel()
+  })
+
+  const controls = document.createElement('div')
+  controls.className = 'arcade-controls'
+  controls.append(restartBtn, muteBtn)
+
   const hint = document.createElement('p')
   hint.className = 'arcade-hint dim'
   hint.textContent =
@@ -295,7 +314,7 @@ export function startArcade(
     'its CV jack and let modulation drive it. Any patch that moves the stereo image works: ' +
     'a ping-pong delay or a hard-panned oscillator steer it just as well.'
 
-  wrap.append(hud, canvas, restartBtn, hint)
+  wrap.append(hud, canvas, controls, hint)
   container.append(wrap)
 
   const config = defaultConfig(CANVAS_WIDTH, CANVAS_HEIGHT)
@@ -340,6 +359,16 @@ export function startArcade(
     if (tap) lastBalance = readBalance(tap)
 
     state = stepGame(state, dt, lastBalance)
+    // Collision feedback -- `state.lastEvent` is set for exactly the frame
+    // a catch or miss happened on (see arcade/game.ts's own doc comment).
+    // `audio` connects straight to ctx.destination, never through the
+    // Output node `tap` reads -- see rack/arcade-audio.ts's header comment
+    // for why that separation is load-bearing, not incidental. Pitch on a
+    // catch is keyed to the paddle's own x position, an honest stand-in for
+    // "where the block hit" since a catch can only register where the two
+    // already overlap.
+    if (state.lastEvent === 'catch') audio.playCatch(state.paddleX / config.width)
+    else if (state.lastEvent === 'miss') audio.playMiss()
     draw(canvas, state, lastBalance)
     updateHud(hud, state, tap !== undefined)
     // Same test hook rationale as the HUD's dataset fields above: proves
@@ -355,6 +384,7 @@ export function startArcade(
     stop(): void {
       cancelAnimationFrame(raf)
       if (tap) disposeTap(tap)
+      audio.dispose()
     },
   }
 }

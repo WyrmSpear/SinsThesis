@@ -3,6 +3,7 @@ import { rms, spectralCentroid } from '../src/engine/analysis/features'
 import { createGame, stepWub, defaultConfig, type WubState } from '../arcade/wub-game'
 import { detectRateHz, LOCK_CONFIDENCE, type RateEstimate } from '../arcade/rate-detect'
 import type { ArcadeHandle } from './arcade-panel'
+import { createArcadeAudio } from './arcade-audio'
 
 /**
  * Wub Disruptor -- ROADMAP 3a's second arcade prototype: destroy targets by
@@ -251,6 +252,29 @@ export function startWub(
   restartBtn.type = 'button'
   restartBtn.dataset['testid'] = 'wub-restart'
 
+  // Same synthesized cues as rack/arcade-panel.ts, same isolation rule --
+  // `createArcadeAudio` only ever takes `ctx`, never the `OutputInstance`
+  // `tap` reads, so this cannot become part of the rate measurement it
+  // would otherwise spike right after every destroy. See
+  // rack/arcade-audio.ts's header comment.
+  const audio = createArcadeAudio(ctx)
+  const muteBtn = document.createElement('button')
+  muteBtn.className = 'arcade-mute-btn toolbar-btn'
+  muteBtn.type = 'button'
+  muteBtn.dataset['testid'] = 'wub-mute'
+  const syncMuteLabel = (): void => {
+    muteBtn.textContent = audio.getMuted() ? 'Sound: off' : 'Sound: on'
+  }
+  syncMuteLabel()
+  muteBtn.addEventListener('click', () => {
+    audio.setMuted(!audio.getMuted())
+    syncMuteLabel()
+  })
+
+  const controls = document.createElement('div')
+  controls.className = 'arcade-controls'
+  controls.append(restartBtn, muteBtn)
+
   const hint = document.createElement('p')
   hint.className = 'arcade-hint dim'
   hint.textContent =
@@ -258,7 +282,7 @@ export function startWub(
     'cutoff CV (or anything else that makes the sound wobble) and tune its rate to match the ' +
     'pulse -- hold it steady to disrupt the target.'
 
-  wrap.append(hud, canvas, restartBtn, hint)
+  wrap.append(hud, canvas, controls, hint)
   container.append(wrap)
 
   const config = defaultConfig(CANVAS_WIDTH, CANVAS_HEIGHT)
@@ -268,6 +292,8 @@ export function startWub(
   let raf = 0
   const levelWindow = new RollingWindow(FEATURE_CAPACITY)
   const centroidWindow = new RollingWindow(FEATURE_CAPACITY)
+  const minRateHz = Math.min(...config.requiredRatesHz)
+  const maxRateHz = Math.max(...config.requiredRatesHz)
 
   restartBtn.addEventListener('click', () => {
     state = createGame(config)
@@ -317,7 +343,22 @@ export function startWub(
       }
     }
 
+    // Captured before stepWub clears it -- `state.target` is `undefined` on
+    // the very frame `lastEvent` reports a destroy or escape, so the rate
+    // that decided this hit's pitch has to be read from the outgoing state.
+    const priorTarget = state.target
     state = stepWub(state, dt, measuredHz, confidence, LOCK_CONFIDENCE)
+    // Collision feedback, same one-frame-event contract
+    // rack/arcade-panel.ts's own tick relies on. Pitch on a destroy is keyed
+    // to the target's own required rate (normalized across this game's rate
+    // set) so a fast target pops higher than a slow one, the same "pitch
+    // carries information" idea the paddle's catch cue uses for position.
+    if (state.lastEvent === 'destroyed' && priorTarget) {
+      const frac = maxRateHz > minRateHz ? (priorTarget.requiredHz - minRateHz) / (maxRateHz - minRateHz) : 0.5
+      audio.playDestroy(frac)
+    } else if (state.lastEvent === 'escaped') {
+      audio.playEscape()
+    }
     draw(canvas, state, time / 1000)
     updateHud(hud, state, tap !== undefined)
     // Test hooks, same rationale as rack/arcade-panel.ts's own dataset
@@ -334,6 +375,7 @@ export function startWub(
     stop(): void {
       cancelAnimationFrame(raf)
       if (tap) disposeFeatureTap(tap)
+      audio.dispose()
     },
   }
 }

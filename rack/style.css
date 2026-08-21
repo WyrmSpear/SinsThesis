@@ -1495,6 +1495,17 @@ body {
   align-self: center;
 }
 
+/* Restart + the collision-sound mute toggle (rack/arcade-audio.ts), side by
+ * side rather than stacked -- both are one-shot controls a player reaches
+ * for at the same moment (start of a run, or "that's loud, quiet it down"
+ * mid-run), so pairing them in one row keeps the panel's vertical budget
+ * for the canvas and HUD instead. */
+.arcade-controls {
+  display: flex;
+  gap: 0.5rem;
+  align-self: center;
+}
+
 .arcade-hint {
   align-self: stretch;
   font-size: var(--text-xs);
