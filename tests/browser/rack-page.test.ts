@@ -165,6 +165,194 @@ describe('rack page', () => {
     await page.close()
   })
 
+  it('cancelling a cable drag mid-gesture (pointercancel) leaves no floating preview and no stale drag state', async () => {
+    // The bug the owner reported as "broken connection graphic artifacts of
+    // the broken link cable icons floating behind": rack/cables.ts listened
+    // for `pointermove`/`pointerup` but never `pointercancel`, which the
+    // browser fires *instead of* `pointerup` whenever it takes a gesture
+    // away mid-drag (a touch scroll/zoom takeover, an interrupting call).
+    // `onDragEnd` never ran, so `dragPreview` was never removed and
+    // `dragFrom` never cleared. This is the test whose absence let that
+    // ship -- see rack/cables.ts's own header comment for the full fix.
+    const page: Page = await browser.newPage()
+    const consoleErrors: string[] = []
+    page.on('console', (msg) => { if (msg.type() === 'error') consoleErrors.push(msg.text()) })
+    page.on('pageerror', (err) => consoleErrors.push(String(err)))
+
+    await powerOn(page)
+
+    const before = await cablesOf(page)
+    expect(before).toHaveLength(6)
+
+    const source = page.getByTestId('jack-lfo-out')
+    await source.waitFor({ state: 'visible' })
+    const sourceBox = await source.boundingBox()
+    if (!sourceBox) throw new Error('jack has no bounding box')
+    const sx = sourceBox.x + sourceBox.width / 2
+    const sy = sourceBox.y + sourceBox.height / 2
+
+    // Capture the real pointerId Chromium assigns the mouse gesture, so the
+    // synthetic `pointercancel` below cancels the *same* drag rather than
+    // relying on an assumed id.
+    await page.evaluate(() => {
+      ;(window as unknown as { __capturedPointerId?: number }).__capturedPointerId = undefined
+      window.addEventListener(
+        'pointerdown',
+        (e) => {
+          ;(window as unknown as { __capturedPointerId?: number }).__capturedPointerId = e.pointerId
+        },
+        { capture: true, once: true },
+      )
+    })
+
+    await page.mouse.move(sx, sy)
+    await page.mouse.down()
+    await page.mouse.move(sx + 60, sy + 60, { steps: 5 })
+
+    // A real drag is in progress -- the preview line exists.
+    await expect.poll(() => page.locator('.cable-preview').count()).toBe(1)
+
+    const pointerId = await page.evaluate(
+      () => (window as unknown as { __capturedPointerId?: number }).__capturedPointerId,
+    )
+    if (pointerId === undefined) throw new Error('pointerdown never fired')
+    await page.evaluate((pid: number) => {
+      window.dispatchEvent(new PointerEvent('pointercancel', { pointerId: pid, bubbles: true, cancelable: true }))
+    }, pointerId)
+
+    // Torn down immediately, before the mouse button is even released --
+    // no orphaned preview line left floating on screen.
+    await expect.poll(() => page.locator('.cable-preview').count()).toBe(0)
+    expect(await cablesOf(page)).toHaveLength(6) // no connection was made
+
+    // Releasing the (Playwright-tracked) mouse button now that the app has
+    // already forgotten about this gesture must not do anything odd --
+    // proves `dragFrom` was actually cleared, not just the preview element
+    // removed while the drag state stayed live underneath.
+    await page.mouse.up()
+    expect(await cablesOf(page)).toHaveLength(6)
+
+    // And the drag lifecycle itself isn't wedged: a completely fresh drag
+    // afterward still creates a real connection.
+    const target = page.getByTestId('jack-vcf-cutoffCv')
+    await target.waitFor({ state: 'visible' })
+    const targetBox = await target.boundingBox()
+    if (!targetBox) throw new Error('jack has no bounding box')
+    const tx = targetBox.x + targetBox.width / 2
+    const ty = targetBox.y + targetBox.height / 2
+
+    await page.mouse.move(sx, sy)
+    await page.mouse.down()
+    await page.mouse.move((sx + tx) / 2, (sy + ty) / 2, { steps: 5 })
+    await page.mouse.move(tx, ty, { steps: 5 })
+    await page.mouse.up()
+
+    const after = await cablesOf(page)
+    expect(after).toHaveLength(7)
+    expect(after.some((c) => c.from[0] === 'lfo' && c.to[0] === 'vcf')).toBe(true)
+
+    expect(consoleErrors, `console errors: ${consoleErrors.join('\n')}`).toEqual([])
+    await page.close()
+  })
+
+  it('tap-to-connect: two taps on different jacks connect them; a second tap on the armed jack cancels', async () => {
+    // Drag is a poor gesture on touch (small jacks, imprecise fingers, a
+    // drag competing with the page's own scroll) -- rack/cables.ts's
+    // tap-to-connect alternative reads any pointerdown/pointerup pair that
+    // barely moved as a tap rather than a drag, so a plain mouse click
+    // (down/up with no move in between) exercises the same state machine a
+    // touch tap would.
+    const page: Page = await browser.newPage()
+    const consoleErrors: string[] = []
+    page.on('console', (msg) => { if (msg.type() === 'error') consoleErrors.push(msg.text()) })
+    page.on('pageerror', (err) => consoleErrors.push(String(err)))
+
+    await powerOn(page)
+
+    const before = await cablesOf(page)
+    expect(before).toHaveLength(6)
+
+    const source = page.getByTestId('jack-lfo-out')
+    const target = page.getByTestId('jack-vcf-cutoffCv')
+    await source.waitFor({ state: 'visible' })
+    await target.waitFor({ state: 'visible' })
+    const sourceBox = await source.boundingBox()
+    const targetBox = await target.boundingBox()
+    if (!sourceBox || !targetBox) throw new Error('jack has no bounding box')
+    const sx = sourceBox.x + sourceBox.width / 2
+    const sy = sourceBox.y + sourceBox.height / 2
+    const tx = targetBox.x + targetBox.width / 2
+    const ty = targetBox.y + targetBox.height / 2
+
+    async function tap(x: number, y: number): Promise<void> {
+      await page.mouse.move(x, y)
+      await page.mouse.down()
+      await page.mouse.up()
+    }
+
+    // First tap arms the jack -- a themed highlight appears, nothing is
+    // connected yet.
+    await tap(sx, sy)
+    await expect.poll(() => page.locator('.jack-armed').count()).toBe(1)
+    expect(await page.locator('[data-testid="jack-lfo-out"].jack-armed').count()).toBe(1)
+    expect(await cablesOf(page)).toHaveLength(6)
+
+    // Tapping the same (armed) jack again cancels the arm rather than
+    // connecting it to itself.
+    await tap(sx, sy)
+    await expect.poll(() => page.locator('.jack-armed').count()).toBe(0)
+    expect(await cablesOf(page)).toHaveLength(6)
+
+    // Arm again, then tap a *different* jack -- completes the connection,
+    // the same graph-level result the drag test above proves for a drag.
+    await tap(sx, sy)
+    await expect.poll(() => page.locator('.jack-armed').count()).toBe(1)
+    await tap(tx, ty)
+    await expect.poll(() => page.locator('.jack-armed').count()).toBe(0)
+
+    const after = await cablesOf(page)
+    expect(after).toHaveLength(7)
+    const newCable = after.find((c) => c.from[0] === 'lfo')
+    expect(newCable).toBeDefined()
+    expect(newCable!.from).toEqual(['lfo', 'out'])
+    expect(newCable!.to).toEqual(['vcf', 'cutoffCv'])
+
+    expect(consoleErrors, `console errors: ${consoleErrors.join('\n')}`).toEqual([])
+    await page.close()
+  })
+
+  it('tapping an armed jack, then clicking empty rack space, cancels the arm', async () => {
+    const page: Page = await browser.newPage()
+    const consoleErrors: string[] = []
+    page.on('console', (msg) => { if (msg.type() === 'error') consoleErrors.push(msg.text()) })
+    page.on('pageerror', (err) => consoleErrors.push(String(err)))
+
+    await powerOn(page)
+
+    const source = page.getByTestId('jack-lfo-out')
+    await source.waitFor({ state: 'visible' })
+    const sourceBox = await source.boundingBox()
+    if (!sourceBox) throw new Error('jack has no bounding box')
+
+    await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2)
+    await page.mouse.down()
+    await page.mouse.up()
+    await expect.poll(() => page.locator('.jack-armed').count()).toBe(1)
+
+    // A click on the rack background -- empty space, not a jack or a
+    // cable -- is "elsewhere" per the tap-to-connect contract.
+    const rackSurface = page.getByTestId('rack-surface')
+    const rackBox = await rackSurface.boundingBox()
+    if (!rackBox) throw new Error('rack surface has no bounding box')
+    await page.mouse.click(rackBox.x + rackBox.width - 5, rackBox.y + rackBox.height - 5)
+
+    await expect.poll(() => page.locator('.jack-armed').count()).toBe(0)
+    expect(await cablesOf(page)).toHaveLength(6)
+
+    expect(consoleErrors, `console errors: ${consoleErrors.join('\n')}`).toEqual([])
+    await page.close()
+  })
+
   it('clicking a cable opens its inspector rather than removing it; the inspector\'s own button does', async () => {
     // Phase 2 reconciles "clicking a cable" with the new click-to-inspect
     // signal-visualization feature (rack/cable-inspector.ts): a click now

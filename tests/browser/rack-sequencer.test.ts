@@ -481,4 +481,77 @@ describe('rack sequencer', () => {
     expect(consoleErrors, `console errors: ${consoleErrors.join('\n')}`).toEqual([])
     await page.close()
   }, 20000)
+
+  it('cancelling a module-reorder drag (pointercancel) leaves no panel stuck in the picked-up state', async () => {
+    // rack/reorder.ts had the exact same missing-pointercancel bug as
+    // rack/cables.ts (see that file's own header comment and the cable
+    // drag-cancel test in rack-page.test.ts): only `pointerup` ended a
+    // drag, so a touch scroll/zoom takeover mid-reorder left `draggingEl`
+    // wedged forever -- the panel stuck at reduced opacity
+    // (`.module-dragging`) and every future `pointermove` anywhere in the
+    // window still shoving it around the rack.
+    const page: Page = await browser.newPage()
+    const consoleErrors: string[] = []
+    page.on('console', (msg) => { if (msg.type() === 'error') consoleErrors.push(msg.text()) })
+    page.on('pageerror', (err) => consoleErrors.push(String(err)))
+
+    await powerOn(page)
+
+    const vcfHeader = page.locator('.module-panel[data-module="vcf"] .module-header')
+    const keyboardPanel = page.locator('.module-panel[data-module="keyboard"]')
+    const vcfBox = await vcfHeader.boundingBox()
+    const kbBox = await keyboardPanel.boundingBox()
+    if (!vcfBox || !kbBox) throw new Error('module has no bounding box')
+
+    await page.evaluate(() => {
+      ;(window as unknown as { __capturedPointerId?: number }).__capturedPointerId = undefined
+      window.addEventListener(
+        'pointerdown',
+        (e) => {
+          ;(window as unknown as { __capturedPointerId?: number }).__capturedPointerId = e.pointerId
+        },
+        { capture: true, once: true },
+      )
+    })
+
+    await page.mouse.move(vcfBox.x + vcfBox.width / 2, vcfBox.y + vcfBox.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(kbBox.x + 5, kbBox.y + kbBox.height / 2, { steps: 10 })
+
+    // A real drag is in progress -- the VCF panel is visibly picked up.
+    await expect
+      .poll(() => page.locator('.module-panel[data-module="vcf"].module-dragging').count())
+      .toBe(1)
+
+    const pointerId = await page.evaluate(
+      () => (window as unknown as { __capturedPointerId?: number }).__capturedPointerId,
+    )
+    if (pointerId === undefined) throw new Error('pointerdown never fired')
+    await page.evaluate((pid: number) => {
+      window.dispatchEvent(new PointerEvent('pointercancel', { pointerId: pid, bubbles: true, cancelable: true }))
+    }, pointerId)
+
+    // Torn down immediately -- not stuck at reduced opacity, and dragging
+    // the mouse further (Playwright's button is still physically "down")
+    // no longer moves anything, proving `draggingEl` was actually cleared
+    // rather than just the CSS class.
+    await expect
+      .poll(() => page.locator('.module-panel[data-module="vcf"].module-dragging').count())
+      .toBe(0)
+
+    const domOrderAfterCancel = await page.evaluate(() =>
+      [...document.querySelectorAll('#rack-modules > .module-panel')].map((p) => (p as HTMLElement).dataset['module']),
+    )
+
+    await page.mouse.move(kbBox.x + 400, kbBox.y + kbBox.height / 2, { steps: 5 })
+    const domOrderAfterFurtherMove = await page.evaluate(() =>
+      [...document.querySelectorAll('#rack-modules > .module-panel')].map((p) => (p as HTMLElement).dataset['module']),
+    )
+    expect(domOrderAfterFurtherMove).toEqual(domOrderAfterCancel)
+
+    await page.mouse.up()
+
+    expect(consoleErrors, `console errors: ${consoleErrors.join('\n')}`).toEqual([])
+    await page.close()
+  }, 20000)
 })

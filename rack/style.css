@@ -931,6 +931,30 @@ body {
    * capped by an ancestor's stacking context. */
   position: relative;
   z-index: 2;
+  /* A jack's own pointerdown starts a drag or a tap (rack/cables.ts) --
+   * without this, a touch press here can instead be interpreted as the
+   * start of a page scroll, racing (and sometimes winning) against the
+   * `pointerdown` handler's own `preventDefault()`. Matches
+   * `.module-header`'s own `touch-action: none`, the reorder drag's
+   * equivalent. */
+  touch-action: none;
+}
+
+/* An invisible touch/pointer hit-area around the visible jack, well below
+ * the visible dot's own 16px -- the ~44px commonly recommended for a touch
+ * target. The *visible* jack does not grow: this is an absolutely
+ * positioned pseudo-element, out of normal flow, so it adds zero width or
+ * height to `.jack`'s own box and cannot move `.jack-socket` by even a
+ * pixel -- confirmed by `tests/browser/theme-geometry.test.ts`, which
+ * measures `.jack-socket` specifically and stays green with this in place.
+ * `inset: -5px` (not more) is a deliberate ceiling: `.module-grid`'s own
+ * row-gap is 0.35rem (~5.6px, see that rule's comment), and growing past
+ * it would start reaching into the knob row above a jack row rather than
+ * only enlarging this jack's own reach. */
+.jack::before {
+  content: '';
+  position: absolute;
+  inset: -5px;
 }
 
 .jack-socket {
@@ -947,6 +971,19 @@ body {
 .jack.signal-audio .jack-socket { border-color: var(--cable-audio); }
 .jack.signal-cv .jack-socket { border-color: var(--cable-cv); }
 .jack.signal-gate .jack-socket { border-color: var(--cable-gate); }
+
+/* Tap-to-connect's armed state (rack/cables.ts): the jack a first tap
+ * armed, waiting for a second tap to complete or cancel it. Both tokens are
+ * already load-bearing elsewhere in this file for "something is actively
+ * selected" (`--text-accent`: `.arcade-hud`'s live readout; `--knob-
+ * indicator-glow`: `.module-panel.module-dragging`'s own ring) rather than
+ * a color introduced just for this state. */
+.jack-armed .jack-socket {
+  border-color: var(--text-accent);
+  box-shadow:
+    inset 0 1px 2px var(--shadow-inset),
+    0 0 0 3px var(--knob-indicator-glow);
+}
 
 .jack-label {
   font-size: var(--text-2xs);

@@ -18,9 +18,45 @@ import { showCableInspector, type CableInspectorHandle } from './cable-inspector
  * attached the instant a cable is selected, detached the instant it is
  * deselected -- and the three ways a cable can be deselected: clicking it
  * again, clicking anywhere else, or its own inspector's remove button.
+ *
+ * **Drag lifecycle.** A drag begins on a jack's `pointerdown` and, until
+ * this fix, only ever ended cleanly via `pointerup` -- `pointermove` and
+ * `pointerup` were the only two events this file listened for. On touch,
+ * the browser fires `pointercancel` instead of `pointerup` any time it
+ * takes the gesture away mid-drag (a scroll, a pinch-zoom, an edge swipe,
+ * an interrupting call), and desktop can hit the same gap when the window
+ * loses focus mid-drag. Neither path ever reached `onDragEnd`, so
+ * `dragPreview` was never removed and `dragFrom` never cleared -- the
+ * "floating broken-link cable icon" the owner reported, and, because a
+ * meaningful share of touch drags get cancelled rather than completed,
+ * also most of why phone patching felt unreliable at all. Every exit from
+ * a drag now funnels through `cancelDrag()`: `pointercancel`,
+ * `lostpointercapture` (defense in depth, in case a future browser quirk
+ * releases capture without either of the other two events), the window
+ * losing focus, and the Escape key, alongside the original `pointerup`.
+ *
+ * **Tap-to-connect.** Drag is a poor gesture on touch -- small jacks,
+ * imprecise fingers, a drag competing with the page's own scroll -- so
+ * every jack also accepts a tap-based alternative: tap one jack to arm it
+ * (a themed highlight, `.jack-armed`), tap a second to complete the
+ * connection, tap the armed jack again or tap anywhere else to cancel.
+ * Fed by the same `pointerdown`/`pointerup` pair a drag already tracks --
+ * `onDragEnd` measures how far the pointer travelled between the two and
+ * reads anything under a small threshold as a tap rather than a drag (see
+ * `TAP_MAX_MOVEMENT_PX`) -- so a mouse click with no real drag, which
+ * previously did nothing here, now arms/completes/cancels exactly the
+ * same way a tap does. Drag itself is untouched and stays the better tool
+ * with a mouse; the two gestures coexist on the same jacks.
  */
 
 const SVG_NS = 'http://www.w3.org/2000/svg'
+
+/** A pointerdown/pointerup pair whose travel stays under this many CSS
+ *  pixels is read as a tap (arm/complete/cancel), not a drag -- generous
+ *  enough to absorb a finger's natural wobble on a small jack, tight
+ *  enough that a real drag toward a different jack is never mistaken for
+ *  one. */
+const TAP_MAX_MOVEMENT_PX = 8
 
 interface JackRef {
   moduleId: string
@@ -49,6 +85,14 @@ export class CableLayer {
   private readonly cableGroups = new Map<string, { group: SVGGElement; from: JackRef; to: JackRef }>()
   private dragFrom: JackRef | null = null
   private dragPreview: SVGPathElement | null = null
+  private dragPointerId: number | null = null
+  private dragStartX = 0
+  private dragStartY = 0
+  /** Tap-to-connect's own state: the jack a first tap armed, waiting for a
+   *  second tap to complete or cancel it. Independent of `dragFrom` --
+   *  arming is an idle state with no pointer currently down, unlike a
+   *  drag. */
+  private armedJack: JackRef | null = null
   private readonly resizeObserver: ResizeObserver
   private readonly onWindowResize = (): void => this.reflow()
   private selectedCableId: string | null = null
@@ -70,6 +114,16 @@ export class CableLayer {
 
     window.addEventListener('pointermove', this.onDragMove)
     window.addEventListener('pointerup', this.onDragEnd)
+    // The cancellation paths a completed drag doesn't need: `pointercancel`
+    // fires instead of `pointerup` whenever the browser takes the gesture
+    // away (touch scroll/zoom takeover, an interrupting call), and a window
+    // `blur` mid-drag (an OS-level app switch, a permission prompt) is not
+    // guaranteed to deliver either pointer event on every platform. Both
+    // funnel into the same `cancelDrag()` a completed drag itself uses for
+    // cleanup, just without ever attempting a connection. See this file's
+    // header comment for the full "floating cable artifact" story.
+    window.addEventListener('pointercancel', this.onDragCancel)
+    window.addEventListener('blur', this.onWindowBlur)
     this.resizeObserver = new ResizeObserver(() => this.reflow())
     this.resizeObserver.observe(container)
     window.addEventListener('resize', this.onWindowResize)
@@ -78,6 +132,12 @@ export class CableLayer {
     // `stopPropagation`, so this only ever sees a click that landed on
     // neither: the rack background, a module panel, a jack. Escape is the
     // keyboard equivalent, for a cable selected without a mouse nearby.
+    // Both also cancel a pending tap-to-connect arm -- "tap elsewhere to
+    // cancel" reads a click here the same way a cable-inspector deselect
+    // does, and a jack's own click handler (registered alongside its
+    // pointerdown below) stops propagation the same way the cable hit-path
+    // does, so tapping the jack that just armed itself never immediately
+    // un-arms it via this same listener.
     window.addEventListener('click', this.onOutsideClick)
     window.addEventListener('keydown', this.onKeyDown)
   }
@@ -90,8 +150,12 @@ export class CableLayer {
    *  may itself be gone. */
   destroy(): void {
     this.closeInspector()
+    this.cancelDrag()
+    this.cancelArmed()
     window.removeEventListener('pointermove', this.onDragMove)
     window.removeEventListener('pointerup', this.onDragEnd)
+    window.removeEventListener('pointercancel', this.onDragCancel)
+    window.removeEventListener('blur', this.onWindowBlur)
     window.removeEventListener('resize', this.onWindowResize)
     window.removeEventListener('click', this.onOutsideClick)
     window.removeEventListener('keydown', this.onKeyDown)
@@ -108,6 +172,12 @@ export class CableLayer {
     for (const key of [...this.jacks.keys()]) {
       if (key.startsWith(`${moduleId}:`)) this.jacks.delete(key)
     }
+    // A module can be removed mid-drag or while one of its jacks is armed
+    // (its own remove button is a normal click elsewhere in the panel) --
+    // without this, `dragFrom`/`armedJack` would keep pointing at a jack
+    // whose panel just left the DOM.
+    if (this.dragFrom?.moduleId === moduleId) this.cancelDrag()
+    if (this.armedJack?.moduleId === moduleId) this.cancelArmed()
   }
 
   /**
@@ -138,11 +208,18 @@ export class CableLayer {
         el.addEventListener('pointerdown', (e) => {
           e.preventDefault()
           e.stopPropagation()
-          this.dragFrom = ref
-          this.dragPreview = document.createElementNS(SVG_NS, 'path')
-          this.dragPreview.classList.add('cable-preview')
-          this.svg.append(this.dragPreview)
-          this.updatePreview(e.clientX, e.clientY)
+          this.beginDrag(ref, e)
+        })
+        // See this file's header comment: stops a jack tap's own synthetic
+        // `click` from reaching `onOutsideClick` and immediately cancelling
+        // the arm that same tap just set.
+        el.addEventListener('click', (e) => e.stopPropagation())
+        // Defense in depth alongside `onDragCancel`/`onWindowBlur`: if
+        // capture is ever released without either a `pointerup` or a
+        // `pointercancel` reaching this layer at all, this is the last
+        // chance to notice the drag this jack started is no longer live.
+        el.addEventListener('lostpointercapture', (e) => {
+          if (this.dragFrom === ref && this.dragPointerId === e.pointerId) this.cancelDrag()
         })
       },
     }
@@ -231,10 +308,14 @@ export class CableLayer {
 
   private readonly onOutsideClick = (): void => {
     if (this.selectedCableId) this.closeInspector()
+    this.cancelArmed()
   }
 
   private readonly onKeyDown = (e: KeyboardEvent): void => {
-    if (e.key === 'Escape' && this.selectedCableId) this.closeInspector()
+    if (e.key !== 'Escape') return
+    if (this.selectedCableId) this.closeInspector()
+    if (this.dragFrom) this.cancelDrag()
+    this.cancelArmed()
   }
 
   /** Recompute every cable's anchor points -- call after anything that
@@ -273,17 +354,71 @@ export class CableLayer {
     this.dragPreview.classList.toggle('signal-' + this.dragFrom.el.dataset['signal'], true)
   }
 
+  private beginDrag(from: JackRef, e: PointerEvent): void {
+    this.dragFrom = from
+    this.dragPointerId = e.pointerId
+    this.dragStartX = e.clientX
+    this.dragStartY = e.clientY
+    this.dragPreview = document.createElementNS(SVG_NS, 'path')
+    this.dragPreview.classList.add('cable-preview')
+    this.svg.append(this.dragPreview)
+    this.updatePreview(e.clientX, e.clientY)
+    // Captured so this jack keeps receiving move/up/cancel events even if
+    // the pointer strays off its small hit area mid-drag -- the same
+    // convention `knob.ts`/`slider.ts` already use. Wrapped in try/catch:
+    // `setPointerCapture` can throw for a pointerId the browser already
+    // considers gone, and capture here is a robustness aid, not a
+    // requirement -- the window-level listeners below work with or
+    // without it.
+    try {
+      from.el.setPointerCapture(e.pointerId)
+    } catch {
+      // no-op -- see comment above
+    }
+  }
+
+  /** Tears down whatever an in-progress drag left behind -- the preview
+   *  line, the tracked "from" jack, its captured pointer -- with no side
+   *  effect on the graph. Every exit from a drag that is not a completed
+   *  connection (`pointercancel`, a lost pointer capture, the window
+   *  losing focus, the Escape key) funnels through this one function, and
+   *  a completed `pointerup` (`onDragEnd`) calls it too before deciding
+   *  what the gesture meant -- so "leaves nothing behind" only has to be
+   *  true in one place. */
+  private cancelDrag(): void {
+    if (this.dragFrom && this.dragPointerId !== null) {
+      try {
+        this.dragFrom.el.releasePointerCapture(this.dragPointerId)
+      } catch {
+        // no-op -- already released, or never actually captured
+      }
+    }
+    this.dragFrom = null
+    this.dragPointerId = null
+    this.dragPreview?.remove()
+    this.dragPreview = null
+  }
+
   private readonly onDragMove = (e: PointerEvent): void => {
-    if (!this.dragFrom) return
+    if (!this.dragFrom || e.pointerId !== this.dragPointerId) return
     this.updatePreview(e.clientX, e.clientY)
   }
 
   private readonly onDragEnd = (e: PointerEvent): void => {
-    if (!this.dragFrom) return
+    if (!this.dragFrom || e.pointerId !== this.dragPointerId) return
     const from = this.dragFrom
-    this.dragFrom = null
-    this.dragPreview?.remove()
-    this.dragPreview = null
+    const moved = Math.hypot(e.clientX - this.dragStartX, e.clientY - this.dragStartY)
+    this.cancelDrag()
+
+    if (moved < TAP_MAX_MOVEMENT_PX) {
+      // Barely moved: read as a tap, not a drag. `handleTap` owns the
+      // arm/complete/cancel state machine -- see this file's header
+      // comment.
+      this.handleTap(from)
+      return
+    }
+
+    this.cancelArmed() // a real drag supersedes any pending tap-arm state
 
     const target = document.elementFromPoint(e.clientX, e.clientY)
     const jackEl = target instanceof Element ? target.closest('.jack') : null
@@ -295,6 +430,47 @@ export class CableLayer {
     if (!to) return
 
     this.tryConnect(from, to)
+  }
+
+  private readonly onDragCancel = (e: PointerEvent): void => {
+    if (!this.dragFrom || e.pointerId !== this.dragPointerId) return
+    this.cancelDrag()
+  }
+
+  private readonly onWindowBlur = (): void => {
+    if (this.dragFrom) this.cancelDrag()
+    this.cancelArmed()
+  }
+
+  /** Tap-to-connect's own state machine (see this file's header comment):
+   *  the first tap on a jack arms it, a second tap on a *different* jack
+   *  completes the connection, and a second tap on the *same* jack cancels
+   *  the arm. Fed only by `onDragEnd`'s "this pointerdown/up pair barely
+   *  moved" branch, so both a real touch tap and a plain mouse click with
+   *  no drag reach this the same way. */
+  private handleTap(tapped: JackRef): void {
+    if (!this.armedJack) {
+      this.armJack(tapped)
+      return
+    }
+    if (this.armedJack.moduleId === tapped.moduleId && this.armedJack.portId === tapped.portId) {
+      this.cancelArmed() // tapped the armed jack again -- cancel
+      return
+    }
+    const armed = this.armedJack
+    this.cancelArmed()
+    this.tryConnect(armed, tapped)
+  }
+
+  private armJack(ref: JackRef): void {
+    this.cancelArmed()
+    this.armedJack = ref
+    ref.el.classList.add('jack-armed')
+  }
+
+  private cancelArmed(): void {
+    if (this.armedJack) this.armedJack.el.classList.remove('jack-armed')
+    this.armedJack = null
   }
 
   /**

@@ -91,13 +91,21 @@ export function enableReorder(
     getCableLayer().reflow()
   }
 
-  function onPointerUp(e: PointerEvent): void {
-    if (!draggingEl || e.pointerId !== activePointerId) return
+  function endDrag(): void {
+    if (!draggingEl) return
     const panel = draggingEl
     draggingEl = null
     activePointerId = null
     panel.classList.remove('module-dragging')
 
+    // The dragged panel's DOM node was already physically moved during
+    // `onPointerMove` (see this file's header comment) -- committing to the
+    // graph is the same whether the gesture ended in a clean `pointerup` or
+    // was cancelled out from under it (`pointercancel`, or the window
+    // losing focus mid-drag): whatever order the panels are visually in
+    // right now is what gets written back, since there is no "revert to
+    // where it started" affordance to fall back to and leaving the graph's
+    // slots out of sync with what is on screen would be worse.
     const graph = getGraph()
     panelsInOrder().forEach((el, index) => {
       const id = el.dataset['module']
@@ -107,11 +115,37 @@ export function enableReorder(
     onReordered()
   }
 
+  function onPointerUp(e: PointerEvent): void {
+    if (!draggingEl || e.pointerId !== activePointerId) return
+    endDrag()
+  }
+
+  // `pointercancel` fires instead of `pointerup` whenever the browser takes
+  // a touch gesture away mid-drag (a scroll takeover, a pinch-zoom, an
+  // interrupting call) -- without this, exactly like the bug this mirrors
+  // in `rack/cables.ts`, `draggingEl` would never clear, the panel would
+  // stay visually stuck in "picked up" (`.module-dragging`'s reduced
+  // opacity and drop shadow) forever, and every subsequent `pointermove`
+  // anywhere in the window would keep shoving it around the rack. Window
+  // `blur` mid-drag is the same class of gap on desktop (an OS-level app
+  // switch, a permission prompt) with no guarantee either pointer event
+  // still arrives.
+  function onPointerCancel(e: PointerEvent): void {
+    if (!draggingEl || e.pointerId !== activePointerId) return
+    endDrag()
+  }
+
+  function onWindowBlur(): void {
+    endDrag()
+  }
+
   container.addEventListener('pointerdown', onPointerDown)
-  // Move/up listen on the window, not the container: a fast drag can carry
-  // the pointer outside the rack surface entirely (past its right edge, or
-  // over the palette drawer), and a container-scoped listener would stop
-  // seeing the drag the instant that happens.
+  // Move/up/cancel listen on the window, not the container: a fast drag can
+  // carry the pointer outside the rack surface entirely (past its right
+  // edge, or over the palette drawer), and a container-scoped listener
+  // would stop seeing the drag the instant that happens.
   window.addEventListener('pointermove', onPointerMove)
   window.addEventListener('pointerup', onPointerUp)
+  window.addEventListener('pointercancel', onPointerCancel)
+  window.addEventListener('blur', onWindowBlur)
 }
