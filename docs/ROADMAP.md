@@ -201,6 +201,52 @@ steers something with momentum rather than issuing instant commands.
 should not imply the app does anything to a player neurologically — the same
 line already drawn for the psychoacoustic modules, and for the same reason.
 
+## 3c. Ferrofluid / nano-ferrite reactive visualiser
+
+Owner's idea: a 3D fluid that dances over the "magnetic resonance" of
+whatever the patch is doing, the way ferrofluid spikes over a magnet — and
+then a game layered on it, matching tone or signal to drive the shape.
+
+**Why it fits.** The visual language is already right for this project: real
+ferrofluid spikes along field lines at discrete points, which is close to
+what a spectrum *is*. Map bins to field sources and the fluid becomes a
+spectrum analyser nobody has to be taught to read. It is the same "make the
+measurement legible" idea the scope and the academy overlays already use,
+one step further.
+
+**The honest technical read.** The physics is the cheap part; the rendering
+is not.
+
+- Real ferrofluid is a Rosensweig instability — a free-surface problem that
+  is genuinely expensive and completely unnecessary here. The look people
+  recognise is spikes along field lines, and that is reproducible with a
+  height field or a metaball/implicit surface over N field sources driven by
+  FFT bins. `src/engine/analysis/fft.ts` already produces the input.
+- WebGL is required; this is the project's first hard GPU dependency. Every
+  visual so far is 2D canvas and degrades on anything. A raymarched metaball
+  surface at full resolution will not hold 60fps on the phone the owner
+  already measured at 100% CPU — and that phone is the constraint that
+  matters, since it is the device the bug reports come from.
+- The viable shape is therefore tiered, decided by measurement rather than
+  by guessing: a full raymarched surface where the GPU allows, a cheaper
+  displaced-mesh or instanced-spike version below that, and the existing 2D
+  visuals as the floor. That tiering has to be built in from the start, not
+  retrofitted — the CPU meter in the toolbar already gives a place to hang
+  the decision.
+- Audio-thread cost stays near zero either way: this reads an
+  `AnalyserNode`, it does not add DSP.
+
+**As a game.** Match-the-shape is a better fit than match-the-number: the
+player is shown a target silhouette and has to find the timbre that produces
+it, which is the academy's match-this-sound level with a visual target
+instead of an audible one — and it reuses that grading path rather than
+needing a new one.
+
+**Sequencing note.** This is a large piece of work whose main cost is
+rendering, not audio, and it competes with rungs that make the *instrument*
+better (reverb, the effects rung, MIDI file playback). Worth doing, worth
+doing after those.
+
 ## 4. Known gaps, already recorded elsewhere
 
 - The two spec'd failure modes never implemented: a native fallback with a
