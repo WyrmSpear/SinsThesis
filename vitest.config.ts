@@ -81,6 +81,19 @@ export default defineConfig({
           // the unit-style browser tests above.
           testTimeout: 30000,
           hookTimeout: 30000,
+          // Every `expect.poll` in these files waits on a real offline
+          // audio render to finish and hand the UI back (the academy's
+          // "Check my patch" button returning to its idle label, the
+          // match-this-sound target finishing playback). Vitest's default
+          // poll budget is 1000ms, which is fine for one of these files on
+          // its own and not fine for twenty of them rendering audio in
+          // parallel Chromiums -- `rack-match-sound.test.ts` timed out at
+          // roughly one full-suite run in ten with "Matcher did not succeed
+          // in time" while the render itself was healthy. This is a
+          // ceiling, not an expectation: the polls still fail if the render
+          // never completes, they just stop failing when the machine is
+          // merely busy.
+          expect: { poll: { timeout: 20000, interval: 100 } },
         },
       },
     ],
