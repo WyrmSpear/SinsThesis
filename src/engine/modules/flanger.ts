@@ -58,7 +58,7 @@ export const flangerDescriptor: ModuleDescriptor = {
   // 10 HP -- Delay's width (delay.ts), for the same reason: five knobs need
   // a 2x3 grid, and "Manual"/"FB" want the column room.
   hp: 10,
-  group: 'shaping',
+  group: 'effects',
   ports: [
     { id: 'in', dir: 'in', signal: 'audio', label: 'In', pos: [0, 3] },
     { id: 'rateCv', dir: 'in', signal: 'cv', label: 'Rate CV', pos: [1, 3] },

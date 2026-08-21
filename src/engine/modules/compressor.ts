@@ -65,12 +65,12 @@ import {
 export const compressorDescriptor: ModuleDescriptor = {
   type: 'compressor',
   name: 'Compressor',
-  // 12 HP -- the widest module in the shaping group, and it needs to be:
+  // 12 HP -- the widest module in the effects group, and it needs to be:
   // six knobs plus a switch over four jacks wants three columns, and at
   // HP_PX = 16 that is 192px / 3 = 64px per track, comfortably above the
   // ~38px a knob dial needs (see rack/panel.ts's hp audit note).
   hp: 12,
-  group: 'shaping',
+  group: 'effects',
   ports: [
     { id: 'in', dir: 'in', signal: 'audio', label: 'In', pos: [0, 3] },
     { id: 'key', dir: 'in', signal: 'audio', label: 'Key', pos: [1, 3] },

@@ -23,7 +23,7 @@ export const pannerDescriptor: ModuleDescriptor = {
   // 8 HP -- one knob, three jacks, the same footprint as vca.ts's own
   // one-knob-plus-CV shape with an extra jack column for the stereo out.
   hp: 8,
-  group: 'shaping',
+  group: 'effects',
   ports: [
     { id: 'in', dir: 'in', signal: 'audio', label: 'In', pos: [0, 3] },
     // 'Pan CV' overflowed this 8 HP panel's jack column and rendered as an

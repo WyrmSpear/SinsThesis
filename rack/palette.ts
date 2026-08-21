@@ -18,6 +18,7 @@ import { MODULE_GROUPS } from '../src/engine/types'
 const GROUP_TITLES: Record<ModuleGroup, string> = {
   source: 'Sources',
   shaping: 'Shaping',
+  effects: 'Effects',
   modulation: 'Modulation',
   utility: 'Utility',
   control: 'Control',

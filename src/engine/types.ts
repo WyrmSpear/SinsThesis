@@ -29,11 +29,24 @@ export interface ParamSpec {
   labels?: readonly string[]
 }
 
-/** The five palette sections the rack groups modules into. A closed set
- *  (not a free string) so every descriptor's `group` sorts into the same
- *  bucket a human would expect, rather than each module author inventing
- *  its own label and the palette silently growing a sixth column. */
-export const MODULE_GROUPS = ['source', 'shaping', 'modulation', 'utility', 'control'] as const
+/** The six palette sections the rack groups modules into, in signal-flow
+ *  order -- `rack/palette.ts` renders them in exactly this sequence.
+ *
+ *  A closed set (not a free string) so every descriptor's `group` sorts
+ *  into the same bucket a human would expect, rather than each module
+ *  author inventing its own label and the palette silently growing a
+ *  column. `'effects'` was added deliberately rather than silently, which
+ *  is what this being a closed set is *for*: `'shaping'` had grown to 14
+ *  of the 30 shipped modules -- half the rack in one column, more than
+ *  source, modulation, utility and control put together -- and it was
+ *  holding two families a musician does not think of together. What a
+ *  signal *is* (filters, level, distortion, ring modulation) is a
+ *  different decision from what happens *to* a finished signal (time and
+ *  space: delay, flange, chorus, dynamics, stereo placement). Splitting
+ *  them left 7 and 7. Nothing about `group` is serialized -- `.sinp`
+ *  carries only `type` -- so regrouping is a presentation change with no
+ *  patch migration behind it. */
+export const MODULE_GROUPS = ['source', 'shaping', 'effects', 'modulation', 'utility', 'control'] as const
 export type ModuleGroup = (typeof MODULE_GROUPS)[number]
 
 export interface LayoutItem {

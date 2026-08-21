@@ -10,7 +10,7 @@ export const delayDescriptor: ModuleDescriptor = {
   // over the plain-3-knob modules giving "Feedback"/"Time CV" a little more
   // column room than the tightest fit needs.
   hp: 10,
-  group: 'shaping',
+  group: 'effects',
   ports: [
     { id: 'in', dir: 'in', signal: 'audio', label: 'In', pos: [0, 3] },
     { id: 'timeCv', dir: 'in', signal: 'cv', label: 'Time CV', pos: [1, 3] },

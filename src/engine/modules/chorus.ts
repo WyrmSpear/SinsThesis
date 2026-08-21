@@ -50,7 +50,7 @@ export const chorusDescriptor: ModuleDescriptor = {
   // 10 HP -- Delay's width (delay.ts). Four knobs over two jacks fits a 2x2
   // grid with room for "Spread".
   hp: 10,
-  group: 'shaping',
+  group: 'effects',
   ports: [
     { id: 'in', dir: 'in', signal: 'audio', label: 'In', pos: [0, 3] },
     { id: 'rateCv', dir: 'in', signal: 'cv', label: 'Rate CV', pos: [1, 3] },

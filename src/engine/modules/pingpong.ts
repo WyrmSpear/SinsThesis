@@ -31,7 +31,7 @@ export const pingpongDescriptor: ModuleDescriptor = {
   // 2x2 knob grid over a 2x2 jack grid, the same shape lfo.ts's own
   // rate/shape/depth/division block uses.
   hp: 12,
-  group: 'shaping',
+  group: 'effects',
   ports: [
     { id: 'in', dir: 'in', signal: 'audio', label: 'In', pos: [0, 2] },
     { id: 'timeCv', dir: 'in', signal: 'cv', label: 'Time CV', pos: [1, 2] },
