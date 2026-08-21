@@ -25,6 +25,7 @@ import { buildKeyboardPanel } from './keyboard-panel'
 import { buildSequencerPanel } from './sequencer-panel'
 import { buildScopePanel } from './scope-panel'
 import { startArcade, type ArcadeHandle } from './arcade-panel'
+import { seededRngFromSearch } from '../arcade/rng'
 import { startWub } from './wub-panel'
 import { buildSamplerPanel } from './sampler-panel'
 import { enableReorder } from './reorder'
@@ -916,7 +917,19 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
    *  file doesn't own. */
   function mountArcadeGame(slot: HTMLElement): void {
     arcadeHandle?.stop()
-    arcadeHandle = arcadeGame === 'wub' ? startWub(slot, ctx, currentOutputInstance) : startArcade(slot, ctx, currentOutputInstance)
+    arcadeHandle =
+      arcadeGame === 'wub'
+        ? startWub(slot, ctx, currentOutputInstance)
+        : // A fresh generator per mount, so `?arcadeSeed=` replays the same
+          // block sequence on every restart rather than continuing the
+          // previous run's stream. Absent the param this is `undefined` and
+          // `startArcade` falls back to `Math.random`.
+          startArcade(
+            slot,
+            ctx,
+            currentOutputInstance,
+            seededRngFromSearch(location.search) ?? Math.random,
+          )
   }
 
   /** The picker itself: two `.mode-toggle-btn`s (the same vocabulary the

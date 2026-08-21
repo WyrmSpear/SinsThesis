@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { createServer, type ViteDevServer } from 'vite'
+import type { ViteDevServer } from 'vite'
+import { createIsolatedServer, closeIsolatedServer } from './support/e2e-server'
 import { chromium, type Browser, type Page } from 'playwright'
 import { fileURLToPath } from 'node:url'
 
@@ -34,7 +35,7 @@ let browser: Browser
 let baseUrl: string
 
 beforeAll(async () => {
-  server = await createServer({ root, configFile: false, server: { port: 0 } })
+  server = await createIsolatedServer(root)
   await server.listen()
   const address = server.httpServer?.address()
   if (!address || typeof address === 'string') throw new Error('dev server did not report a port')
@@ -45,12 +46,12 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await browser?.close()
-  await server?.close()
+  await closeIsolatedServer(server)
 })
 
-async function powerOn(page: Page): Promise<void> {
+async function powerOn(page: Page, search = ''): Promise<void> {
   await page.setViewportSize({ width: 2000, height: 1150 })
-  await page.goto(baseUrl + '/', { waitUntil: 'load' })
+  await page.goto(baseUrl + '/' + search, { waitUntil: 'load' })
   const powerBtn = page.getByTestId('power')
   await powerBtn.waitFor({ state: 'visible' })
   await powerBtn.click()
@@ -247,35 +248,36 @@ describe('rack arcade (pan paddle)', () => {
     page.on('console', (msg) => { if (msg.type() === 'error') consoleErrors.push(msg.text()) })
     page.on('pageerror', (err) => consoleErrors.push(String(err)))
 
-    await powerOn(page)
+    // Seed the block spawns (arcade/rng.ts). The previous version of this
+    // test swept the paddle with an LFO and waited 15s for a *randomly*
+    // placed block to happen to fall under it -- the paddle is 90px of a
+    // 420px playfield, so roughly a 1-in-5 shot per block, and it failed
+    // about a quarter of full-suite runs. Seed 58's first spawn is at
+    // x=209.98, dead centre, so a paddle parked at centre catches it every
+    // time: the assertion is now a fixed outcome, not a likely one.
+    await powerOn(page, '?arcadeSeed=58')
     await addModule(page, 'vco')
     await addModule(page, 'panner')
-    await addModule(page, 'lfo')
     const vcoId = await firstIdOfType(page, 'vco')
     const pannerId = await firstIdOfType(page, 'panner')
     const outputId = await firstIdOfType(page, 'output')
-    const lfoId = await firstIdOfType(page, 'lfo')
 
     await dragJackToJack(page, `jack-${vcoId}-out`, `jack-${pannerId}-in`)
     await dragJackToJack(page, `jack-${pannerId}-out`, `jack-${outputId}-in`)
-    // The interesting way to play this game: modulation, not direct
-    // manipulation. The LFO sweeps the Panner's CV fast enough that the
-    // paddle crosses the whole 420px playfield well within the several
-    // seconds a block takes to fall, so a real spawn (at whatever x the
-    // game's own rng picks) is virtually guaranteed a pass under the
-    // paddle before it reaches the bottom.
-    await dragJackToJack(page, `jack-${lfoId}-out`, `jack-${pannerId}-panCv`)
-    await setParam(page, lfoId, 'rate', 0.6)
-    await setParam(page, lfoId, 'depth', 1)
+    // Centred image -> paddle parked at the middle of the playfield. This
+    // still exercises the whole real path the game depends on (output
+    // stereo balance -> paddle position -> collision), it just doesn't
+    // gamble on where the block lands. The block spans 182..238 and the
+    // paddle 165..255, so the catch has ~45px of slack on either side --
+    // far more than the balance read's jitter.
     await setParam(page, pannerId, 'pan', 0)
 
     await page.getByTestId('mode-arcade').click()
     await page.getByTestId('arcade-display').waitFor({ state: 'visible' })
 
-    // Poll for a nonzero score rather than a fixed sleep -- the first
-    // spawn's exact x is randomized (arcade/game.ts's `spawnBlock`), so
-    // this waits for whichever sweep actually intercepts it instead of
-    // asserting a specific timing.
+    // Still a poll rather than a fixed sleep: the block has to physically
+    // fall (~2.3s spawn delay plus fall time), and that timing rides on
+    // rAF cadence, which no fixed sleep should be asserting.
     await page.waitForFunction(
       () => {
         const el = document.querySelector('[data-testid="arcade-hud"]')

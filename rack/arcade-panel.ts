@@ -268,6 +268,11 @@ export function startArcade(
   container: HTMLElement,
   ctx: AudioContext,
   getOutputInstance: () => OutputInstance | undefined,
+  /** Block-spawn generator. Defaults to real randomness; `rack/main.ts`
+   *  passes a seeded one when `?arcadeSeed=` is present, which is what lets
+   *  the catch test in `tests/browser/rack-arcade.test.ts` assert a fixed
+   *  outcome rather than wait on a lucky spawn. See `arcade/rng.ts`. */
+  rng: () => number = Math.random,
 ): ArcadeHandle {
   container.innerHTML = ''
   const wrap = document.createElement('div')
@@ -358,7 +363,7 @@ export function startArcade(
     ensureTap()
     if (tap) lastBalance = readBalance(tap)
 
-    state = stepGame(state, dt, lastBalance)
+    state = stepGame(state, dt, lastBalance, rng)
     // Collision feedback -- `state.lastEvent` is set for exactly the frame
     // a catch or miss happened on (see arcade/game.ts's own doc comment).
     // `audio` connects straight to ctx.destination, never through the
