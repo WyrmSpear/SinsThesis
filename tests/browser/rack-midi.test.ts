@@ -321,4 +321,27 @@ describe('MIDI learn: right-click a knob, wiggle a CC, it binds and drives the p
 
     await page.close()
   })
+
+  it('removing the bound module drops its binding rather than leaving it dangling', async () => {
+    const page = await browser.newPage()
+    await installFakeMidi([{ id: 'dev-a', name: 'Test Controller' }])(page)
+    await powerOn(page)
+
+    await page.getByTestId('knob-cutoff').click({ button: 'right' })
+    await page.getByTestId('knob-midi-learn').click()
+    await sendRawMidi(page, 'dev-a', [0xb0, 30, 50])
+    await page.waitForTimeout(50)
+    expect(
+      await page.evaluate(() => (window as unknown as { __sinsthesis: DebugHook }).__sinsthesis.midiLearn.bindingFor('vcf', 'cutoff')),
+    ).toEqual({ controller: 30, moduleId: 'vcf', paramId: 'cutoff' })
+
+    await page.getByTestId('remove-vcf').click()
+
+    const bindingsAfterRemove = await page.evaluate(
+      () => (window as unknown as { __sinsthesis: DebugHook }).__sinsthesis.midiLearn.all,
+    )
+    expect(bindingsAfterRemove.some((b) => b.moduleId === 'vcf')).toBe(false)
+
+    await page.close()
+  })
 })
