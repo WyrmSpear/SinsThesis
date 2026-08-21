@@ -9,10 +9,14 @@ import { inspect, type InspectorFailure, type InspectorResult } from '../src/eng
 import { compareSounds } from '../src/engine/analysis/compare'
 import { gradeFeatures } from '../src/engine/analysis/rubric'
 import type { OutputInstance } from '../src/engine/modules/output'
+import type { KeyboardMidiInstance } from '../src/engine/modules/keyboard-midi'
+import { requestMidiAccess, parseMidiMessage } from '../src/engine/midi'
+import { MidiLearnController, type MidiBinding } from '../src/engine/midi-learn'
 import { LiveRecorder, type RecordingResult } from '../src/engine/recorder'
 import { encodeWav, type WavFormat } from '../src/engine/wav'
-import { buildPanel } from './panel'
+import { buildPanel, type MidiKnobHandle } from './panel'
 import { buildGhostPanel } from './ghost-panel'
+import { renderMidiStatus, flashMidiActivity, type MidiStatusState } from './midi-status-panel'
 import { buildPalette } from './palette'
 import { buildPresetBankPanel } from './preset-bank-panel'
 import { PRESET_BANK, getPreset } from '../presets/bank'
@@ -135,6 +139,7 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
   const loadBtn = $<HTMLButtonElement>('load-patch')
   const loadFileInput = $<HTMLInputElement>('load-file')
   const cpuMeterEl = $('cpu-meter')
+  const midiStatusEl = $('midi-status')
   const modeFreeplayBtn = $<HTMLButtonElement>('mode-freeplay')
   const modeAcademyBtn = $<HTMLButtonElement>('mode-academy')
   const modeArcadeBtn = $<HTMLButtonElement>('mode-arcade')
@@ -158,6 +163,58 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
   let nextColumn = 0
   let currentPatchName = 'Untitled'
   const connectedOutputs = new Set<string>()
+
+  // ---- MIDI hardware state. `midiLearn` and `knobRegistry` are rebuilt on
+  // every `mountGraph` -- a binding's `moduleId` is only meaningful against
+  // the graph it names, the same reason `cableLayer` is rebuilt rather than
+  // patched. Device access/selection, by contrast, is a property of the
+  // player's own rig, not the patch (see src/engine/midi-learn.ts's header
+  // comment for the full reasoning) -- it survives every patch swap and is
+  // set up once, below, after POWER ON. ----
+  let midiLearn = new MidiLearnController()
+  // `${moduleId}:${paramId}` -> the live on-screen knob handle `rack/panel.ts`
+  // registered for it, so an incoming CC can push a value onto the exact
+  // dial it drives (`MidiKnobHandle.setValue`) and refresh its badge/armed
+  // indicator (`MidiLearnHandle.refresh`) without rebuilding the panel.
+  const knobRegistry = new Map<string, MidiKnobHandle>()
+  // Mirrors `midiLearn`'s own single-armed-target invariant so this file
+  // knows which *other* knob (if any) needs its indicator cleared when a
+  // new one is armed -- `midiLearn.isArmed(...)` stays the source of truth
+  // for any individual knob's own display, this is only bookkeeping for
+  // "who else needs a refresh call."
+  let armedKnobKey: string | undefined
+  let midiAccess: MIDIAccess | null = null
+  const midiInputs = new Map<string, MIDIInput>()
+  let midiInput: MIDIInput | undefined
+  let selectedMidiDeviceId: string | undefined
+
+  function knobKey(moduleId: string, paramId: string): string {
+    return `${moduleId}:${paramId}`
+  }
+
+  // Requested here, on POWER ON, not on page load and not behind a
+  // separate "connect MIDI" button. Two reasons: some browsers gate
+  // `requestMIDIAccess` behind its own permission prompt, and POWER ON is
+  // already the one user gesture this whole app requires before anything
+  // runs at all (`power-section`'s own "audio requires a user gesture"
+  // copy) -- reusing it means a plugged-in controller works the instant
+  // the rack does, with no extra click asked of a player who may not even
+  // own one. `requestMidiAccess` never throws (src/engine/midi.ts's own
+  // doc comment) -- `null` is the ordinary "no API, or the player refused
+  // the prompt" case, and it is never treated as an error here: no banner,
+  // no console noise, just `renderMidiStatusPanel` reading `midiAccess ===
+  // null` as "unavailable." The computer keyboard (`rack/keyboard-panel.ts`)
+  // needs nothing from this and keeps working regardless of the outcome.
+  midiAccess = await requestMidiAccess()
+  if (midiAccess) {
+    // Hot-plug: a controller plugged in or unplugged after POWER ON fires
+    // this, and `refreshMidiDevices` re-enumerates from scratch rather
+    // than trying to patch in just the one port that changed.
+    midiAccess.onstatechange = () => refreshMidiDevices()
+    refreshMidiDevices()
+  } else {
+    renderMidiStatusPanel()
+  }
 
   // ---- academy mode state. `mode` gates two things: which chrome is
   // visible (`academyPanel` vs. the ordinary palette/toolbar), and whether
@@ -268,8 +325,156 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
     saveDebounced()
   }
   const saveDebounced = debounce(() => {
-    saveAutosave(serializePatch(graph, { name: currentPatchName }))
+    saveAutosave(serializePatch(graph, { name: currentPatchName }, midiLearn.all))
   }, 400)
+
+  // ---- MIDI hardware wiring. `MIDI_DEVICE_KEY` is deliberately a
+  // different storage key from `patch-io.ts`'s `AUTOSAVE_KEY` and never
+  // touches `PatchFile` at all -- device selection is the player's rig,
+  // not the patch (src/engine/midi-learn.ts's header comment). Best-effort
+  // like every other localStorage write in this app (`saveAutosave`'s own
+  // comment): losing it just means the device picker falls back to "first
+  // available" next time, never a thrown error. ----
+  const MIDI_DEVICE_KEY = 'sinsthesis:midi-device:v1'
+
+  function loadSelectedMidiDeviceId(): string | undefined {
+    try {
+      return localStorage.getItem(MIDI_DEVICE_KEY) ?? undefined
+    } catch {
+      return undefined
+    }
+  }
+
+  function saveSelectedMidiDeviceId(id: string): void {
+    try {
+      localStorage.setItem(MIDI_DEVICE_KEY, id)
+    } catch {
+      /* best-effort */
+    }
+  }
+
+  function renderMidiStatusPanel(): void {
+    const state: MidiStatusState = !midiAccess
+      ? { kind: 'unavailable' }
+      : midiInputs.size === 0
+        ? { kind: 'no-device' }
+        : {
+            kind: 'connected',
+            devices: [...midiInputs.values()].map((d) => ({ id: d.id, name: d.name || 'MIDI device' })),
+            selectedId: selectedMidiDeviceId!,
+          }
+    renderMidiStatus(midiStatusEl, state, {
+      onSelectDevice(id) {
+        selectedMidiDeviceId = id
+        saveSelectedMidiDeviceId(id)
+        attachToSelectedDevice()
+        renderMidiStatusPanel()
+      },
+    })
+  }
+
+  /** Listens to exactly one input at a time -- the device named by
+   *  `selectedMidiDeviceId` -- rather than fanning in every plugged-in
+   *  controller. Simpler to reason about (one clock of note/CC traffic,
+   *  never two controllers' CC 74 fighting over the same knob) and matches
+   *  the device picker's own "choose one" UI. Detaches from whatever was
+   *  previously attached first, so switching devices (or losing the
+   *  selected one on unplug) never leaves a stale listener receiving
+   *  messages nobody expects anymore. */
+  function attachToSelectedDevice(): void {
+    if (midiInput) midiInput.onmidimessage = null
+    midiInput = selectedMidiDeviceId ? midiInputs.get(selectedMidiDeviceId) : undefined
+    if (midiInput) midiInput.onmidimessage = handleRawMidiMessage
+  }
+
+  /** Re-reads `midiAccess.inputs` -- called once after access is granted
+   *  and again on every `onstatechange` (hot-plug: a controller plugged in
+   *  or pulled out while the rack is already running). Keeps the current
+   *  selection if it is still present; otherwise falls back to whatever
+   *  was last persisted (if that device is back), then to the first
+   *  available input, then to none. */
+  function refreshMidiDevices(): void {
+    midiInputs.clear()
+    midiAccess?.inputs.forEach((input) => midiInputs.set(input.id, input))
+    if (!selectedMidiDeviceId || !midiInputs.has(selectedMidiDeviceId)) {
+      const persisted = loadSelectedMidiDeviceId()
+      const fallback = persisted && midiInputs.has(persisted) ? persisted : midiInputs.keys().next().value
+      selectedMidiDeviceId = fallback
+    }
+    attachToSelectedDevice()
+    renderMidiStatusPanel()
+  }
+
+  /** Drops every MIDI-learn binding and registered knob addressed to
+   *  `moduleId` -- called on module removal so a stale binding never
+   *  points at a param that no longer exists, mirroring
+   *  `removeModuleById`'s other per-module cleanup (`cableLayer`,
+   *  `connectedOutputs`). */
+  function purgeMidiForModule(moduleId: string): void {
+    midiLearn.unbindModule(moduleId)
+    const prefix = `${moduleId}:`
+    for (const key of [...knobRegistry.keys()]) {
+      if (key.startsWith(prefix)) knobRegistry.delete(key)
+    }
+    if (armedKnobKey?.startsWith(prefix)) armedKnobKey = undefined
+  }
+
+  /** Right-click "MIDI Learn" (or "Cancel MIDI Learn" while already armed)
+   *  on a knob -- `rack/knob-midi.ts`'s `onLearnRequest`, which fires for
+   *  both cases since they're the same toggle. Refreshes both the
+   *  previously armed knob (if any, and different) and the newly armed
+   *  one, so at most one knob ever shows a "listening" indicator. */
+  function setArmedKnob(moduleId: string, paramId: string): void {
+    const key = knobKey(moduleId, paramId)
+    const previous = armedKnobKey
+    if (armedKnobKey === key) {
+      midiLearn.disarm()
+      armedKnobKey = undefined
+    } else {
+      midiLearn.arm(moduleId, paramId)
+      armedKnobKey = key
+    }
+    if (previous && previous !== key) knobRegistry.get(previous)?.refresh()
+    knobRegistry.get(key)?.refresh()
+  }
+
+  /** The one entry point for every raw MIDI message this rack ever
+   *  receives -- `MIDIInput.onmidimessage`, wired in `attachToSelectedDevice`.
+   *  Note messages go to every Keyboard module in the patch, each deciding
+   *  independently (via its own `handleMidiEvent`) whether the note falls
+   *  in its own key-range zone -- exactly the same "every zone answers for
+   *  itself, no arbitration" rule a computer-keyboard keydown already
+   *  follows (`keyboard-midi.ts`'s own doc comment), so a split keyboard
+   *  works identically from real hardware. CC messages never reach a
+   *  Keyboard module at all -- they go straight to `midiLearn`, which may
+   *  apply an existing binding, complete an armed one, or (the common
+   *  case, no binding and nothing armed) do nothing. */
+  function handleRawMidiMessage(e: MIDIMessageEvent): void {
+    const event = parseMidiMessage(new Uint8Array(e.data ?? []))
+    if (!event) return
+    flashMidiActivity(midiStatusEl)
+
+    if (event.kind === 'noteOn' || event.kind === 'noteOff') {
+      for (const id of graph.moduleIds) {
+        if (graph.getType(id) !== 'keyboard') continue
+        const instance = graph.getInstance(id) as KeyboardMidiInstance | undefined
+        instance?.handleMidiEvent(event)
+      }
+      return
+    }
+
+    const wasArmed = armedKnobKey
+    const touched = midiLearn.handleCc(graph, event.controller, event.value)
+    if (wasArmed && !midiLearn.armedTarget) armedKnobKey = undefined // the CC that just completed a bind disarms it
+    if (touched.length === 0) return
+    for (const binding of touched) {
+      const handle = knobRegistry.get(knobKey(binding.moduleId, binding.paramId))
+      const value = graph.getParams(binding.moduleId)[binding.paramId]
+      if (value !== undefined) handle?.setValue(value)
+      handle?.refresh()
+    }
+    scheduleAutosave()
+  }
 
   /** Rebuilds the palette drawer, optionally restricted to `allowedTypes`
    *  -- the mechanism Section 12's "a level can grant four modules and
@@ -495,7 +700,7 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
     // a correct (if unremarkable) stereo file, not a special case.
     const wavBuffer = encodeWav(lastCapture.channels, lastCapture.sampleRate, wavFormat)
     downloadWav(currentPatchName, wavBuffer)
-    if (saveSinpAlongside) downloadPatch(serializePatch(graph, { name: currentPatchName }))
+    if (saveSinpAlongside) downloadPatch(serializePatch(graph, { name: currentPatchName }, midiLearn.all))
     studioStatus = `Exported "${currentPatchName}.wav"${saveSinpAlongside ? ' and .sinp' : ''}.`
     renderStudio()
   }
@@ -512,8 +717,8 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
     lastCheck = undefined
     lastMatch = undefined
     lastConstrained = undefined
-    const { graph: loaded } = loadPatch(ctx, level.startingPatch)
-    mountGraph(loaded)
+    const { graph: loaded, midiBindings } = loadPatch(ctx, level.startingPatch)
+    mountGraph(loaded, midiBindings)
     currentPatchName = level.title
     patchNameInput.value = currentPatchName
     refreshPalette(level.grantedModules)
@@ -645,7 +850,7 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
   }
 
   function showAcademy(): void {
-    if (mode !== 'academy') freePlaySnapshot = serializePatch(graph, { name: currentPatchName })
+    if (mode !== 'academy') freePlaySnapshot = serializePatch(graph, { name: currentPatchName }, midiLearn.all)
     stopArcade()
     mode = 'academy'
     modeAcademyBtn.classList.add('mode-toggle-btn-active')
@@ -680,8 +885,8 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
     // regardless of where the player came from would occasionally hand
     // them back a stale snapshot from a much earlier academy visit.
     if (wasAcademy && freePlaySnapshot) {
-      const { graph: restored } = loadPatch(ctx, freePlaySnapshot)
-      mountGraph(restored)
+      const { graph: restored, midiBindings } = loadPatch(ctx, freePlaySnapshot)
+      mountGraph(restored, midiBindings)
       currentPatchName = freePlaySnapshot.meta.name
       patchNameInput.value = currentPatchName
     }
@@ -828,6 +1033,7 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
     // check -- looking connected while its `out` was never actually patched
     // to `ctx.destination` at all.
     connectedOutputs.delete(id)
+    purgeMidiForModule(id)
     scheduleAutosave()
     // Constrained-challenge's live module counter (Section: "show the
     // player their count against the limit while they build") has to
@@ -853,6 +1059,17 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
       },
       onChange: scheduleAutosave,
       onRemove: removeModuleById,
+      midiLearn: {
+        getBinding: (moduleId, paramId) => midiLearn.bindingFor(moduleId, paramId),
+        isArmed: (moduleId, paramId) => midiLearn.isArmed(moduleId, paramId),
+        onLearnRequest: (moduleId, paramId) => setArmedKnob(moduleId, paramId),
+        onUnbind: (moduleId, paramId) => {
+          midiLearn.unbind(moduleId, paramId)
+          knobRegistry.get(knobKey(moduleId, paramId))?.refresh()
+          scheduleAutosave()
+        },
+        registerKnob: (moduleId, paramId, handle) => knobRegistry.set(knobKey(moduleId, paramId), handle),
+      },
     })
   }
 
@@ -886,6 +1103,7 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
       ctx,
       graph,
       cableLayer,
+      midiLearn,
       rms(): number {
         const outId = graph.moduleIds.find((id) => graph.getType(id) === 'output')
         const instance = outId ? (graph.getInstance(outId) as OutputInstance | undefined) : undefined
@@ -904,7 +1122,7 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
    *  whole rack from it. Used for the initial boot, an explicit Load, and
    *  autosave restore alike, so there is exactly one path from "a graph
    *  exists" to "the screen matches it." */
-  function mountGraph(newGraph: PatchGraph): void {
+  function mountGraph(newGraph: PatchGraph, midiBindings: readonly MidiBinding[] = []): void {
     cableLayer?.destroy()
     graph?.dispose()
 
@@ -912,6 +1130,17 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
     cableLayer = new CableLayer($('rack-surface'), graph)
     cableLayer.onChange = scheduleAutosave
     connectedOutputs.clear()
+    // A binding's `moduleId` is only meaningful against the graph that
+    // minted it -- see the `midiLearn` field's own comment above -- so a
+    // fresh `MidiLearnController` is built from exactly this load's own
+    // bindings on every swap, the same way `cableLayer` is rebuilt rather
+    // than reused. `renderRack` below repopulates `knobRegistry` from
+    // scratch as it draws each panel, so clearing it here (rather than
+    // leaving stale entries from the discarded graph) keeps it exactly in
+    // sync with what's on screen.
+    midiLearn = new MidiLearnController(midiBindings)
+    knobRegistry.clear()
+    armedKnobKey = undefined
     wireOutputs()
     recomputeNextColumn()
     renderRack()
@@ -986,10 +1215,10 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
     // cached by the module loader), so reopening the same preset later in
     // the session costs no extra network or parse work.
     const file = await preset.file()
-    const { graph: loaded, ghosts } = loadPatch(ctx, file)
+    const { graph: loaded, ghosts, midiBindings } = loadPatch(ctx, file)
     currentPatchName = file.meta.name
     patchNameInput.value = currentPatchName
-    mountGraph(loaded)
+    mountGraph(loaded, midiBindings)
     if (ghosts.length > 0) showBanner('warn', ghostMessage(ghosts))
     else clearBanner()
     scheduleAutosave()
@@ -1018,7 +1247,7 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
   saveBtn.addEventListener('click', () => {
     currentPatchName = patchNameInput.value.trim() || 'Untitled'
     patchNameInput.value = currentPatchName
-    downloadPatch(serializePatch(graph, { name: currentPatchName }))
+    downloadPatch(serializePatch(graph, { name: currentPatchName }, midiLearn.all))
   })
 
   loadBtn.addEventListener('click', () => {
@@ -1032,14 +1261,14 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
     void (async () => {
       try {
         const parsed = await readPatchFile(file)
-        const { graph: loaded, ghosts } = loadPatch(ctx, parsed)
+        const { graph: loaded, ghosts, midiBindings } = loadPatch(ctx, parsed)
         // Only now, with a fully-built replacement graph in hand, do we
         // touch the live rack -- a `loadPatch` throw above (bad version,
         // a cable naming a port a known module no longer has) leaves the
         // running patch completely untouched rather than half-torn-down.
         currentPatchName = parsed.meta?.name ?? 'Untitled'
         patchNameInput.value = currentPatchName
-        mountGraph(loaded)
+        mountGraph(loaded, midiBindings)
         if (ghosts.length > 0) showBanner('warn', ghostMessage(ghosts))
         else clearBanner()
         scheduleAutosave()
@@ -1056,9 +1285,9 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
   const autosaved = loadAutosave()
   if (autosaved) {
     try {
-      const { graph: restored, ghosts } = loadPatch(ctx, autosaved)
+      const { graph: restored, ghosts, midiBindings } = loadPatch(ctx, autosaved)
       currentPatchName = autosaved.meta?.name ?? 'Untitled'
-      mountGraph(restored)
+      mountGraph(restored, midiBindings)
       if (ghosts.length > 0) showBanner('warn', ghostMessage(ghosts))
     } catch (err) {
       showBanner('error', `Could not restore your autosaved patch (${(err as Error).message}). Starting fresh.`)

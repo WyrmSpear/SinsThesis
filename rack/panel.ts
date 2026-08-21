@@ -2,6 +2,20 @@ import type { LayoutItem, ModuleDescriptor, ParamSpec, PortSpec } from '../src/e
 import type { PatchGraph } from '../src/engine/graph'
 import { buildKnob } from './knob'
 import { buildSwitch } from './switch'
+import { attachMidiLearn, type KnobMidiBinding, type MidiLearnHandle } from './knob-midi'
+
+/** Handed to `BuildPanelOptions.midiLearn.registerKnob`: the MIDI-learn
+ *  badge/armed refresh every registered knob already gets, plus the raw
+ *  `KnobHandle.setValue` -- so `rack/main.ts` can push a hardware CC's
+ *  resulting value onto the exact on-screen dial the same instant it calls
+ *  `graph.setParam` for it, the same way an on-screen drag already keeps
+ *  its own dial in sync with the value it just set. Without this, a bound
+ *  hardware knob would move the sound correctly but the on-screen dial
+ *  would silently disagree with it until something else (a page reload)
+ *  happened to re-render the panel. */
+export interface MidiKnobHandle extends MidiLearnHandle {
+  setValue(value: number): void
+}
 
 /**
  * The generic panel renderer -- the thing this whole slice exists to prove
@@ -44,6 +58,24 @@ export interface BuildPanelOptions {
    *  module's id. Omit to render a panel with no way to remove itself --
    *  used for ghosts, which manage their own removal affordance. */
   onRemove?: (moduleId: string) => void
+  /** Wires MIDI learn onto every continuous (knob) param this panel draws
+   *  -- omitted for a switch-kind (discrete/`labels`) param, since CC-to-
+   *  param mapping goes through a knob's own curve math
+   *  (`src/engine/midi-learn.ts`'s `ccToParamValue`), which a discrete
+   *  switch has no equivalent use for. Optional so a caller that doesn't
+   *  care about MIDI (a test building a bare panel) needs nothing extra. */
+  midiLearn?: {
+    getBinding(moduleId: string, paramId: string): KnobMidiBinding | undefined
+    isArmed(moduleId: string, paramId: string): boolean
+    onLearnRequest(moduleId: string, paramId: string): void
+    onUnbind(moduleId: string, paramId: string): void
+    /** Hands back a live handle so the caller can `refresh()` this exact
+     *  knob's badge/armed indicator later (an incoming CC completing a
+     *  bind, or a different knob being armed) without rebuilding the
+     *  panel -- the same "register a live handle, push updates to it
+     *  later" shape `JackRegistry` already uses for cables. */
+    registerKnob(moduleId: string, paramId: string, handle: MidiKnobHandle): void
+  }
 }
 
 interface RowPlan {
@@ -264,7 +296,20 @@ export function buildPanel(
     // -- draw the switch, not the knob, regardless of which `layout.kind`
     // the descriptor used to reach it. The decision lives entirely in the
     // descriptor's own `ParamSpec`, so no module is special-cased here.
-    return spec.labels ? buildSwitch(spec, initial, onChange).el : buildKnob(spec, initial, onChange).el
+    if (spec.labels) return buildSwitch(spec, initial, onChange).el
+
+    const knob = buildKnob(spec, initial, onChange)
+    if (opts.midiLearn) {
+      const ml = opts.midiLearn
+      const midiHandle = attachMidiLearn(knob, {
+        getBinding: () => ml.getBinding(moduleId, spec.id),
+        isArmed: () => ml.isArmed(moduleId, spec.id),
+        onLearnRequest: () => ml.onLearnRequest(moduleId, spec.id),
+        onUnbind: () => ml.onUnbind(moduleId, spec.id),
+      })
+      ml.registerKnob(moduleId, spec.id, { ...midiHandle, setValue: knob.setValue })
+    }
+    return knob.el
   }
 
   for (const item of descriptor.layout) {

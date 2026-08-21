@@ -187,6 +187,69 @@ body {
   letter-spacing: var(--tracking-label);
 }
 
+/* ---- MIDI hardware status (rack/midi-status-panel.ts) -- same toolbar
+ * placement and reasoning as the CPU meter directly above: visible in
+ * every mode, so "is my controller actually connected" is never a silent
+ * unknown. The dot itself carries the state's color (idle grey, connected
+ * green, unavailable/no-device amber) and flashes on every incoming MIDI
+ * message via `.midi-status-dot-flash`'s keyframe animation, restarted on
+ * each message (`flashMidiActivity`'s own JS reflow trick) rather than
+ * tracking a persistent "last seen" timestamp on a redraw loop. */
+.midi-status {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: var(--text-2xs);
+  color: var(--text-dim);
+  margin-left: 0.75rem;
+}
+
+.midi-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--lamp-off);
+  border: 1px solid var(--lamp-off-border);
+  flex-shrink: 0;
+}
+
+.midi-status-connected .midi-status-dot {
+  background: var(--lamp-on);
+  border-color: var(--lamp-on);
+  box-shadow: 0 0 4px var(--lamp-on-glow);
+}
+
+.midi-status-unavailable .midi-status-dot,
+.midi-status-no-device .midi-status-dot {
+  background: var(--lamp-off);
+  border-color: var(--lamp-warn);
+}
+
+@keyframes midi-status-flash {
+  0% { box-shadow: 0 0 8px 3px var(--lamp-on-glow); }
+  100% { box-shadow: none; }
+}
+
+.midi-status-dot-flash {
+  animation: midi-status-flash 220ms ease-out;
+}
+
+.midi-status-readout {
+  white-space: nowrap;
+  letter-spacing: var(--tracking-label);
+}
+
+.midi-status-select {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--text-primary);
+  background: var(--surface-recess);
+  border: 1px solid var(--panel-border-strong);
+  border-radius: 3px;
+  padding: 0.1rem 0.2rem;
+  max-width: 140px;
+}
+
 /* ---- free play / academy mode toggle ---- */
 .mode-toggle {
   display: flex;
@@ -828,6 +891,85 @@ body {
 
 .knob-wrap.dragging .knob-dial {
   box-shadow: 0 0 0 3px var(--knob-indicator-glow), 0 2px 4px var(--shadow-ambient);
+}
+
+/* ---- MIDI learn (rack/knob-midi.ts): a badge and two indicator states
+ * layered onto every generic knob, with zero effect on the knob's own box.
+ * `.knob-midi-badge` is `position: absolute` inside `.knob-dial` (already
+ * `position: relative` -- see that rule above), and `.knob-midi-armed`/
+ * `.knob-midi-bound` below only ever add `box-shadow`/`border-color` to
+ * elements whose `width`/`height` stay exactly what they already were --
+ * `tests/browser/theme-geometry.test.ts` measures `.knob-dial`'s own
+ * `getBoundingClientRect()` across all thirteen themes and would fail the
+ * instant any of this nudged that box by even one pixel. */
+.knob-midi-badge {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  line-height: 1;
+  letter-spacing: 0;
+  color: var(--surface-rack);
+  background: var(--knob-indicator);
+  border-radius: 3px;
+  padding: 1px 3px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* Pulses while this knob is the pending target of a "MIDI Learn" gesture
+ * -- waiting for the next CC to arrive. Only one knob in the whole rack is
+ * ever armed at once (`MidiLearnController.arm`'s own doc comment). */
+@keyframes knob-midi-armed-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px var(--knob-indicator-glow); }
+  50% { box-shadow: 0 0 0 5px var(--knob-indicator-glow); }
+}
+
+.knob-midi-armed .knob-dial {
+  animation: knob-midi-armed-pulse 900ms ease-in-out infinite;
+}
+
+.knob-midi-bound .knob-dial {
+  border-color: var(--knob-indicator);
+}
+
+/* ---- MIDI learn right-click menu: a themed popover positioned at the
+ * cursor (`left`/`top` set inline by rack/knob-midi.ts, viewport
+ * coordinates -- `position: fixed` to match), the same look
+ * `.cable-inspector` below already establishes for a click-anchored
+ * popover. Appended to `document.body`, not the knob itself, so it is
+ * never clipped by a module panel's own fixed 3U height. */
+.knob-midi-menu {
+  position: fixed;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  min-width: 160px;
+  background: linear-gradient(180deg, var(--surface-panel) 0%, var(--surface-panel-alt) 100%);
+  border: 1px solid var(--panel-border-strong);
+  border-radius: 5px;
+  box-shadow: 0 4px 14px var(--shadow-panel), inset 0 1px 0 var(--highlight-edge);
+  padding: 0.25rem;
+  gap: 0.15rem;
+}
+
+.knob-midi-menu-item {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  letter-spacing: var(--tracking-label);
+  color: var(--text-primary);
+  background: var(--surface-recess);
+  border: 1px solid var(--panel-border);
+  border-radius: 3px;
+  padding: 0.3rem 0.5rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.knob-midi-menu-item:hover {
+  border-color: var(--knob-indicator);
+  color: var(--knob-indicator);
 }
 
 /* ---- switch: discrete params (ParamSpec.labels), never a continuous knob ---- */

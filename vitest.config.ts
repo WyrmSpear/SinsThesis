@@ -41,6 +41,7 @@ export default defineConfig({
             'tests/browser/rack-arcade.test.ts',
             'tests/browser/rack-wub.test.ts',
             'tests/browser/cpu-meter.test.ts',
+            'tests/browser/rack-midi.test.ts',
           ],
           browser: {
             enabled: true,
@@ -74,6 +75,7 @@ export default defineConfig({
             'tests/browser/rack-arcade.test.ts',
             'tests/browser/rack-wub.test.ts',
             'tests/browser/cpu-meter.test.ts',
+            'tests/browser/rack-midi.test.ts',
           ],
           // Boots a Vite dev server and a Chromium instance; slower than
           // the unit-style browser tests above.
