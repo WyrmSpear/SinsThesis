@@ -2,6 +2,8 @@ import { PatchGraph } from '../src/engine/graph'
 import { registerAllModules } from '../src/engine/modules'
 import { getModule, listModules } from '../src/engine/registry'
 import { ensureWorklets, renderPatch, renderPatchStereo } from '../src/engine/render'
+import { createCpuMeter } from '../src/engine/cpu-meter'
+import { renderCpuMeter } from './cpu-meter-panel'
 import { serializePatch, loadPatch, type PatchFile } from '../src/engine/patch'
 import { inspect, type InspectorFailure, type InspectorResult } from '../src/engine/analysis/inspector'
 import { compareSounds } from '../src/engine/analysis/compare'
@@ -131,10 +133,20 @@ async function start(powerBtn: HTMLButtonElement): Promise<void> {
   const saveBtn = $<HTMLButtonElement>('save-patch')
   const loadBtn = $<HTMLButtonElement>('load-patch')
   const loadFileInput = $<HTMLInputElement>('load-file')
+  const cpuMeterEl = $('cpu-meter')
   const modeFreeplayBtn = $<HTMLButtonElement>('mode-freeplay')
   const modeAcademyBtn = $<HTMLButtonElement>('mode-academy')
   const modeArcadeBtn = $<HTMLButtonElement>('mode-arcade')
   const arcadePanelEl = $('arcade-panel')
+
+  // Section 11's "CPU overload -> load meter": one meter for the whole
+  // session, not per patch -- it measures the audio context's overall
+  // render load (src/engine/cpu-meter.ts's own doc comment explains why
+  // that already covers whatever is currently mounted), so nothing about
+  // it needs rebuilding across mountGraph's patch swaps. `undefined` when
+  // the `cpu-meter` worklet bundle itself didn't load; `renderCpuMeter`
+  // hides the element rather than showing a reading that isn't real.
+  renderCpuMeter(cpuMeterEl, createCpuMeter(ctx))
 
   // ---- mutable rack state: reassigned wholesale on every patch load, per
   // src/engine/graph.ts's dispose() doc comment -- a live session swapping

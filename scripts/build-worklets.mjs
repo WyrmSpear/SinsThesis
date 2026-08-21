@@ -49,6 +49,7 @@ const WORKLETS = {
   bitcrusher: entry('../src/engine/worklets/bitcrusher.worklet.ts'),
   binaural: entry('../src/engine/worklets/binaural.worklet.ts'),
   isochronic: entry('../src/engine/worklets/isochronic.worklet.ts'),
+  'cpu-meter': entry('../src/engine/worklets/cpu-meter.worklet.ts'),
 }
 
 const OUT_DIR = fileURLToPath(new URL('../public/worklets', import.meta.url))

@@ -36,7 +36,13 @@ describe('engine boundaries', () => {
     // also just copies its input back to the main thread verbatim, batched,
     // for `wav.ts` to encode later -- no signal processing happens on the
     // audio thread here either.
-    const DSP_FREE_WORKLETS = ['passthrough.worklet.ts', 'peak-tap.worklet.ts', 'recorder.worklet.ts']
+    // cpu-meter.worklet.ts is the same shape once more: it measures the
+    // audio thread's own wall-clock timing (Section 11's CPU-overload
+    // failure mode, see its own doc comment), never touching the signal
+    // itself, so there is no DSP to delegate to dsp/ either.
+    const DSP_FREE_WORKLETS = [
+      'passthrough.worklet.ts', 'peak-tap.worklet.ts', 'recorder.worklet.ts', 'cpu-meter.worklet.ts',
+    ]
     for (const file of files.filter(
       (f) => f.endsWith('.worklet.ts') && !DSP_FREE_WORKLETS.some((name) => f.endsWith(name)),
     )) {

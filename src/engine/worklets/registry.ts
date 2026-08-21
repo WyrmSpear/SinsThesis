@@ -15,6 +15,7 @@ export const WORKLET_MODULES = [
   'bitcrusher',
   'binaural',
   'isochronic',
+  'cpu-meter',
 ] as const
 
 type WorkletBundle = (typeof WORKLET_MODULES)[number]
