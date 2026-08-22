@@ -324,6 +324,29 @@ doing after those.
   Bounded, documented, needs an async flush protocol to fix. **Still true** —
   `finish()` disconnects and flattens synchronously, so any batch still in
   flight on the worklet's message port is lost.
-- Deployment to the site is a manual build-and-commit. Automating it needs a
-  deploy key so a GitHub Action can push the built output. **Still true** —
-  there is no `.github/workflows/`.
+- ~~Deployment to the site is a manual build-and-commit. Automating it needs
+  a deploy key so a GitHub Action can push the built output.~~ **Half of this
+  was already wrong.** *Publishing* is fully automatic and always has been:
+  the site lives in its own repo (`WyrmSpear/ryanoglelmt-site`, checked out
+  at `~/Desktop/ryanoglelmt-site`) and **Cloudflare Pages' native Git
+  integration deploys it on every push** — no GitHub Action, no deploy key,
+  no `.github/workflows/` needed, which is why the absence of that directory
+  read as "not automated" and wasn't.
+
+  What is still manual is only the step *before* that: `npm run build` here,
+  then copying `dist/` into `ryanoglelmt-site/portfolio/sinsthesis/` and
+  committing it there. So the remaining automation is a much smaller job than
+  this bullet implied — a script or hook that does the build-and-copy, after
+  which the existing Cloudflare integration already handles the rest.
+
+  Two things to know when doing it by hand:
+
+  - **Stage only `portfolio/sinsthesis/`.** The site repo routinely carries
+    unrelated in-progress work (an edited `index.html`, untracked assets); a
+    bare `git add -A` there would sweep it into a deploy commit.
+  - **The site sits behind a Cloudflare managed challenge.** `curl` and
+    headless browsers get a 403 with `cf-mitigated: challenge` on the HTML
+    document, so the deploy cannot be verified by loading the page
+    automatically. Subresources are *not* challenged, so the way to confirm a
+    deploy landed is to fetch `assets/main-<hash>.js` and diff its hash
+    against the local build.

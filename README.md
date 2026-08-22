@@ -62,6 +62,47 @@ subpath — and `registry.ts` reads `import.meta.env.BASE_URL` rather than
 hardcoding a leading `/`. Move `dist/`'s contents anywhere and it works; there
 is nothing to reconfigure per deployment.
 
+### Deploying this project's own live copy
+
+The demo at `ryanoglelmt.com/portfolio/sinsthesis/` is published from a
+**separate repository** — `WyrmSpear/ryanoglelmt-site` — which **Cloudflare
+Pages deploys automatically on every push** through its native Git
+integration. There is no GitHub Action and no deploy key involved, so the
+absence of a `.github/workflows/` directory in either repo is not a sign that
+publishing is manual.
+
+The manual part is only getting the build across:
+
+```bash
+npm run build
+rm -rf ~/Desktop/ryanoglelmt-site/portfolio/sinsthesis
+cp -r dist  ~/Desktop/ryanoglelmt-site/portfolio/sinsthesis
+cd ~/Desktop/ryanoglelmt-site
+git add portfolio/sinsthesis        # ONLY this path -- see below
+git commit -m "Deploy SinsThesis: ..."
+git push                            # this is the deploy
+```
+
+`git add portfolio/sinsthesis` rather than `git add -A` is deliberate: that
+repo is a whole website and routinely carries unrelated in-progress work, so
+a blanket add would sweep someone else's edits into a deploy commit.
+
+**Verifying a deploy landed needs a side door.** The site sits behind a
+Cloudflare managed challenge, so `curl` and headless browsers both get a 403
+(`cf-mitigated: challenge`) on the HTML document and cannot simply load the
+page. Subresources are *not* challenged, so fetch a hashed asset and compare
+it to the local build instead:
+
+```bash
+curl -s https://ryanoglelmt.com/portfolio/sinsthesis/assets/main-<hash>.js | sha256sum
+sha256sum ~/Desktop/ryanoglelmt-site/portfolio/sinsthesis/assets/main-<hash>.js
+```
+
+A stale asset from the previous build may keep returning 200 for a while from
+Cloudflare's edge cache. That is harmless — `index.html` points at the new
+hash and Vite's hashed filenames are immutable — so check the hash the live
+`index.html` references, not whether old files have disappeared.
+
 If you build without `npm run build` (which runs `build:worklets` first), the
 worklets are missing from `dist/` and every module goes silent with no
 visible error, only a console 404 for each `dist/worklets/*.js` — the exact
